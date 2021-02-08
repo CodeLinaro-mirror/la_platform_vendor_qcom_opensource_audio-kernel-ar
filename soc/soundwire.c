@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -141,6 +143,7 @@ err_out:
 	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%lx %d\n",
 		swr->name, swr->addr, result);
 	swr_master_put(master);
+	list_del_init(&swr->dev_list);
 	kfree(swr);
 	return NULL;
 }
