@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022,2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _MSM_COMMON_H_
 #define _MSM_COMMON_H_
@@ -9,6 +9,9 @@
 #include <sound/soc.h>
 #include <sound/pcm.h>
 #include <linux/cpu.h>
+
+#define DEVICE_ENABLE 1
+#define DEVICE_DISABLE 0
 
 enum {
 	MI2S = 0,
