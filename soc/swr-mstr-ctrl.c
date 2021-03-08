@@ -509,7 +509,7 @@ static int swrm_get_ssp_period(struct swr_mstr_ctrl *swrm,
 	return ((swrm->bus_clk * 2) / ((row * col) * frame_sync));
 }
 
-static int swrm_core_vote_request(struct swr_mstr_ctrl *swrm)
+static int swrm_core_vote_request(struct swr_mstr_ctrl *swrm, bool enable)
 {
 	int ret = 0;
 
@@ -522,7 +522,7 @@ static int swrm_core_vote_request(struct swr_mstr_ctrl *swrm)
 		goto exit;
 	}
 	if (swrm->core_vote) {
-		ret = swrm->core_vote(swrm->handle, true);
+		ret = swrm->core_vote(swrm->handle, enable);
 		if (ret)
 			dev_err_ratelimited(swrm->dev,
 				"%s: core vote request failed\n", __func__);
@@ -553,8 +553,10 @@ static int swrm_clk_request(struct swr_mstr_ctrl *swrm, bool enable)
 					dev_err_ratelimited(swrm->dev,
 						"%s: core vote request failed\n",
 						__func__);
+					swrm->core_vote(swrm->handle, false);
 					goto exit;
 				}
+				ret = swrm->core_vote(swrm->handle, false);
 			}
 		}
 		swrm->clk_ref_count++;
@@ -590,6 +592,7 @@ static int swrm_ahb_write(struct swr_mstr_ctrl *swrm,
 {
 	u32 temp = (u32)(*value);
 	int ret = 0;
+	int vote_ret = 0;
 
 	mutex_lock(&swrm->devlock);
 	if (!swrm->dev_up)
@@ -603,13 +606,20 @@ static int swrm_ahb_write(struct swr_mstr_ctrl *swrm,
 					    __func__);
 			goto err;
 		}
-	} else if (swrm_core_vote_request(swrm)) {
-		goto err;
+	} else {
+		vote_ret = swrm_core_vote_request(swrm, true);
+		if (vote_ret == -ENOTSYNC)
+			goto err_vote;
+		else if (vote_ret)
+			goto err;
 	}
 
 	iowrite32(temp, swrm->swrm_dig_base + reg);
 	if (is_swr_clk_needed(swrm))
 		swrm_clk_request(swrm, FALSE);
+err_vote:
+	if (!is_swr_clk_needed(swrm))
+		swrm_core_vote_request(swrm, false);
 err:
 	mutex_unlock(&swrm->devlock);
 	return ret;
@@ -620,6 +630,7 @@ static int swrm_ahb_read(struct swr_mstr_ctrl *swrm,
 {
 	u32 temp = 0;
 	int ret = 0;
+	int vote_ret = 0;
 
 	mutex_lock(&swrm->devlock);
 	if (!swrm->dev_up)
@@ -632,14 +643,21 @@ static int swrm_ahb_read(struct swr_mstr_ctrl *swrm,
 					    __func__);
 			goto err;
 		}
-	} else if (swrm_core_vote_request(swrm)) {
-		goto err;
+	} else {
+		vote_ret = swrm_core_vote_request(swrm, true);
+		if (vote_ret == -ENOTSYNC)
+			goto err_vote;
+		else if (vote_ret)
+			goto err;
 	}
 
 	temp = ioread32(swrm->swrm_dig_base + reg);
 	*value = temp;
 	if (is_swr_clk_needed(swrm))
 		swrm_clk_request(swrm, FALSE);
+err_vote:
+	if (!is_swr_clk_needed(swrm))
+		swrm_core_vote_request(swrm, false);
 err:
 	mutex_unlock(&swrm->devlock);
 	return ret;
