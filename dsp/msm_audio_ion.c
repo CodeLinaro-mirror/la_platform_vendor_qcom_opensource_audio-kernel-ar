@@ -534,7 +534,6 @@ err:
 	*dma_buf = NULL;
 	return rc;
 }
-EXPORT_SYMBOL(msm_audio_ion_import);
 
 /**
  * msm_audio_ion_free -
@@ -563,7 +562,6 @@ static int msm_audio_ion_free(struct dma_buf *dma_buf, struct msm_audio_ion_priv
 
 	return 0;
 }
-EXPORT_SYMBOL(msm_audio_ion_free);
 
 /**
  * msm_audio_ion_crash_handler -
