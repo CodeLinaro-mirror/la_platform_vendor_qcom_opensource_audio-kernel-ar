@@ -577,6 +577,7 @@ void msm_audio_ion_crash_handler(void)
 	struct msm_audio_ion_private *ion_data = NULL;
 
 	pr_debug("Inside %s\n", __func__);
+	mutex_lock(&(msm_audio_ion_fd_list.list_mutex));
 	list_for_each_entry(msm_audio_fd_data,
 		&msm_audio_ion_fd_list.fd_list, list) {
 		handle = msm_audio_fd_data->handle;
@@ -590,6 +591,7 @@ void msm_audio_ion_crash_handler(void)
 		list_del(&(msm_audio_fd_data->list));
 		kfree(msm_audio_fd_data);
 	}
+	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
 }
 EXPORT_SYMBOL(msm_audio_ion_crash_handler);
 
