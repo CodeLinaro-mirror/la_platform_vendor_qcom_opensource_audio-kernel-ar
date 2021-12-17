@@ -107,7 +107,7 @@ typedef struct apm_cmd_header_t
 	@values > 0 bytes, in multiples of 4 bytes */
 }apm_cmd_header_t;
 
-typedef struct apm_module_param_data_t
+struct apm_module_param_data_t
 {
 	uint32_t module_instance_id;
 	/**< Valid instance ID of module
@@ -127,7 +127,9 @@ typedef struct apm_module_param_data_t
 	uint32_t error_code;
 	/**< Error code populated by the entity hosting the	module.
 	 Applicable only for out-of-band command mode  */
-}apm_module_param_data_t;
+}__attribute__((packed, aligned(8)));
+
+typedef struct apm_module_param_data_t apm_module_param_data_t;
 
 typedef struct audio_hw_clk_cfg_req_param_t
 {
@@ -189,6 +191,29 @@ typedef struct prm_cmd_request_hw_core_t
         apm_module_param_data_t module_payload_1;
 }prm_cmd_request_hw_core_t;
 
+typedef struct sb_clk_rsc_request_t {
+	uint32_t clock_src;
+	/**
+	 * @values #0 - CLOCK_ROOT_SRC_DEFAULT
+	 *	#1 - CLOCK_ROOT_SRC_XO
+	 *	#2 - CLOCK_ROOT_SRC_RCO
+	 */
+	uint32_t slimbus_dev_id;
+	/**
+	 * @values #0 - SLIMBUS_DEVICE_1
+	 *	#1 - SLIMBUS_DEVICE_2
+	 */
+} sb_clk_rsc_request_t;
+
+typedef struct sb_clk_rsp_rsc_request_t {
+	uint32_t status;
+} sb_clk_rsp_rsc_request_t;
+
+typedef struct prm_cmd_request_sb_clk_t {
+	apm_cmd_header_t payload_header;
+	apm_module_param_data_t module_payload_0;
+	sb_clk_rsc_request_t sb_clk_rsc;
+} prm_cmd_request_sb_clk_t;
 
 #define PRM_CMD_REQUEST_HW_RSC 0x0100100F
 
@@ -512,8 +537,12 @@ typedef struct prm_cmd_request_hw_core_t
 /** Hardware core identifier for digital codec. */
 #define HW_CORE_ID_DCODEC 0x2
 
+/** PARAM ID for slimbus clock source selection from HLOS */
+#define PARAM_ID_RSC_SLIMBUS_CLOCK_SOURCE 0x0800131C
+
 int audio_prm_set_lpass_clk_cfg(struct clk_cfg *cfg, uint8_t enable);
 int audio_prm_set_lpass_hw_core_req(struct clk_cfg *cfg, uint32_t hw_core_id, uint8_t enable);
 int audio_prm_set_lpass_core_clk_req(struct clk_cfg *cfg, uint32_t hw_core_id, uint8_t enable);
+int audio_prm_set_slimbus_clock_src(uint32_t clock, uint32_t slimbus_dev_id);
 
 #endif

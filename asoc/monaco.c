@@ -15,6 +15,7 @@
 #include <linux/of_device.h>
 #include <linux/soc/qcom/fsa4480-i2c.h>
 #include <linux/nvmem-consumer.h>
+#include <linux/soc/qcom/slatecom_intf.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -26,6 +27,7 @@
 #include <soc/soundwire.h>
 #include <dsp/spf-core.h>
 #include <dsp/msm_audio_ion.h>
+#include <dsp/audio_notifier.h>
 #include "device_event.h"
 #include "asoc/msm-cdc-pinctrl.h"
 #include "asoc/wcd-mbhc-v2.h"
@@ -37,6 +39,7 @@
 #include "msm-audio-defs.h"
 #include "msm_common.h"
 #include "msm_monaco_dailink.h"
+#include "dsp/audio_prm.h"
 
 #define DRV_NAME "monaco-asoc-snd"
 #define __CHIPSET__ "MONACO "
@@ -52,6 +55,11 @@
 #undef LPASS_BE_PRI_MI2S_TX
 #define LPASS_BE_PRI_MI2S_TX "MI2S-LPAIF_VA-TX-PRIMARY"
 #endif
+#ifdef LPASS_BE_PRI_MI2S_RX
+#undef LPASS_BE_PRI_MI2S_RX
+#define LPASS_BE_PRI_MI2S_RX "MI2S-LPAIF_VA-RX-PRIMARY"
+#endif
+
 #ifdef LPASS_BE_QUAT_MI2S_RX
 #undef LPASS_BE_QUAT_MI2S_RX
 #define LPASS_BE_QUAT_MI2S_RX "MI2S-LPAIF_RXTX-RX-PRIMARY"
@@ -60,6 +68,18 @@
 #undef LPASS_BE_QUAT_MI2S_TX
 #define LPASS_BE_QUAT_MI2S_TX "MI2S-LPAIF_RXTX-TX-PRIMARY"
 #endif
+
+#ifdef LPASS_BE_PRI_TDM_TX_0
+#undef LPASS_BE_PRI_TDM_TX_0
+#define LPASS_BE_PRI_TDM_TX_0 "TDM-LPAIF_VA-TX-PRIMARY"
+#endif
+#ifdef LPASS_BE_PRI_TDM_RX_0
+#undef LPASS_BE_PRI_TDM_RX_0
+#define LPASS_BE_PRI_TDM_RX_0 "TDM-LPAIF_VA-RX-PRIMARY"
+#endif
+#define BT_SLIMBUS_CLK_STR "BT SLIMBUS CLK SRC"
+/* Slimbus device id for SLIMBUS_DEVICE_1 */
+#define BT_SLIMBUS_DEV_ID 0
 
 struct msm_asoc_mach_data {
 	struct snd_info_entry *codec_root;
@@ -72,6 +92,12 @@ struct msm_asoc_mach_data {
 	struct device_node *hph_en0_gpio_p; /* used by pinctrl API */
 	struct device_node *fsa_handle;
 	bool visense_enable;
+	struct srcu_notifier_head *slatecom_notifier_chain;
+};
+
+enum bt_slimbus_clk_src {
+	SLIMBUS_CLOCK_SRC_XO = 1,
+	SLIMBUS_CLOCK_SRC_RCO = 2
 };
 
 static bool is_initial_boot;
@@ -79,6 +105,8 @@ static bool codec_reg_done;
 static struct snd_soc_card snd_soc_card_monaco_msm;
 static int dmic_0_1_gpio_cnt;
 static int dmic_2_3_gpio_cnt;
+static atomic_t bt_slim_clk_src_value = ATOMIC_INIT(SLIMBUS_CLOCK_SRC_XO);
+static atomic_t card_status;
 
 static void check_userspace_service_state(struct snd_soc_pcm_runtime *rtd,
 						struct msm_common_pdata *pdata)
@@ -461,12 +489,75 @@ err:
 	return ret;
 }
 
+int slimbus_clock_src_info(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = SLIMBUS_CLOCK_SRC_XO;
+	uinfo->value.integer.max = SLIMBUS_CLOCK_SRC_RCO;
+
+	return 0;
+}
+
+int slimbus_clock_src_get(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	ucontrol->value.integer.value[0] = atomic_read(&bt_slim_clk_src_value);
+	return 0;
+}
+
+int slimbus_clock_src_put(struct snd_kcontrol *kcontrol,
+	struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+		snd_soc_kcontrol_component(kcontrol);
+	int ret = 0;
+
+	if (ucontrol->value.integer.value[0] < SLIMBUS_CLOCK_SRC_XO ||
+			ucontrol->value.integer.value[0] > SLIMBUS_CLOCK_SRC_RCO) {
+		pr_err("%s: Invalid ctrl value %s=%d\n", __func__, BT_SLIMBUS_CLK_STR,
+				ucontrol->value.integer.value[0]);
+		return -EINVAL;
+	}
+
+	dev_dbg(component->dev, "%s: old_clock = %d : new_clock = %d\n", __func__,
+			atomic_read(&bt_slim_clk_src_value),
+			ucontrol->value.integer.value[0]);
+
+	if (atomic_read(&bt_slim_clk_src_value) != ucontrol->value.integer.value[0]) {
+		ret = audio_prm_set_slimbus_clock_src(ucontrol->value.integer.value[0],
+			BT_SLIMBUS_DEV_ID);
+		if (!ret) {
+			atomic_set(&bt_slim_clk_src_value,
+					ucontrol->value.integer.value[0]);
+		} else {
+			pr_err("%s: audio_prm_set_slimbus_clock_src value = %d failed : ret = %d\n",
+					__func__, ucontrol->value.integer.value[0], ret);
+		}
+	}
+	return ret;
+}
+
+static struct snd_kcontrol_new slimbus_clock_src_ctrls[1] = {
+	{
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.name = BT_SLIMBUS_CLK_STR,
+		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info = slimbus_clock_src_info,
+		.get = slimbus_clock_src_get,
+		.put = slimbus_clock_src_put,
+		.private_value = 0,
+	}
+};
+
 static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 {
 	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
 	unsigned int tx_ch[WCN_CDC_SLIM_TX_CH_MAX]  = {159, 160};
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-	int ret = 0;
+	int ret = 0, rc = 0;
+	u32 bt_slim_clk_src_ctrl = 0;
 
 	ret = snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
 					   tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
@@ -474,6 +565,20 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 
 	msm_common_dai_link_init(rtd);
+
+
+	rc = of_property_read_u32(rtd->card->dev->of_node,
+			"qcom,bt-slim-clk-src-ctrl", &bt_slim_clk_src_ctrl);
+
+	if (!rc && bt_slim_clk_src_ctrl) {
+		ret = snd_soc_add_card_controls(rtd->card,
+				slimbus_clock_src_ctrls,
+				ARRAY_SIZE(slimbus_clock_src_ctrls));
+		if (ret)
+			dev_err(rtd->card->dev, "unable to add %s mixer control\n",
+				BT_SLIMBUS_CLK_STR);
+	}
+
 	return ret;
 }
 
@@ -813,11 +918,63 @@ static struct snd_soc_dai_link msm_mi2s_be_dai_links[] = {
 	},
 };
 
+static struct snd_soc_dai_link msm_pri_mi2s_be_dai_links[] = {
+	{
+		.name = LPASS_BE_PRI_MI2S_TX,
+		.stream_name = LPASS_BE_PRI_MI2S_TX,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(pri_mi2s_tx2),
+	},
+	{
+		.name = LPASS_BE_PRI_MI2S_RX,
+		.stream_name = LPASS_BE_PRI_MI2S_RX,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(pri_mi2s_rx),
+	},
+};
+
+static struct snd_soc_dai_link msm_pri_tdm_be_dai_links[] = {
+	{
+		.name = LPASS_BE_PRI_TDM_TX_0,
+		.stream_name = LPASS_BE_PRI_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(pri_tdm_tx),
+	},
+	{
+		.name = LPASS_BE_PRI_TDM_RX_0,
+		.stream_name = LPASS_BE_PRI_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(pri_tdm_rx),
+	},
+};
+
 static struct snd_soc_dai_link msm_monaco_dai_links[
 	ARRAY_SIZE(msm_common_dai_links) +
 	ARRAY_SIZE(msm_va_dai_links) +
 	ARRAY_SIZE(msm_mi2s_be_dai_links) +
-	ARRAY_SIZE(msm_wcn_be_dai_links)
+	ARRAY_SIZE(msm_wcn_be_dai_links) +
+	ARRAY_SIZE(msm_pri_mi2s_be_dai_links) +
+	ARRAY_SIZE(msm_pri_tdm_be_dai_links)
 ];
 
 static const struct of_device_id monaco_asoc_machine_of_match[]  = {
@@ -899,6 +1056,28 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 				msm_common_dai_links,
 				sizeof(msm_common_dai_links));
 			total_links += ARRAY_SIZE(msm_common_dai_links);
+
+			rc = of_property_read_u32(dev->of_node,
+				"qcom,mi2s-audio-intf", &val);
+			if (!rc && val) {
+				dev_dbg(dev, "%s(): MI2S support present\n",
+					__func__);
+				memcpy(msm_monaco_dai_links + total_links,
+					msm_pri_mi2s_be_dai_links,
+					sizeof(msm_pri_mi2s_be_dai_links));
+				total_links += ARRAY_SIZE(msm_pri_mi2s_be_dai_links);
+			}
+
+			rc = of_property_read_u32(dev->of_node,
+				"qcom,tdm-audio-intf", &val);
+			if (!rc && val) {
+				dev_dbg(dev, "%s(): TDM support present\n",
+					__func__);
+				memcpy(msm_monaco_dai_links + total_links,
+					msm_pri_tdm_be_dai_links,
+					sizeof(msm_pri_tdm_be_dai_links));
+				total_links += ARRAY_SIZE(msm_pri_tdm_be_dai_links);
+			}
 		}
 
 		// WCN BT is common for both ATH & ATH+SL variants
@@ -934,6 +1113,55 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 	return card;
 }
 
+static void monaco_update_snd_card_status(unsigned long opcode)
+{
+	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+
+	switch (opcode) {
+	case AUDIO_NOTIFIER_SERVICE_DOWN:
+
+		if (atomic_inc_return(&card_status) == 1) {
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
+			snd_card_notify_user(0);
+#endif
+		}
+		break;
+	case AUDIO_NOTIFIER_SERVICE_UP:
+		if (atomic_dec_return(&card_status) == 0) {
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
+			snd_card_notify_user(1);
+#endif
+		}
+		break;
+	default:
+		break;
+	}
+}
+
+static int monaco_cc_dsp_notifier_service_cb(struct notifier_block *this,
+					 unsigned long opcode, void *ptr)
+{
+	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+
+	switch (opcode) {
+	case DSP_ERROR:
+		monaco_update_snd_card_status(AUDIO_NOTIFIER_SERVICE_DOWN);
+		break;
+	case DSP_READY:
+		monaco_update_snd_card_status(AUDIO_NOTIFIER_SERVICE_UP);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block notifier_cc_dsp_nb = {
+	.notifier_call  = monaco_cc_dsp_notifier_service_cb,
+	.priority = 0,
+};
+
 static int monaco_ssr_enable(struct device *dev, void *data)
 {
 	struct platform_device *pdev = to_platform_device(dev);
@@ -951,9 +1179,10 @@ static int monaco_ssr_enable(struct device *dev, void *data)
 		dev_dbg(dev, "%s: TODO\n", __func__);
 	}
 
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
-	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
-#endif
+	atomic_set(&bt_slim_clk_src_value, SLIMBUS_CLOCK_SRC_XO);
+	dev_dbg(dev, "%s: reset bt_slim_clk_src_value = %d\n", __func__,
+		atomic_read(&bt_slim_clk_src_value));
+	monaco_update_snd_card_status(AUDIO_NOTIFIER_SERVICE_UP);
 	dev_dbg(dev, "%s: setting snd_card to ONLINE\n", __func__);
 
 err:
@@ -971,9 +1200,7 @@ static void monaco_ssr_disable(struct device *dev, void *data)
 	}
 
 	dev_dbg(dev, "%s: setting snd_card to OFFLINE\n", __func__);
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
-	snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
-#endif /* CONFIG_AUDIO_QGKI */
+	monaco_update_snd_card_status(AUDIO_NOTIFIER_SERVICE_DOWN);
 
 	if (!strcmp(card->name, "monaco-stub-snd-card")) {
 		/* TODO */
@@ -1186,11 +1413,14 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	else
 		pdata->visense_enable = val;
 
+	atomic_set(&card_status, 1);
 	ret = msm_audio_ssr_register(&pdev->dev);
 	if (ret)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
 			__func__, ret);
 
+	pdata->slatecom_notifier_chain =
+		(struct srcu_notifier_head *)slatecom_register_notifier(&notifier_cc_dsp_nb);
 	is_initial_boot = true;
 
 	 /* change card status to ONLINE */
@@ -1215,6 +1445,7 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	if (pdata)
 		common_pdata = pdata->common_pdata;
 
+	slatecom_unregister_notifier(pdata->slatecom_notifier_chain, &notifier_cc_dsp_nb);
 	msm_common_snd_deinit(common_pdata);
 
 	snd_event_master_deregister(&pdev->dev);
