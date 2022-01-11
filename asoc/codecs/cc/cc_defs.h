@@ -1,12 +1,14 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __CC_RTOS_H__
 #define __CC_RTOS_H__
 
-/* Minimum platform information size */
-#define CC_MIN_PLATINFO_SIZE 24
+/* Minimum IPC payload response size */
+#define CC_MIN_IPC_PAYLOAD_SIZE 24
 
 /* Maximum allowed debug register regions */
 #define CC_MAX_REG_REGION 16
@@ -100,18 +102,24 @@ struct cc_set_get_param_t {
 	uint8_t payload[0];
 } __packed;
 
-struct cc_read_write_reg_req {
-	uint32_t version;
+typedef struct __packed {
+	uint32_t dev_id;
 	uint32_t start_addr;
 	uint32_t num_reg;
 	uint8_t payload[0];
-} __packed;
+} cc_reg_request_t;
+
+typedef struct __packed {
+	int32_t success;
+	uint8_t payload[0];
+} cc_reg_response_t;
 
 #define RESPONSE_SUCESS 0
+#define RESPONSE_FAILURE -1
 
 struct cc_resp_generic {
 	uint32_t opcode;
-	uint32_t response;
+	int32_t response;
 } __packed;
 
 struct cc_get_cdc_status_t {
