@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -28,6 +29,7 @@
 #include <dsp/spf-core.h>
 #include <dsp/msm_audio_ion.h>
 #include <dsp/audio_notifier.h>
+#include <soc/qcom/subsystem_notif.h>
 #include "device_event.h"
 #include "asoc/msm-cdc-pinctrl.h"
 #include "asoc/wcd-mbhc-v2.h"
@@ -93,11 +95,24 @@ struct msm_asoc_mach_data {
 	struct device_node *fsa_handle;
 	bool visense_enable;
 	struct srcu_notifier_head *slatecom_notifier_chain;
+#if IS_ENABLED(CONFIG_DEEPSLEEP)
+	void *subsys_nhdl;
+#endif
 };
 
 enum bt_slimbus_clk_src {
 	SLIMBUS_CLOCK_SRC_XO = 1,
 	SLIMBUS_CLOCK_SRC_RCO = 2
+};
+
+#define CS_VAL_INVALID	0xffffffff
+struct card_status {
+	int card_status;
+	bool standby;
+#if IS_ENABLED(CONFIG_DEEPSLEEP)
+	int val_before_qb;
+#endif
+	struct mutex lock;
 };
 
 static bool is_initial_boot;
@@ -106,7 +121,7 @@ static struct snd_soc_card snd_soc_card_monaco_msm;
 static int dmic_0_1_gpio_cnt;
 static int dmic_2_3_gpio_cnt;
 static atomic_t bt_slim_clk_src_value = ATOMIC_INIT(SLIMBUS_CLOCK_SRC_XO);
-static atomic_t card_status;
+static struct card_status cs;
 
 static void check_userspace_service_state(struct snd_soc_pcm_runtime *rtd,
 						struct msm_common_pdata *pdata)
@@ -1113,35 +1128,140 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 	return card;
 }
 
+#if IS_ENABLED(CONFIG_DEEPSLEEP)
+static char *subsys_notif_type_to_str(enum subsys_notif_type code)
+{
+	switch (code) {
+	case SUBSYS_BEFORE_SHUTDOWN:
+		return "BEFORE_SHUTDOWN";
+	case SUBSYS_AFTER_SHUTDOWN:
+		return "AFTER_SHUTDOWN";
+	case SUBSYS_BEFORE_POWERUP:
+		return "BEFORE_POWERUP";
+	case SUBSYS_AFTER_POWERUP:
+		return "AFTER_POWERUP";
+	case SUBSYS_BEFORE_AUTH_AND_RESET:
+		return "BEFORE_AUTH_AND_RESET";
+	case SUBSYS_RAMDUMP_NOTIFICATION:
+		return "RAMDUMP_NOTIFICATION";
+	case SUBSYS_POWERUP_FAILURE:
+		return "POWERUP_FAILURE";
+	case SUBSYS_PROXY_VOTE:
+		return "PROXY_VOTE";
+	case SUBSYS_PROXY_UNVOTE:
+		return "PROXY_UNVOTE";
+	case SUBSYS_SOC_RESET:
+		return "SOC_RESET";
+	case SUBSYS_BEFORE_DS_ENTRY:
+		return "BEFORE_DS_ENTRY";
+	case SUBSYS_AFTER_DS_ENTRY:
+		return "AFTER_DS_ENTRY";
+	case SUBSYS_DS_ENTRY_FAIL:
+		return "DS_ENTRY_FAIL";
+	case SUBSYS_BEFORE_DS_EXIT:
+		return "BEFORE_DS_EXIT";
+	case SUBSYS_AFTER_DS_EXIT:
+		return "AFTER_DS_EXIT";
+	case SUBSYS_DS_EXIT_FAIL:
+		return "DS_EXIT_FAIL";
+	case SUBSYS_NOTIF_TYPE_COUNT:
+		return "NOTIF_TYPE_COUNT";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+static int notifier_adsp_quickboot_cb(struct notifier_block *this, unsigned long opcode, void *data)
+{
+	pr_debug("%s: Monaco: ADSP: %s\n", __func__, subsys_notif_type_to_str(opcode));
+
+	mutex_lock(&cs.lock);
+	switch (opcode) {
+	case SUBSYS_BEFORE_DS_ENTRY:
+		cs.standby = true;
+		cs.val_before_qb = cs.card_status;
+		pr_info("%s: Sound card is in STANDBY\n", __func__);
+		break;
+	case SUBSYS_DS_ENTRY_FAIL:
+		cs.standby = false;
+		cs.val_before_qb = CS_VAL_INVALID;
+		pr_info("%s: Sound card is out of STANDBY\n", __func__);
+		break;
+	default:
+		break;
+	}
+	mutex_unlock(&cs.lock);
+
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block subsys_adsp_qb_nb = {
+	.notifier_call = notifier_adsp_quickboot_cb,
+	.priority = 0,
+};
+#endif
+
 static void monaco_update_snd_card_status(unsigned long opcode)
 {
-	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+	pr_debug("%s: Service opcode 0x%lx: %s\n", __func__, opcode,
+		opcode == AUDIO_NOTIFIER_SERVICE_DOWN ? "DOWN" :
+		opcode == AUDIO_NOTIFIER_SERVICE_UP ? "UP" : "UNKOWN");
+
+	mutex_lock(&cs.lock);
+	if (cs.standby)
+		pr_err("%s: Sound card is in STANDBY, ignoring status change\n", __func__);
 
 	switch (opcode) {
 	case AUDIO_NOTIFIER_SERVICE_DOWN:
-
-		if (atomic_inc_return(&card_status) == 1) {
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
-			snd_card_notify_user(0);
+		cs.card_status--;
+		if (cs.standby) {
+#if IS_ENABLED(CONFIG_DEEPSLEEP)
+			if (cs.card_status == cs.val_before_qb) {
+				cs.standby = false;
+				cs.val_before_qb = CS_VAL_INVALID;
+			}
 #endif
+		} else {
+			if (cs.card_status == SND_CARD_STATUS_OFFLINE) {
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
+				snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
+#endif
+				pr_info("%s: Sound card is in OFFLINE\n", __func__);
+			}
 		}
 		break;
 	case AUDIO_NOTIFIER_SERVICE_UP:
-		if (atomic_dec_return(&card_status) == 0) {
-#if IS_ENABLED(CONFIG_AUDIO_QGKI)
-			snd_card_notify_user(1);
+		cs.card_status++;
+		if (cs.standby) {
+#if IS_ENABLED(CONFIG_DEEPSLEEP)
+			if (cs.card_status == cs.val_before_qb) {
+				cs.standby = false;
+				cs.val_before_qb = CS_VAL_INVALID;
+			}
 #endif
+		} else {
+			if (cs.card_status == SND_CARD_STATUS_ONLINE) {
+#if IS_ENABLED(CONFIG_AUDIO_QGKI)
+				snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+#endif
+				pr_info("%s: Sound card is in ONLINE\n", __func__);
+			}
 		}
 		break;
 	default:
 		break;
 	}
+	mutex_unlock(&cs.lock);
+
+	return;
 }
 
 static int monaco_cc_dsp_notifier_service_cb(struct notifier_block *this,
 					 unsigned long opcode, void *ptr)
 {
-	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+	pr_debug("%s: Service DSP-opcode 0x%lx: %s\n", __func__, opcode,
+		opcode == DSP_ERROR ? "DSP_ERROR" :
+		opcode == DSP_READY ? "DSP_READY" : "UNKOWN");
 
 	switch (opcode) {
 	case DSP_ERROR:
@@ -1183,7 +1303,6 @@ static int monaco_ssr_enable(struct device *dev, void *data)
 	dev_dbg(dev, "%s: reset bt_slim_clk_src_value = %d\n", __func__,
 		atomic_read(&bt_slim_clk_src_value));
 	monaco_update_snd_card_status(AUDIO_NOTIFIER_SERVICE_UP);
-	dev_dbg(dev, "%s: setting snd_card to ONLINE\n", __func__);
 
 err:
 	return ret;
@@ -1199,7 +1318,6 @@ static void monaco_ssr_disable(struct device *dev, void *data)
 		return;
 	}
 
-	dev_dbg(dev, "%s: setting snd_card to OFFLINE\n", __func__);
 	monaco_update_snd_card_status(AUDIO_NOTIFIER_SERVICE_DOWN);
 
 	if (!strcmp(card->name, "monaco-stub-snd-card")) {
@@ -1413,7 +1531,21 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	else
 		pdata->visense_enable = val;
 
-	atomic_set(&card_status, 1);
+	mutex_init(&cs.lock);
+	cs.card_status = SND_CARD_STATUS_OFFLINE;
+	cs.standby = false;
+#if IS_ENABLED(CONFIG_DEEPSLEEP)
+	cs.val_before_qb = CS_VAL_INVALID;
+	pdata->subsys_nhdl =
+		subsys_notif_register_notifier("adsp", &subsys_adsp_qb_nb);
+	if (IS_ERR_OR_NULL(pdata->subsys_nhdl)) {
+		dev_err(&pdev->dev,
+			"%s: adsp: subsys unregistered: card standby will not support\n",
+			__func__);
+		pdata->subsys_nhdl = NULL;
+	}
+#endif
+
 	ret = msm_audio_ssr_register(&pdev->dev);
 	if (ret)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
@@ -1422,10 +1554,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	pdata->slatecom_notifier_chain =
 		(struct srcu_notifier_head *)slatecom_register_notifier(&notifier_cc_dsp_nb);
 	is_initial_boot = true;
-
-	 /* change card status to ONLINE */
-	dev_dbg(&pdev->dev, "%s: setting snd_card to ONLINE\n", __func__);
-	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
 
 	return 0;
 err:
@@ -1448,8 +1576,15 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	slatecom_unregister_notifier(pdata->slatecom_notifier_chain, &notifier_cc_dsp_nb);
 	msm_common_snd_deinit(common_pdata);
 
+#if IS_ENABLED(CONFIG_DEEPSLEEP)
+	subsys_notif_unregister_notifier(pdata->subsys_nhdl, &subsys_adsp_qb_nb);
+#endif
+
 	snd_event_master_deregister(&pdev->dev);
 	snd_soc_unregister_card(card);
+
+	cs.card_status = SND_CARD_STATUS_OFFLINE;
+	cs.standby = false;
 
 	return 0;
 }
