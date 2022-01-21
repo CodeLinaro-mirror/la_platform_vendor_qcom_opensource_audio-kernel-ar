@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -21,7 +22,7 @@
 void *audio_ssr_register(const char *domain_name, struct notifier_block *nb)
 {
 	if (domain_name  == NULL) {
-		pr_err("%s: Invalid domain name  %d\n", __func__);
+		pr_err("%s: Invalid domain name\n", __func__);
 		return ERR_PTR(-EINVAL);
 	}
 

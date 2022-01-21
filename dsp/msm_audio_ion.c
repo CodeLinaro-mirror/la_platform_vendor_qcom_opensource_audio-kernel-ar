@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -579,8 +580,8 @@ static int msm_audio_hyp_unassign(struct msm_audio_fd_data *msm_audio_fd_data)
 		ret = hyp_assign_phys(msm_audio_fd_data->paddr, msm_audio_fd_data->plen,
 			source_vm_unmap, 2, dest_vm_unmap, dest_perms_unmap, 1);
 		if (ret < 0) {
-			pr_err("%s: hyp unassign failed result = %d addr = 0x%pK size = %d\n",
-			__func__, ret, msm_audio_fd_data->paddr, msm_audio_fd_data->plen);
+			pr_err("%s: hyp unassign failed result = %d addr = 0x%pK size = %zu\n",
+			__func__, ret, (void *)msm_audio_fd_data->paddr, msm_audio_fd_data->plen);
 		}
 		msm_audio_fd_data->hyp_assign = false;
 		pr_debug("%s: hyp unassign success\n", __func__);
@@ -706,8 +707,8 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		ret = hyp_assign_phys(paddr, pa_len, source_vm_map, 1,
 		                      dest_vm_map, dest_perms_map, 2);
 		if (ret < 0) {
-			pr_err("%s: hyp assign failed result = %d addr = 0x%pK size = %d\n",
-					__func__, ret, paddr, pa_len);
+			pr_err("%s: hyp assign failed result = %d addr = 0x%pK size = %zu\n",
+					__func__, ret, (void *)paddr, pa_len);
 			return ret;
 		}
 		pr_debug("%s: hyp assign success\n", __func__);
@@ -722,8 +723,8 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		ret = hyp_assign_phys(paddr, pa_len, source_vm_unmap, 2,
 		                      dest_vm_unmap, dest_perms_unmap, 1);
 		if (ret < 0) {
-			pr_err("%s: hyp unassign failed result = %d addr = 0x%pK size = %d\n",
-					__func__, ret, paddr, pa_len);
+			pr_err("%s: hyp unassign failed result = %d addr = 0x%pK size = %zu\n",
+					__func__, ret, (void *)paddr, pa_len);
 			return ret;
 		}
 		pr_debug("%s: hyp unassign success\n", __func__);
