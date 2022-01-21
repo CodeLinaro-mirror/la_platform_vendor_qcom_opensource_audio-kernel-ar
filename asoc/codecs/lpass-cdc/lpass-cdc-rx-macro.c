@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+   Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1235,7 +1236,7 @@ static int lpass_cdc_rx_macro_get_channel_map(struct snd_soc_dai *dai,
 		*rx_slot = ch_mask;
 		*rx_num = rx_priv->active_ch_cnt[dai->id];
 		dev_dbg(rx_priv->dev,
-			"%s: dai->id:%d, ch_mask:0x%x, active_ch_cnt:%d active_mask: 0x%x\n",
+			"%s: dai->id:%d, ch_mask:0x%x, active_ch_cnt:%d active_mask: 0x%lx\n",
 			__func__, dai->id, *rx_slot, *rx_num, rx_priv->active_ch_mask[dai->id]);
 		break;
 	case RX_MACRO_AIF5_PB:

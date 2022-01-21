@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+   Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -2919,7 +2920,7 @@ static int lpass_cdc_wsa2_macro_set_cur_state(
 		wsa2_priv->thermal_cur_state = state;
 	} else {
 		dev_err(wsa2_priv->dev,
-			"%s: incorrect requested state:%d\n",
+			"%s: incorrect requested state:%lu\n",
 			__func__, state);
 		return -EINVAL;
 	}
