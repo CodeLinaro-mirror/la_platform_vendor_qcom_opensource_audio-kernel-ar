@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/irq.h>
@@ -2972,6 +2974,7 @@ err_irq_fail:
 	pm_qos_remove_request(&swrm->pm_qos_req);
 
 err_pdata_fail:
+	platform_set_drvdata(pdev, NULL);
 err_memory_fail:
 	return ret;
 }
