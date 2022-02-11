@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <sound/soc.h>
@@ -34,7 +35,7 @@ SND_SOC_DAILINK_DEFS(display_port,
 			"msm_dp_audio_codec_rx_dai")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
-SND_SOC_DAILINK_DEFS(display_port1,
+SND_SOC_DAILINK_DEFS(__attribute__((unused)) display_port1,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC(
 			"soc:qcom,msm-ext-disp:qcom,msm-ext-disp-audio-codec-rx",
@@ -343,12 +344,12 @@ SND_SOC_DAILINK_DEFS(wsa_wsa2_vi_feedback,
 			   COMP_CODEC("lpass-cdc", "wsa2_macro_vifeedback")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
-SND_SOC_DAILINK_DEFS(tavil_i2s_rx1,
+SND_SOC_DAILINK_DEFS(__attribute__((unused)) tavil_i2s_rx1,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("tavil_codec", "tavil_i2s_rx1")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
-SND_SOC_DAILINK_DEFS(tavil_i2s_tx1,
+SND_SOC_DAILINK_DEFS(__attribute__((unused)) tavil_i2s_tx1,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("tavil_codec", "tavil_i2s_tx1")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));

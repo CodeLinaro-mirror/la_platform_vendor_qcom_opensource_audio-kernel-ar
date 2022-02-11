@@ -20,6 +20,9 @@ endif
 ifeq ($(TARGET_SUPPORT), sdxlemur))
 KBUILD_OPTIONS += CONFIG_ARCH_SDXLEMUR=y
 endif
+ifeq ($(TARGET_SUPPORT), neo))
+KBUILD_OPTIONS += CONFIG_SND_SOC_WAIPIO=m
+endif
 
 subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
 
@@ -41,6 +44,10 @@ endif
 ifeq ($(TARGET_SUPPORT), sdmsteppe)
 obj-m += asoc/codecs/bolero/
 obj-m += asoc/codecs/wcd937x/
+endif
+ifeq ($(TARGET_SUPPORT), neo)
+obj-m += asoc/codecs/bolero/
+obj-m += asoc/codecs/wcd938x/
 endif
 
 ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa8155 sa8155ivi sa6155 sa8195 qtiquingvm))
