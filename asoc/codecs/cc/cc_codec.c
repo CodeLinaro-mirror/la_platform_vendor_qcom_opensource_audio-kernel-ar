@@ -1576,6 +1576,10 @@ static int cc_action_set(uint32_t id, void *ptr, size_t size)
 	param_sz = sizeof(*set_param) - sizeof(set_param->payload) + size;
 
 	set_param = (struct cc_set_get_param_t *)kzalloc(param_sz, GFP_KERNEL);
+
+	if(!set_param)
+		return -ENOMEM;
+
 	set_param->action_id = id;
 	memcpy(set_param->payload, ptr, size);
 
@@ -1822,11 +1826,14 @@ static int cc_action_ctl_array_put(struct snd_kcontrol *kcontrol,
 	list_for_each_safe(node, next, &act_ifaces->iface->action_value_list) {
 		act_val = list_entry(node,
 				struct cc_action_value_list, list);
-		if (act_val->action_id == act->act_id->id) {
+		if (act_val && act_val->action_id == act->act_id->id) {
 			found = 1;
 			break;
 		}
 	}
+
+	if (!act_val)
+		return 0;
 
 	switch (act->action_type) {
 	case ACTION_TYPE_CHAR_ARRAY:
@@ -2231,7 +2238,7 @@ static int cc_parse_interface(struct cc_codec_priv *cc_priv,
 
 	cc_priv->dai = kzalloc(
 		num_intf * sizeof(struct snd_soc_dai_driver), GFP_KERNEL);
-	if (!cc_priv->iface)
+	if (!cc_priv->dai)
 		return -ENOMEM;
 
 	*parsed_len = 0;
