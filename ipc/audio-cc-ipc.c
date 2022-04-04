@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -19,6 +20,7 @@
 #include <linux/poll.h>
 #include <linux/vmalloc.h>
 #include <linux/rpmsg.h>
+#include <linux/delay.h>
 #include <ipc/audio-cc-ipc.h>
 #include <dsp/audio_notifier.h>
 #include <soc/snd_event.h>
@@ -27,6 +29,10 @@
 #define CC_IPC_NAME_MAX_LEN 32
 #define CC_IPC_MAX_DEV		2
 #define CC_IPC_MAX_CLIENTS	2
+
+#define CC_IPC_RETRY_COUNT	5
+#define CC_IPC_RETRY_DELAY_US_LOW	500
+#define CC_IPC_RETRY_DELAY_US_HIGH	550
 
 #define MINOR_NUMBER_COUNT 1
 #define TIMEOUT_MS 2000
@@ -213,6 +219,7 @@ static unsigned int cc_ipc_fpoll(struct file *file, poll_table *wait)
 static int cc_ipc_send_pkt(struct cc_ipc_priv *ipriv, void *pkt, uint32_t pkt_size)
 {
 	int ret;
+	int i = 0;
 
 	if (!ipriv) {
 		pr_err("%s: Invalid private data\n", __func__);
@@ -227,7 +234,15 @@ static int cc_ipc_send_pkt(struct cc_ipc_priv *ipriv, void *pkt, uint32_t pkt_si
 	}
 
 	mutex_lock(&cc_ipc_plat_priv->g_ipriv_lock);
-	ret = rpmsg_send(ipriv->ch, pkt, pkt_size);
+	for (i = 0; i < CC_IPC_RETRY_COUNT; i++) {
+		ret = rpmsg_send(ipriv->ch, pkt, pkt_size);
+		if (ret != -EAGAIN)
+			break;
+
+		usleep_range(CC_IPC_RETRY_DELAY_US_LOW,
+				CC_IPC_RETRY_DELAY_US_HIGH);
+	}
+
 	mutex_unlock(&cc_ipc_plat_priv->g_ipriv_lock);
 	if (ret < 0)
 		dev_err_ratelimited(ipriv->pdev, "%s: failed, ch %s, ret %d\n",
