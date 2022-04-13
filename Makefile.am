@@ -46,7 +46,7 @@ obj-m += asoc/codecs/bolero/
 obj-m += asoc/codecs/wcd937x/
 endif
 ifeq ($(TARGET_SUPPORT), neo)
-obj-m += asoc/codecs/bolero/
+obj-m += asoc/codecs/lpass-cdc/
 obj-m += asoc/codecs/wcd938x/
 endif
 
