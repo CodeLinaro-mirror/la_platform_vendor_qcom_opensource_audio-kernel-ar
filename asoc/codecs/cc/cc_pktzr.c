@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -145,8 +147,11 @@ int cc_pktzr_send_packet(uint32_t opcode, void *req_payload, size_t req_size,
 	}
 
 	spin_unlock(&ppriv->cc_pktzr_lock);
-	if (!found)
+	if (!found || (*resp_payload == NULL)) {
+		pr_err("%s: packet response not received\n", __func__);
+		ret = -EINVAL;
 		goto err;
+	}
 	return 0;
 err:
 	kfree(msg_pkt);
