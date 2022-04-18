@@ -1423,12 +1423,13 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_component *component = NULL;
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(rtd->card);
+	int wsa_reg_count = 0;
 
-	if (pdata->wsa_max_devs > 0) {
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
 		if (!component) {
 			pr_err("%s: wsa-codec.1 component is NULL\n", __func__);
-			return -EINVAL;
+			goto wsa_codec2;
 		}
 
 		wsa883x_set_channel_map(component, &spkleft_ports[0],
@@ -1437,14 +1438,19 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 				component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
+wsa_codec2:
 	/* If current platform has more than one WSA */
-	if (pdata->wsa_max_devs > 1) {
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.2");
 		if (!component) {
 			pr_err("%s: wsa-codec.2 component is NULL\n", __func__);
-			return -EINVAL;
+			goto wsa_codec3;
 		}
 
 		wsa883x_set_channel_map(component, &spkright_ports[0],
@@ -1453,13 +1459,18 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 			component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
-	if (pdata->wsa_max_devs > 2) {
+wsa_codec3:
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.3");
 		if (!component) {
 			pr_err("%s: wsa-codec.3 component is NULL\n", __func__);
-			return -EINVAL;
+			goto wsa_codec4;
 		}
 
 		wsa883x_set_channel_map(component, &spkleft_ports[0],
@@ -1468,13 +1479,18 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 			component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
-	if (pdata->wsa_max_devs > 3) {
+wsa_codec4:
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.4");
 		if (!component) {
 			pr_err("%s: wsa-codec.4 component is NULL\n", __func__);
-			return -EINVAL;
+			goto dai_init;
 		}
 
 		wsa883x_set_channel_map(component, &spkright_ports[0],
@@ -1483,8 +1499,16 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 			component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
+dai_init:
+	if (pdata->wsa_max_devs != wsa_reg_count) {
+		return -EINVAL;
+	}
 	msm_common_dai_link_init(rtd);
 
 	return 0;
