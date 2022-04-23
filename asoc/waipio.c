@@ -1245,6 +1245,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	int ret = 0;
 	void *mbhc_calibration;
 	bool is_wcd937x = false;
+	struct msm_asoc_mach_data *pdata = NULL;
 
 	rtd = snd_soc_get_pcm_runtime(card, &card->dai_link[0]);
 	if (!rtd) {
@@ -1253,6 +1254,9 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 			__func__, card->dai_link[0].name);
 		return -EINVAL;
 	}
+	pdata = snd_soc_card_get_drvdata(rtd->card);
+	if (pdata->wcd_disabled)
+		return 0;
 
 	component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
 	if (!component) {
