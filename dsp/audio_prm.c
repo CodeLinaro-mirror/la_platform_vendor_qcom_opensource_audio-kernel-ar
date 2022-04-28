@@ -8,6 +8,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -171,7 +173,7 @@ int audio_prm_set_lpass_hw_core_req(struct clk_cfg *cfg, uint32_t hw_core_id, ui
 		pkt->hdr.opcode = PRM_CMD_RELEASE_HW_RSC;
 
         //pr_err("%s: clk_id %d size of cmd_req %ld \n",__func__, cfg->clk_id, sizeof(prm_cmd_request_hw_core_t));
-
+	memset(&prm_rsc_request, 0, sizeof(prm_rsc_request));
         prm_rsc_request.payload_header.payload_address_lsw = 0;
         prm_rsc_request.payload_header.payload_address_msw = 0;
         prm_rsc_request.payload_header.mem_map_handle = 0;
