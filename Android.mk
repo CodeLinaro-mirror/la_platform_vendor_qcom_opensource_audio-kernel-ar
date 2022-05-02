@@ -2,12 +2,12 @@
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(call is-board-platform, taro parrot neo),true)
+ifeq ($(call is-board-platform, taro parrot neo anorak),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_WAIPIO=m
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama parrot neo), true)
+ifeq ($(call is-board-platform-in-list,taro kalama parrot neo anorak), true)
 
 LOCAL_PATH := $(call my-dir)
 

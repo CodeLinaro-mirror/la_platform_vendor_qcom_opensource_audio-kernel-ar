@@ -12,6 +12,7 @@ endif
 ifeq ($(BUILD_AUDIO_MODULES),true)
 ifneq ($(TARGET_BOARD_AUTO),true)
 ifeq ($(call is-board-platform-in-list,$(TARGET_BOARD_PLATFORM)),true)
+ifeq ($(call is-board-platform-in-list, anorak), false)
 BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/spf_core_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/audpkt_ion_dlkm.ko \
@@ -44,6 +45,7 @@ BOARD_VENDOR_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
+endif
 endif
 endif
 endif
