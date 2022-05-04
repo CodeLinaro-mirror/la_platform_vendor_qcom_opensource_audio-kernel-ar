@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -1242,9 +1242,17 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 {
 	struct snd_soc_component *component = NULL;
 	struct snd_soc_pcm_runtime *rtd;
+	struct msm_asoc_mach_data *pdata;
 	int ret = 0;
 	void *mbhc_calibration;
 	bool is_wcd937x = false;
+
+	 pdata = snd_soc_card_get_drvdata(card);
+	if (!pdata)
+		return -EINVAL;
+
+	if (pdata->wcd_disabled)
+		return 0;
 
 	rtd = snd_soc_get_pcm_runtime(card, &card->dai_link[0]);
 	if (!rtd) {
