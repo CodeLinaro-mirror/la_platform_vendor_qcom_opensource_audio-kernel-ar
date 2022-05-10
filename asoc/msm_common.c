@@ -53,7 +53,7 @@ static struct attribute device_state_attr = {
 
 static struct attribute card_state_attr = {
 	.name = "card_state",
-	.mode = 0660,
+	.mode = 0666,
 };
 
 #define MAX_PORT 20

@@ -1245,6 +1245,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	int ret = 0;
 	void *mbhc_calibration;
 	bool is_wcd937x = false;
+	struct msm_asoc_mach_data *pdata = NULL;
 
 	rtd = snd_soc_get_pcm_runtime(card, &card->dai_link[0]);
 	if (!rtd) {
@@ -1253,6 +1254,9 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 			__func__, card->dai_link[0].name);
 		return -EINVAL;
 	}
+	pdata = snd_soc_card_get_drvdata(rtd->card);
+	if (pdata->wcd_disabled)
+		return 0;
 
 	component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
 	if (!component) {
@@ -1423,12 +1427,13 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 	struct snd_soc_component *component = NULL;
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(rtd->card);
+	int wsa_reg_count = 0;
 
-	if (pdata->wsa_max_devs > 0) {
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
 		if (!component) {
 			pr_err("%s: wsa-codec.1 component is NULL\n", __func__);
-			return -EINVAL;
+			goto wsa_codec2;
 		}
 
 		wsa883x_set_channel_map(component, &spkleft_ports[0],
@@ -1437,14 +1442,19 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 				component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
+wsa_codec2:
 	/* If current platform has more than one WSA */
-	if (pdata->wsa_max_devs > 1) {
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.2");
 		if (!component) {
 			pr_err("%s: wsa-codec.2 component is NULL\n", __func__);
-			return -EINVAL;
+			goto wsa_codec3;
 		}
 
 		wsa883x_set_channel_map(component, &spkright_ports[0],
@@ -1453,13 +1463,18 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 			component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
-	if (pdata->wsa_max_devs > 2) {
+wsa_codec3:
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.3");
 		if (!component) {
 			pr_err("%s: wsa-codec.3 component is NULL\n", __func__);
-			return -EINVAL;
+			goto wsa_codec4;
 		}
 
 		wsa883x_set_channel_map(component, &spkleft_ports[0],
@@ -1468,13 +1483,18 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 			component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
-	if (pdata->wsa_max_devs > 3) {
+wsa_codec4:
+	if (pdata->wsa_max_devs > wsa_reg_count) {
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.4");
 		if (!component) {
 			pr_err("%s: wsa-codec.4 component is NULL\n", __func__);
-			return -EINVAL;
+			goto dai_init;
 		}
 
 		wsa883x_set_channel_map(component, &spkright_ports[0],
@@ -1483,8 +1503,16 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 
 		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
 			component);
+
+		wsa_reg_count++;
+		if (pdata->wsa_max_devs == wsa_reg_count)
+			goto dai_init;
 	}
 
+dai_init:
+	if (pdata->wsa_max_devs != wsa_reg_count) {
+		return -EINVAL;
+	}
 	msm_common_dai_link_init(rtd);
 
 	return 0;
@@ -1545,7 +1573,10 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	lpass_cdc_register_wake_irq(lpass_cdc_component, false);
 
 	if (pdata->wcd_disabled)
+	{
+		lpass_cdc_set_port_map(lpass_cdc_component, ARRAY_SIZE(sm_port_map_wsa), sm_port_map_wsa);
 		goto done;
+	}
 
 	component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
 	if (!component) {
