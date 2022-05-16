@@ -129,6 +129,7 @@ struct cc_codec_priv {
 	struct snd_soc_dai_driver *dai;
 	struct snd_soc_component_driver cc_comp;
 	struct class *class;	/* Debugging only */
+	struct notifier_block cc_adsp_nb;
 };
 
 typedef int (cc_add_elem_func)(struct cc_element *, int);
@@ -1218,6 +1219,26 @@ static int cc_trigger_uc(struct cc_element *elem, int on)
 	return rc;
 }
 
+static void cc_stop_all_pb_stream(struct cc_codec_priv *cc_priv)
+{
+	int i = 0;
+	struct cc_element *elem = NULL;
+
+	if (!cc_priv || !cc_priv->elems) {
+		pr_err("%s: driver data is null\n", __func__);
+		return;
+	}
+
+	for (i = 0; i < cc_priv->num_elem; i++) {
+		elem = &cc_priv->elems[i];
+		if (elem->elem_type == ELEM_TYPE_STREAM_OUT) {
+			pr_info("%s: powering down stream: %s\n",
+					__func__, elem->s_name);
+			cc_trigger_uc(elem, 0);
+		}
+	}
+}
+
 static int cc_widget_ev_func(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -1576,6 +1597,10 @@ static int cc_action_set(uint32_t id, void *ptr, size_t size)
 	param_sz = sizeof(*set_param) - sizeof(set_param->payload) + size;
 
 	set_param = (struct cc_set_get_param_t *)kzalloc(param_sz, GFP_KERNEL);
+
+	if(!set_param)
+		return -ENOMEM;
+
 	set_param->action_id = id;
 	memcpy(set_param->payload, ptr, size);
 
@@ -1822,11 +1847,14 @@ static int cc_action_ctl_array_put(struct snd_kcontrol *kcontrol,
 	list_for_each_safe(node, next, &act_ifaces->iface->action_value_list) {
 		act_val = list_entry(node,
 				struct cc_action_value_list, list);
-		if (act_val->action_id == act->act_id->id) {
+		if (act_val && act_val->action_id == act->act_id->id) {
 			found = 1;
 			break;
 		}
 	}
+
+	if (!act_val)
+		return 0;
 
 	switch (act->action_type) {
 	case ACTION_TYPE_CHAR_ARRAY:
@@ -2231,7 +2259,7 @@ static int cc_parse_interface(struct cc_codec_priv *cc_priv,
 
 	cc_priv->dai = kzalloc(
 		num_intf * sizeof(struct snd_soc_dai_driver), GFP_KERNEL);
-	if (!cc_priv->iface)
+	if (!cc_priv->dai)
 		return -ENOMEM;
 
 	*parsed_len = 0;
@@ -2686,6 +2714,21 @@ static const struct snd_event_ops cc_cdc_ssr_ops = {
 	.disable = cc_cdc_ssr_disable,
 };
 
+static int cc_cdc_notifier_service_cb(struct notifier_block *this,
+				      unsigned long opcode, void *ptr)
+{
+	struct cc_codec_priv *cc_priv = NULL;
+
+	cc_priv = container_of(this, struct cc_codec_priv, cc_adsp_nb);
+	if (!cc_priv)
+		return NOTIFY_OK;
+
+	if (opcode == AUDIO_NOTIFIER_SERVICE_DOWN)
+		cc_stop_all_pb_stream(cc_priv);
+
+	return NOTIFY_OK;
+}
+
 static int cc_cdc_probe(struct platform_device *pdev)
 {
 	struct cc_codec_priv *cc_priv = NULL;
@@ -2748,6 +2791,15 @@ static int cc_cdc_probe(struct platform_device *pdev)
 	else
 		dev_err(&pdev->dev, "%s: Registration with SND event fwk failed ret = %d\n",
 			__func__, ret);
+
+	cc_priv->cc_adsp_nb.notifier_call = cc_cdc_notifier_service_cb;
+	cc_priv->cc_adsp_nb.priority = 0;
+	ret = audio_notifier_register(CC_CODEC_STR, AUDIO_NOTIFIER_ADSP_DOMAIN,
+						&cc_priv->cc_adsp_nb);
+	if (ret)
+		dev_err(&pdev->dev, "%s: ADSP ssr register fail ret:%d\n",
+			__func__, ret);
+
 	return 0;
 
 free_priv:
@@ -2762,6 +2814,7 @@ static int cc_cdc_remove(struct platform_device *pdev)
 {
 	struct cc_codec_priv *cc_priv = dev_get_drvdata(&pdev->dev);
 
+	audio_notifier_deregister(CC_CODEC_STR);
 	cc_pktzr_deinit();
 	snd_event_client_deregister(&pdev->dev);
 	snd_soc_unregister_component(&pdev->dev);
