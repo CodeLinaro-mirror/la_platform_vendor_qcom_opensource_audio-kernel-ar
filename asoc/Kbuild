@@ -19,6 +19,11 @@ ifeq ($(CONFIG_SND_SOC_AUTO), y)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sa8295autoconf.h
 	endif
+	ifdef CONFIG_SND_SOC_SA8255
+		include $(AUDIO_ROOT)/config/sa8255auto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sa8255autoconf.h
+	endif
 else
 	ifeq ($(KERNEL_BUILD), 0)
 		ifeq ($(CONFIG_ARCH_SM8150), y)
@@ -170,6 +175,11 @@ ifdef CONFIG_SND_SOC_SA8295_AUTO_SPF
 	MACHINE_OBJS += auto_spf_dummy.o
 endif
 
+# for sa8255 sound card driver
+ifdef CONFIG_SND_SOC_SA8255_AUTO_SPF
+	MACHINE_OBJS += auto_spf_dummy.o
+endif
+
 ifdef CONFIG_SND_SOC_QDSP6V2
 	PLATFORM_OBJS += platform_init.o
 endif
@@ -263,6 +273,9 @@ obj-$(CONFIG_SND_SOC_SA8295_AUTO_SPF) += spf_machine_dlkm.o
 spf_machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_SA8155_AUTO_SPF) += spf_machine_dlkm.o
+spf_machine_dlkm-y := $(MACHINE_OBJS)
+
+obj-$(CONFIG_SND_SOC_SA8255_AUTO_SPF) += spf_machine_dlkm.o
 spf_machine_dlkm-y := $(MACHINE_OBJS)
 
 # inject some build related information
