@@ -120,6 +120,8 @@ static const char *const tdm_gpio_phandle[] = {"qcom,pri-tdm-gpios",
 						"qcom,hsif0-tdm-gpios",
 						"qcom,hsif1-tdm-gpios",
 						"qcom,hsif2-tdm-gpios",
+						"qcom,hsif3-tdm-gpios",
+						"qcom,hsif4-tdm-gpios",
 						};
 
 static const char *const mclk_gpio_phandle[] = { "qcom,internal-mclk1-gpios" };
@@ -147,6 +149,8 @@ enum {
 	TDM_HSIF0,
 	TDM_HSIF1,
 	TDM_HSIF2,
+	TDM_HSIF3,
+	TDM_HSIF4,
 	TDM_INTERFACE_MAX,
 };
 
@@ -220,6 +224,10 @@ static struct tdm_slot_cfg tdm_slot[TDM_INTERFACE_MAX] = {
 	/* HSIF1 TDM */
 	{32, 16},
 	/* HSIF2 TDM */
+	{32, 16},
+	/* HSIF3 TDM */
+	{32, 16},
+	/* HSIF4 TDM */
 	{32, 16}
 };
 /*****************************************************************************
@@ -343,6 +351,26 @@ static unsigned int tdm_rx_slot_offset
 		{0xFFFF}, /* not used */
 		{0xFFFF}, /* not used */
 		{0xFFFF}, /* not used */
+	},
+	{/* HSIF3 TDM */
+		{0, 4, 8, 12, 16, 20, 0xFFFF},
+		{24, 0xFFFF},
+		{28, 0xFFFF},
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+	},
+	{/* HSIF4 TDM */
+		{0, 4, 8, 12, 16, 20, 0xFFFF},
+		{24, 0xFFFF},
+		{28, 0xFFFF},
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
 	}
 };
 
@@ -439,6 +467,26 @@ static unsigned int tdm_tx_slot_offset
 		{0xFFFF}, /* not used */
 	},
 	{/* HSIF2 TDM */
+		{0, 4, 8, 12, 0xFFFF},
+		{16, 20, 0xFFFF},
+		{24, 28, 0xFFFF},
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+	},
+	{/* HSIF3 TDM */
+		{0, 4, 8, 12, 0xFFFF},
+		{16, 20, 0xFFFF},
+		{24, 28, 0xFFFF},
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+		{0xFFFF}, /* not used */
+	},
+	{/* HSIF4 TDM */
 		{0, 4, 8, 12, 0xFFFF},
 		{16, 20, 0xFFFF},
 		{24, 28, 0xFFFF},
@@ -565,12 +613,16 @@ static unsigned int tdm_tx_slot_offset_custom
 };
 
 
-struct snd_soc_card snd_soc_card_auto_8295_msm = {
+struct snd_soc_card sa8155_snd_soc_card_auto_msm = {
+        .name = "sa8155-adp-star-snd-card",
+};
+
+struct snd_soc_card sa8295_snd_soc_card_auto_msm = {
 	.name = "sa8295-adp-star-snd-card",
 };
 
-struct snd_soc_card snd_soc_card_auto_8155_msm = {
-        .name = "sa8155-adp-star-snd-card",
+struct snd_soc_card sa8255_snd_soc_card_auto_msm = {
+	.name = "sa8255-adp-star-snd-card",
 };
 
 /* Digital audio interface glue - connects codec <---> CPU */
@@ -598,6 +650,26 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	SND_SOC_DAILINK_REG(pri_tdm_tx_0),
 },
 {
+	.name = "SEC_TDM_RX_0",
+	.stream_name = "TDM-LPAIF-RX-SECONDARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(sec_tdm_rx_0),
+},
+{
+	.name = "SEC_TDM_TX_0",
+	.stream_name = "TDM-LPAIF-TX-SECONDARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(sec_tdm_tx_0),
+},
+{
 	.name = "TERT_TDM_RX_0",
 	.stream_name = "TDM-LPAIF-RX-TERTIARY",
 	.dpcm_playback = 1,
@@ -617,6 +689,106 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.ignore_pmdown_time = 1,
 	SND_SOC_DAILINK_REG(tert_tdm_tx_0),
 },
+{
+	.name = "HS_IF0_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_SDR-RX-PRIMARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if0_tdm_rx_0),
+},
+{
+	.name = "HS_IF0_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_SDR-TX-PRIMARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if0_tdm_tx_0),
+},
+{
+	.name = "HS_IF1_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_SDR-RX-SECONDARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if1_tdm_rx_0),
+},
+{
+	.name = "HS_IF1_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_SDR-TX-SECONDARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if1_tdm_tx_0),
+},
+{
+	.name = "HS_IF2_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_SDR-RX-TERTIARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if2_tdm_rx_0),
+},
+{
+	.name = "HS_IF2_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_SDR-TX-TERTIARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if2_tdm_tx_0),
+},
+{
+	.name = "HS_IF3_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_SDR-RX-QUATERNARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if3_tdm_rx_0),
+},
+{
+	.name = "HS_IF3_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_SDR-TX-QUATERNARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if3_tdm_tx_0),
+},
+{
+	.name = "HS_IF4_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_SDR-RX-QUINARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if4_tdm_rx_0),
+},
+{
+	.name = "HS_IF4_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_SDR-TX-QUINARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(hs_if4_tdm_tx_0),
+}
 };
 
 
@@ -724,8 +896,10 @@ static const struct of_device_id asoc_machine_of_match[]  = {
 	  .data = ""},
 	{ .compatible = "qcom,sa8295-asoc-snd-adp-star",
 	  .data = "adp_star_codec"},
-        { .compatible = "qcom,sa8155-asoc-snd-adp-star",
-          .data = "adp_star_codec"},
+	{ .compatible = "qcom,sa8155-asoc-snd-adp-star",
+	  .data = "adp_star_codec"},
+	{ .compatible = "qcom,sa8255-asoc-snd-adp-star",
+	  .data = "adp_star_codec"},
 	{},
 };
 
@@ -746,21 +920,18 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 		return NULL;
 	}
 
-	if (!strcmp(match->compatible, "qcom,sa8295-asoc-snd-adp-star")) {
-		card = &snd_soc_card_auto_8295_msm;
-		total_links = ARRAY_SIZE(msm_common_dai_links);
-		memcpy(msm_auto_dai_links,
-			msm_common_dai_links,
-			sizeof(msm_common_dai_links));
-		dailink = msm_auto_dai_links;
-	} else if (!strcmp(match->compatible, "qcom,sa8155-asoc-snd-adp-star")) {
-		card = &snd_soc_card_auto_8155_msm;
-		total_links = ARRAY_SIZE(msm_common_dai_links);
-		memcpy(msm_auto_dai_links,
-			msm_common_dai_links,
-			sizeof(msm_common_dai_links));
-		dailink = msm_auto_dai_links;
+	if (!strcmp(match->compatible, "qcom,sa8155-asoc-snd-adp-star")) {
+		card = &sa8155_snd_soc_card_auto_msm;
+	} else if (!strcmp(match->compatible, "qcom,sa8295-asoc-snd-adp-star")) {
+		card = &sa8295_snd_soc_card_auto_msm;
+	} else if (!strcmp(match->compatible, "qcom,sa8255-asoc-snd-adp-star")) {
+		card = &sa8255_snd_soc_card_auto_msm;
 	}
+	total_links = ARRAY_SIZE(msm_common_dai_links);
+	memcpy(msm_auto_dai_links,
+		msm_common_dai_links,
+		sizeof(msm_common_dai_links));
+	dailink = msm_auto_dai_links;
 
 	if (card) {
 		card->dai_link = dailink;
@@ -1163,7 +1334,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: No DT match found for sound card\n", __func__);
 		return -EINVAL;
 	}
-	if (strstr(match->compatible, "sa8295")) {
+	if (strstr(match->compatible, "sa8295") || strstr(match->compatible, "sa8255")) {
 		/* enable mclk pinctrl info from devicetree */
 		ret = msm_pinctrl_mclk_enable(pdev);
 		if (!ret) {
