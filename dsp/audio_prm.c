@@ -236,7 +236,7 @@ int audio_prm_set_lpass_core_clk_req(struct clk_cfg *cfg, uint32_t hw_core_id, u
 		pkt->hdr.opcode = PRM_CMD_RELEASE_HW_RSC;
 
         //pr_err("%s: clk_id %d size of cmd_req %ld \n",__func__, cfg->clk_id, sizeof(prm_cmd_request_hw_core_t));
-
+	memset(&prm_rsc_request, 0, sizeof(prm_rsc_request));
         prm_rsc_request.payload_header.payload_address_lsw = 0;
         prm_rsc_request.payload_header.payload_address_msw = 0;
         prm_rsc_request.payload_header.mem_map_handle = 0;
@@ -290,7 +290,7 @@ static int audio_prm_set_lpass_clk_cfg_req(struct clk_cfg *cfg)
 	pkt->hdr.opcode = PRM_CMD_REQUEST_HW_RSC;
 
 	//pr_err("%s: clk_id %d size of cmd_req %ld \n",__func__, cfg->clk_id, sizeof(prm_cmd_request_rsc_t));
-
+	memset(&prm_rsc_request, 0, sizeof(prm_rsc_request));
 	prm_rsc_request.payload_header.payload_address_lsw = 0;
 	prm_rsc_request.payload_header.payload_address_msw = 0;
 	prm_rsc_request.payload_header.mem_map_handle = 0;
@@ -343,7 +343,7 @@ static int audio_prm_set_lpass_clk_cfg_rel(struct clk_cfg *cfg)
         pkt->hdr.opcode = PRM_CMD_RELEASE_HW_RSC;
 
         //pr_err("%s: clk_id %d size of cmd_req %ld \n",__func__, cfg->clk_id, sizeof(prm_cmd_release_rsc_t));
-
+	memset(&prm_rsc_release, 0, sizeof(prm_rsc_release));
         prm_rsc_release.payload_header.payload_address_lsw = 0;
         prm_rsc_release.payload_header.payload_address_msw = 0;
         prm_rsc_release.payload_header.mem_map_handle = 0;
