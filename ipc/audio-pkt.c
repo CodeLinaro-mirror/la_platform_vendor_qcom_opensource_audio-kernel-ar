@@ -63,7 +63,7 @@ do {									      \
 #define MINOR_NUMBER_COUNT 1
 #define AUDPKT_DRIVER_NAME "aud_pasthru_adsp"
 #define CHANNEL_NAME "adsp_apps"
-
+#define MAX_PACKET_SIZE 4096
 
 enum audio_pkt_state {
 	AUDIO_PKT_INIT,
