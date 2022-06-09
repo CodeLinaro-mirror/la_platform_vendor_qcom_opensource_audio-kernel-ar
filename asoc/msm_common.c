@@ -37,7 +37,7 @@ struct snd_card_pdata {
 #define DIR_SZ 10
 
 #define MAX_CODEC_DAI 8
-#define TDM_SLOT_WIDTH_BITS 32
+#define TDM_SLOT_WIDTH_BITS 16
 #define TDM_MAX_SLOTS 8
 #define MI2S_NUM_CHANNELS 2
 
@@ -324,7 +324,7 @@ static int get_tdm_clk_id(int index)
 		clk_id = CLOCK_ID_TER_TDM_IBIT;
 		break;
 	case QUAT_MI2S_TDM_AUXPCM:
-		clk_id = CLOCK_ID_QUAD_TDM_IBIT;
+		clk_id = CLOCK_ID_QUAD_TDM_EBIT;	//TDM in slave mode
 		break;
 	case QUIN_MI2S_TDM_AUXPCM:
 		clk_id = CLOCK_ID_QUI_TDM_IBIT;
