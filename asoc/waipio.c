@@ -89,10 +89,12 @@ static int dmic_0_1_gpio_cnt;
 static int dmic_2_3_gpio_cnt;
 static int dmic_4_5_gpio_cnt;
 
+#ifndef CONFIG_TDM_EXT
 static void *def_wcd_mbhc_cal(void);
 
 static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime*);
 static int msm_int_wsa_init(struct snd_soc_pcm_runtime*);
+#endif
 
 /*
  * Need to report LINEIN
@@ -398,6 +400,7 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
     return ret;
 }
 
+#ifndef CONFIG_TDM_EXT
 static struct snd_info_entry *msm_snd_info_create_subdir(struct module *mod,
 				const char *name,
 				struct snd_info_entry *parent)
@@ -491,6 +494,7 @@ static struct snd_soc_dai_link msm_common_be_dai_links[] = {
 		SND_SOC_DAILINK_REG(usb_audio_tx),
 	},
 };
+#endif
 
 static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 	{
@@ -532,6 +536,7 @@ static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	},
 };
 
+#ifndef CONFIG_TDM_EXT
 static struct snd_soc_dai_link msm_wsa_cdc_dma_be_dai_links[] = {
 	/* WSA CDC DMA Backend DAI Links */
 	{
@@ -805,6 +810,7 @@ static struct snd_soc_dai_link msm_va_cdc_dma_be_dai_links[] = {
 		SND_SOC_DAILINK_REG(va_dma_tx2),
 	},
 };
+#endif
 
 /*
  * I2S interface pinctrl mapping
@@ -1076,13 +1082,15 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 };
 
 static struct snd_soc_dai_link msm_waipio_dai_links[
+#ifndef CONFIG_TDM_EXT
 			ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_wsa2_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_wsa_wsa2_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_va_cdc_dma_be_dai_links) +
-			ARRAY_SIZE(ext_disp_be_dai_link) +
 			ARRAY_SIZE(msm_common_be_dai_links) +
+#endif
+			ARRAY_SIZE(ext_disp_be_dai_link) +
 			ARRAY_SIZE(msm_wcn_be_dai_links) +
 			ARRAY_SIZE(msm_mi2s_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links)];
@@ -1240,6 +1248,7 @@ static const struct of_device_id waipio_asoc_machine_of_match[]  = {
 
 static int msm_snd_card_late_probe(struct snd_soc_card *card)
 {
+#ifndef CONFIG_TDM_EXT
 	struct snd_soc_component *component = NULL;
 	struct snd_soc_pcm_runtime *rtd;
 	int ret = 0;
@@ -1284,11 +1293,14 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 			__func__, ret);
 		goto err_hs_detect;
 	}
+#endif
 	return 0;
 
+#ifndef CONFIG_TDM_EXT
 err_hs_detect:
 	kfree(mbhc_calibration);
 	return ret;
+#endif
 }
 
 static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int wsa_max_devs)
@@ -1311,6 +1323,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 		card = &snd_soc_card_waipio_msm;
 
 		/* late probe uses dai link at index '0' to get wcd component */
+#ifndef CONFIG_TDM_EXT
 		memcpy(msm_waipio_dai_links + total_links,
 		       msm_rx_tx_cdc_dma_be_dai_links,
 		       sizeof(msm_rx_tx_cdc_dma_be_dai_links));
@@ -1353,6 +1366,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 		       sizeof(msm_common_be_dai_links));
 		total_links += ARRAY_SIZE(msm_common_be_dai_links);
 
+#endif
 		rc = of_property_read_u32(dev->of_node,
 				"qcom,mi2s-audio-intf", &val);
 		if (!rc && val) {
@@ -1413,6 +1427,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 	return card;
 }
 
+#ifndef CONFIG_TDM_EXT
 static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 {
 	u8 spkleft_ports[WSA883X_MAX_SWR_PORTS] = {0, 1, 2, 3};
@@ -1641,6 +1656,7 @@ done:
 
 	return ret;
 }
+#endif
 
 static int waipio_ssr_enable(struct device *dev, void *data)
 {
@@ -1676,6 +1692,7 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 			__func__, card->dai_link[0].name);
 	}
 
+#ifndef CONFIG_TDM_EXT
 	if (pdata->wsa_max_devs > 0) {
 		rtd_wsa = snd_soc_get_pcm_runtime(card,
 			&card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)]);
@@ -1685,6 +1702,7 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 			__func__, card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)].name);
 		}
 	}
+#endif
 	/* set UPD configuration */
 	if(!pdata->upd_config.backend_used) {
 		dev_dbg(dev,
@@ -1882,6 +1900,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+#ifndef CONFIG_TDM_EXT
 	ret = snd_soc_of_parse_audio_routing(card, "qcom,audio-routing");
 	if (ret) {
 		dev_err(&pdev->dev, "%s: parse audio routing failed, err:%d\n",
@@ -1889,6 +1908,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
+#endif
 	ret = msm_populate_dai_link_component_of_node(card);
 	if (ret) {
 		ret = -EPROBE_DEFER;
