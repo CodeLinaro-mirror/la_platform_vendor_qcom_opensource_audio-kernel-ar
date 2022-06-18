@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef __CC_PKTZR_H_
@@ -15,7 +17,6 @@ struct cc_pktzr_pkt_t {
 } __packed;
 
 struct cc_pktzr_pkt_priv {
-	struct completion thread_complete;
 	spinlock_t cc_pktzr_lock;
 	uint32_t token;
 	struct list_head cc_list;
@@ -30,6 +31,7 @@ struct cc_pktzr_pkt_priv {
 } __packed;
 
 struct cc_pktzr_pkt_node {
+	struct completion thread_complete;
 	struct list_head list;
 	uint32_t token;
 	uint32_t opcode;

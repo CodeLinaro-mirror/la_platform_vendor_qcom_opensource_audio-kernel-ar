@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
@@ -97,9 +98,10 @@ struct cc_ipc_plat_private {
 	struct cc_ipc_priv *g_ipriv[CC_IPC_MAX_DEV];
 	struct work_struct add_child_dev_work;
 	struct mutex g_ipriv_lock;
-	struct delayed_work ssr_snd_event_work;
+	struct work_struct ssr_snd_event_work;
 	atomic_t audio_cc_state;
 	int cc_ipc_num_cdev;
+	int cc_ipc_dev_cnt;
 };
 
 struct cc_ipc_plat_private *cc_ipc_plat_priv;
@@ -612,10 +614,10 @@ static int cc_ipc_notifier_service_cb(struct notifier_block *this,
 		break;
 	case AUDIO_NOTIFIER_SERVICE_UP:
 		/*
-		 * Delaying work to call SND_EVENT_UP after rpmsg probe
+		 * In case of SSR, domain state is not updated as part of audio notifier register
+		 * and service call back can't be triggered from audio notifier.
+		 * Trigger SND_EVENT_UP notification as part of rpmsg probe.
 		 */
-		schedule_delayed_work(&cc_ipc_plat_priv->ssr_snd_event_work,
-				msecs_to_jiffies(3 * 1000));
 		break;
 	default:
 		break;
@@ -811,6 +813,13 @@ static int cc_ipc_rpmsg_probe(struct rpmsg_device *rpdev)
 		schedule_work(&cc_ipc_plat_priv->add_child_dev_work);
 	}
 
+	cc_ipc_plat_priv->cc_ipc_dev_cnt++;
+	if (cc_ipc_plat_priv->cc_ipc_dev_cnt == CC_IPC_MAX_DEV)
+		schedule_work(&cc_ipc_plat_priv->ssr_snd_event_work);
+	else if (cc_ipc_plat_priv->cc_ipc_dev_cnt > CC_IPC_MAX_DEV)
+		dev_err(dev, "%s: dev cnt %d excedded max cnt %d\n", __func__,
+			    cc_ipc_plat_priv->cc_ipc_dev_cnt, CC_IPC_MAX_DEV);
+
 	return 0;
 
 cleanup:
@@ -831,9 +840,12 @@ static void cc_ipc_rpmsg_remove(struct rpmsg_device *rpdev)
 		ipriv->rpdev = NULL;
 		mutex_unlock(&cc_ipc_plat_priv->g_ipriv_lock);
 		dev_set_drvdata(dev, NULL);
+		cc_ipc_plat_priv->cc_ipc_dev_cnt--;
 	} else {
 		dev_err(dev, "%s: no ipc g_ipriv\n", __func__);
 	}
+
+	dev_dbg(dev, "%s: dev cnt %d\n", __func__, cc_ipc_plat_priv->cc_ipc_dev_cnt);
 }
 
 static const struct of_device_id cc_ipc_of_match[] = {
@@ -867,7 +879,7 @@ static int audio_cc_ipc_platform_driver_probe(struct platform_device *pdev)
 	mutex_init(&cc_ipc_plat_priv->g_ipriv_lock);
 
 	INIT_WORK(&cc_ipc_plat_priv->add_child_dev_work, cc_ipc_add_child_dev_func);
-	INIT_DELAYED_WORK(&cc_ipc_plat_priv->ssr_snd_event_work, cc_ipc_snd_event_func);
+	INIT_WORK(&cc_ipc_plat_priv->ssr_snd_event_work, cc_ipc_snd_event_func);
 
 	ret = cc_ipc_plat_init(cc_ipc_plat_priv);
 	if (ret < 0) {
@@ -901,6 +913,7 @@ static int audio_cc_ipc_platform_driver_probe(struct platform_device *pdev)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",	__func__, ret);
 
 	cc_ipc_plat_priv->is_initial_boot = true;
+	cc_ipc_plat_priv->cc_ipc_dev_cnt = 0;
 
 	return 0;
 
