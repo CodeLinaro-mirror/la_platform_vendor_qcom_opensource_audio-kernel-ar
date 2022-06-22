@@ -1491,7 +1491,7 @@ static int wcd938x_codec_enable_dmic(struct snd_soc_dapm_widget *w,
 				true);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		wcd938x_tx_connect_port(component, DMIC0 + (w->shift), 0,
+		wcd938x_tx_connect_port(component, DMIC1 + (w->shift), 0,
 				false);
 		snd_soc_component_update_bits(component,
 				WCD938X_DIGITAL_CDC_AMIC_CTL,
