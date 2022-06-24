@@ -1944,9 +1944,9 @@ static int swrm_disconnect_port(struct swr_master *master,
 		if (!port_req) {
 			dev_err(&master->dev, "%s:port not enabled : port %d\n",
 					 __func__, portinfo->port_id[i]);
-			goto err;
+		} else {
+			port_req->req_ch &= ~portinfo->ch_en[i];
 		}
-		port_req->req_ch &= ~portinfo->ch_en[i];
 		mport->req_ch &= ~mstr_ch_mask;
 		if (swrm->clk_stop_mode0_supp &&
 				swrm->dynamic_port_map_supported &&
