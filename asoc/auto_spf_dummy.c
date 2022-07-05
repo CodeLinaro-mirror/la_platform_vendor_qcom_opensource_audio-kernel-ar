@@ -34,7 +34,7 @@
 #include "msm_common.h"
 
 
-#define DRV_NAME "sa8295-asoc-snd"
+#define DRV_NAME "spf-asoc-snd"
 
 #define __CHIPSET__ "SA8xx5 "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
@@ -565,8 +565,12 @@ static unsigned int tdm_tx_slot_offset_custom
 };
 
 
-struct snd_soc_card snd_soc_card_auto_msm = {
+struct snd_soc_card snd_soc_card_auto_8295_msm = {
 	.name = "sa8295-adp-star-snd-card",
+};
+
+struct snd_soc_card snd_soc_card_auto_8155_msm = {
+        .name = "sa8155-adp-star-snd-card",
 };
 
 /* Digital audio interface glue - connects codec <---> CPU */
@@ -720,6 +724,8 @@ static const struct of_device_id asoc_machine_of_match[]  = {
 	  .data = ""},
 	{ .compatible = "qcom,sa8295-asoc-snd-adp-star",
 	  .data = "adp_star_codec"},
+        { .compatible = "qcom,sa8155-asoc-snd-adp-star",
+          .data = "adp_star_codec"},
 	{},
 };
 
@@ -740,8 +746,15 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 		return NULL;
 	}
 
-	if (!strcmp(match->data, "adp_star_codec")) {
-		card = &snd_soc_card_auto_msm;
+	if (!strcmp(match->compatible, "qcom,sa8295-asoc-snd-adp-star")) {
+		card = &snd_soc_card_auto_8295_msm;
+		total_links = ARRAY_SIZE(msm_common_dai_links);
+		memcpy(msm_auto_dai_links,
+			msm_common_dai_links,
+			sizeof(msm_common_dai_links));
+		dailink = msm_auto_dai_links;
+	} else if (!strcmp(match->compatible, "qcom,sa8155-asoc-snd-adp-star")) {
+		card = &snd_soc_card_auto_8155_msm;
 		total_links = ARRAY_SIZE(msm_common_dai_links);
 		memcpy(msm_auto_dai_links,
 			msm_common_dai_links,

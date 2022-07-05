@@ -269,8 +269,13 @@ swr_dmic_dlkm-y := $(SWR_DMIC_OBJS)
 obj-$(CONFIG_SND_SOC_WSA881X_ANALOG) += wsa881x_analog_dlkm.o
 wsa881x_analog_dlkm-y := $(WSA881X_ANALOG_OBJS)
 
-obj-$(CONFIG_SND_SOC_MSM_STUB) += stub_dlkm.o
-stub_dlkm-y := $(STUB_OBJS)
+ifdef CONFIG_SND_SOC_SA8155_AUTO_SPF
+	obj-$(CONFIG_SND_SOC_MSM_STUB) += stub_ar_dlkm.o
+	stub_ar_dlkm-y := $(STUB_OBJS)
+else
+	obj-$(CONFIG_SND_SOC_MSM_STUB) += stub_dlkm.o
+	stub_dlkm-y := $(STUB_OBJS)
+endif
 
 obj-$(CONFIG_SND_SOC_WCD_CPE) += wcd_cpe_dlkm.o
 wcd_cpe_dlkm-y := $(WCD_CPE_OBJS)

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/platform_device.h>
@@ -8,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/of_device.h>
 #include <soc/snd_event.h>
+#include <soc/qcom/boot_stats.h>
 
 struct snd_event_client {
 	struct list_head node;
@@ -498,6 +500,18 @@ exit:
 	return ret;
 }
 EXPORT_SYMBOL(snd_event_notify);
+
+static int __init snd_event_init(void)
+{
+	place_marker("M - Driver Sound Event Init");
+	return 0;
+}
+module_init(snd_event_init);
+
+static void __exit snd_event_exit(void)
+{
+}
+module_exit(snd_event_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("SND event module");

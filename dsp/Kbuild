@@ -211,14 +211,24 @@ ifeq ($(KERNEL_BUILD), 0)
 KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/ipc/Module.symvers
 endif
 
-obj-$(CONFIG_SND_SOC_MSM_QDSP6V2_INTF) += q6_dlkm.o
-q6_dlkm-y := $(Q6_OBJS)
+ifdef CONFIG_SND_SOC_SA8155_AUTO_SPF
+	obj-$(CONFIG_SND_SOC_MSM_QDSP6V2_INTF) += q6_ar_dlkm.o
+	q6_ar_dlkm-y := $(Q6_OBJS)
+else
+	obj-$(CONFIG_SND_SOC_MSM_QDSP6V2_INTF) += q6_dlkm.o
+	q6_dlkm-y := $(Q6_OBJS)
+endif
 
 obj-$(CONFIG_SND_SOC_MSM_QDSP6V2_VM) += q6_dlkm.o
 q6_dlkm-y := $(Q6_OBJS)
 
-obj-$(CONFIG_MSM_ADSP_LOADER) += adsp_loader_dlkm.o
-adsp_loader_dlkm-y := $(ADSP_LOADER_OBJS)
+ifdef CONFIG_SND_SOC_SA8155_AUTO_SPF
+	obj-$(CONFIG_MSM_ADSP_LOADER) += adsp_loader_ar_dlkm.o
+	adsp_loader_ar_dlkm-y := $(ADSP_LOADER_OBJS)
+else
+	obj-$(CONFIG_MSM_ADSP_LOADER) += adsp_loader_dlkm.o
+	adsp_loader_dlkm-y := $(ADSP_LOADER_OBJS)
+endif
 
 obj-$(CONFIG_MSM_QDSP6_PDR) += q6_pdr_dlkm.o
 q6_pdr_dlkm-y := $(QDSP6_PDR_OBJS)
