@@ -176,7 +176,9 @@ struct lpass_cdc_va_macro_priv {
 	int dapm_tx_clk_status;
 	u16 current_clk_id;
 	bool dev_up;
+	bool pre_dev_up;
 	bool swr_dmic_enable;
+	bool use_lpi_mixer_control;
 };
 
 static bool lpass_cdc_va_macro_get_data(struct snd_soc_component *component,
@@ -280,7 +282,8 @@ static int lpass_cdc_va_macro_mclk_enable(
 					va_priv->default_clk_id,
 					va_priv->clk_id,
 					false);
-		lpass_cdc_va_macro_core_vote(va_priv, false);
+		if (!ret)
+			lpass_cdc_va_macro_core_vote(va_priv, false);
 	}
 exit:
 	mutex_unlock(&va_priv->mclk_lock);
@@ -321,6 +324,7 @@ static int lpass_cdc_va_macro_event_handler(struct snd_soc_component *component,
 				__func__);
 		break;
 	case LPASS_CDC_MACRO_EVT_PRE_SSR_UP:
+		va_priv->pre_dev_up = true;
 		/* enable&disable VA_CORE_CLK to reset GFMUX reg */
 		ret = lpass_cdc_va_macro_core_vote(va_priv, true);
 		if (ret < 0) {
@@ -356,6 +360,7 @@ static int lpass_cdc_va_macro_event_handler(struct snd_soc_component *component,
 		lpass_cdc_rsc_clk_reset(va_dev, VA_CORE_CLK);
 		break;
 	case LPASS_CDC_MACRO_EVT_SSR_DOWN:
+		va_priv->pre_dev_up = false;
 		va_priv->dev_up = false;
 		if (va_priv->swr_ctrl_data) {
 			swrm_wcd_notify(
@@ -413,16 +418,13 @@ static int lpass_cdc_va_macro_swr_pwr_event(struct snd_soc_dapm_widget *w,
 	int ret = 0;
 	struct device *va_dev = NULL;
 	struct lpass_cdc_va_macro_priv *va_priv = NULL;
+	bool vote_err = false;
 
 	if (!lpass_cdc_va_macro_get_data(component, &va_dev,
 					 &va_priv, __func__))
 		return -EINVAL;
 
-	/**
-	 * no need to switch to va_core_clk if va is chosen to
-	 * run based off tx_core_clk
-	 */
-	if (va_priv->clk_id == TX_CORE_CLK)
+	if (!va_priv->use_lpi_mixer_control)
 		return 0;
 
 	dev_dbg(va_dev, "%s: event = %d, lpi_enable = %d\n",
@@ -496,12 +498,14 @@ static int lpass_cdc_va_macro_swr_pwr_event(struct snd_soc_dapm_widget *w,
 					__func__);
 				if (va_priv->dev_up)
 					break;
+				vote_err = true;
 			}
 			ret = lpass_cdc_clk_rsc_request_clock(va_priv->dev,
 					va_priv->default_clk_id,
 					VA_CORE_CLK,
 					false);
-			lpass_cdc_va_macro_core_vote(va_priv, false);
+			if (!vote_err)
+				lpass_cdc_va_macro_core_vote(va_priv, false);
 			if (ret) {
 				dev_err_ratelimited(component->dev,
 					"%s: request clock VA_CLK disable failed\n",
@@ -567,7 +571,7 @@ static int lpass_cdc_va_macro_mclk_event(struct snd_soc_dapm_widget *w,
 		if (!ret)
 			va_priv->dapm_tx_clk_status++;
 
-		if (va_priv->clk_id == TX_CORE_CLK) {
+		if (!va_priv->use_lpi_mixer_control) {
 			ret = lpass_cdc_va_macro_mclk_enable(va_priv, 1, true);
 		} else {
 			if (va_priv->lpi_enable)
@@ -577,7 +581,7 @@ static int lpass_cdc_va_macro_mclk_event(struct snd_soc_dapm_widget *w,
 		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		if (va_priv->clk_id == TX_CORE_CLK) {
+		if (!va_priv->use_lpi_mixer_control) {
 			lpass_cdc_va_macro_mclk_enable(va_priv, 0, true);
 		} else {
 			if (va_priv->lpi_enable)
@@ -741,6 +745,11 @@ static int lpass_cdc_va_macro_core_vote(void *handle, bool enable)
 		pr_err_ratelimited("%s: va priv data is NULL\n", __func__);
 		return -EINVAL;
 	}
+	if (!va_priv->pre_dev_up && enable) {
+		pr_err("%s: adsp is not up\n", __func__);
+		return -EINVAL;
+	}
+
 	trace_printk("%s, enter: enable %d\n", __func__, enable);
 	if (enable) {
 		pm_runtime_get_sync(va_priv->dev);
@@ -2511,6 +2520,13 @@ static int lpass_cdc_va_macro_probe(struct platform_device *pdev)
 	va_priv->default_clk_id = default_clk_id;
 	va_priv->current_clk_id = TX_CORE_CLK;
 
+	va_priv->use_lpi_mixer_control = false;
+	if (of_find_property(pdev->dev.of_node, "use-lpi-control", NULL)) {
+		dev_dbg(&pdev->dev, "%s(): Usage of LPI Enable mixer control is enabled\n",
+				__func__);
+		va_priv->use_lpi_mixer_control = true;
+	}
+
 	if (is_used_va_swr_gpio) {
 		va_priv->reset_swr = true;
 		INIT_WORK(&va_priv->lpass_cdc_va_macro_add_child_devices_work,
@@ -2525,6 +2541,7 @@ static int lpass_cdc_va_macro_probe(struct platform_device *pdev)
 		mutex_init(&va_priv->swr_clk_lock);
 	}
 	va_priv->is_used_va_swr_gpio = is_used_va_swr_gpio;
+	va_priv->pre_dev_up = true;
 
 	mutex_init(&va_priv->mclk_lock);
 	dev_set_drvdata(&pdev->dev, va_priv);
