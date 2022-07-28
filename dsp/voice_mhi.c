@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/dma-mapping.h>
@@ -72,21 +73,21 @@ struct voice_mhi {
 typedef struct vcpm_param_id_mailbox_memory_config_t
 {
   uint32_t mailbox_mem_address_adsp_lsw;
-  /**< Lower 32 bits of IO virtual address(understandable to ADSP) of Mailbox Memory carved out from APQ DDR 
+  /**< Lower 32 bits of IO virtual address(understandable to ADSP) of Mailbox Memory carved out from APQ DDR
        specifically for mailbox packet exchange between ADSP and MDM. */
- 
+
   uint32_t mailbox_mem_address_adsp_msw;
-  /**< Upper 32 bits of IO virtual address(understandable to ADSP) of Mailbox Memory carved out from APQ DDR 
+  /**< Upper 32 bits of IO virtual address(understandable to ADSP) of Mailbox Memory carved out from APQ DDR
        specifically for mailbox packet exchange between ADSP and MDM. */
- 
+
   uint32_t mailbox_mem_address_pcie_lsw;
-  /**< Lower 32 bits of IO virtual address(understandable to PCIe) of Mailbox Memory carved out from APQ DDR 
+  /**< Lower 32 bits of IO virtual address(understandable to PCIe) of Mailbox Memory carved out from APQ DDR
        specifically for mailbox packet exchange between ADSP and MDM. */
- 
+
   uint32_t mailbox_mem_address_pcie_msw;
-  /**< Upper 32 bits of IO virtual address(understandable to PCIe) of Mailbox Memory carved out from APQ DDR 
+  /**< Upper 32 bits of IO virtual address(understandable to PCIe) of Mailbox Memory carved out from APQ DDR
        specifically for mailbox packet exchange between ADSP and MDM. */
- 
+
   uint32_t mem_size;
   /**< Size(in bytes) of the Mailbox Memory carved out from APQ DDR.
    */
@@ -590,7 +591,7 @@ static int voice_mhi_probe(struct platform_device *pdev)
 					 __func__, (unsigned long)phys_addr);
 		}
 
-		ret = msm_audio_ion_dma_map(&phys_addr, &iova, mem_size,
+		ret = spf_msm_audio_ion_dma_map(&phys_addr, &iova, mem_size,
 					DMA_BIDIRECTIONAL);
 		if (ret) {
 			pr_err("%s: dma mapping failed %d\n", __func__, ret);

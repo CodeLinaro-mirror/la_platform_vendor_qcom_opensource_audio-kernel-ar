@@ -40,11 +40,11 @@ endif
 
 ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), qtiquingvm8295))
 KBUILD_OPTIONS += CONFIG_QTI_QUIN_GVM=y
-obj-m := ipc/
-obj-m += dsp/
-obj-m += asoc/
-obj-m += asoc/codecs/
-obj-m += soc/
+endif
+
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa8295))
+KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
+KBUILD_OPTIONS += CONFIG_SND_SOC_SA8295=m
 endif
 
 define PROCESS_HEADERS

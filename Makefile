@@ -31,7 +31,7 @@ export
 endif
 endif
 
-ifeq ($(CONFIG_QTI_QUIN_GVM), y)
+ifneq ($(findstring y, $(CONFIG_QTI_QUIN_GVM)$(CONFIG_ARCH_SA8155)),)
 # Use USERINCLUDE when you must reference the UAPI directories only.
 USERINCLUDE     += \
                 -I$(srctree)/techpack/audio-ar/include/uapi/audio
