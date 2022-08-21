@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -293,7 +294,7 @@ err:
 	return rc;
 }
 
-int msm_audio_ion_get_smmu_info(struct device **cb_dev,
+int spf_msm_audio_ion_get_smmu_info(struct device **cb_dev,
 		u64 *smmu_sid)
 {
 	if (!cb_dev || !smmu_sid) {
@@ -397,7 +398,7 @@ static u32 msm_audio_ion_get_smmu_sid_mode32(void)
 }
 
 /**
- * msm_audio_ion_alloc -
+ * spf_msm_audio_ion_alloc -
  *        Allocs ION memory for given client name
  *
  * @dma_buf: dma_buf for the ION memory
@@ -408,7 +409,8 @@ static u32 msm_audio_ion_get_smmu_sid_mode32(void)
  *
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_alloc(struct dma_buf **dma_buf, size_t bufsz,
+int spf_msm_audio_ion_alloc(struct dma_buf **dma_buf, size_t bufsz,
+
 			dma_addr_t *paddr, size_t *plen, void **vaddr)
 {
 	int rc = -EINVAL;
@@ -453,7 +455,7 @@ int msm_audio_ion_alloc(struct dma_buf **dma_buf, size_t bufsz,
 err:
 	return rc;
 }
-EXPORT_SYMBOL(msm_audio_ion_alloc);
+EXPORT_SYMBOL(spf_msm_audio_ion_alloc);
 
 int msm_audio_ion_phys_free(void *handle,
 			   dma_addr_t *paddr,
@@ -481,7 +483,7 @@ bool msm_audio_is_hypervisor_supported(void)
 }
 EXPORT_SYMBOL(msm_audio_is_hypervisor_supported);
 /**
- * msm_audio_ion_dma_map -
+ * spf_msm_audio_ion_dma_map -
  *        Memory maps for a given DMA buffer
  *
  * @phys_addr: Physical address of DMA buffer to be mapped
@@ -490,7 +492,7 @@ EXPORT_SYMBOL(msm_audio_is_hypervisor_supported);
  * @dir: DMA direction
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_dma_map(dma_addr_t *phys_addr, dma_addr_t *iova_base,
+int spf_msm_audio_ion_dma_map(dma_addr_t *phys_addr, dma_addr_t *iova_base,
 			u32 size, enum dma_data_direction dir)
 {
 	dma_addr_t iova;
@@ -515,7 +517,7 @@ int msm_audio_ion_dma_map(dma_addr_t *phys_addr, dma_addr_t *iova_base,
 
 	return 0;
 }
-EXPORT_SYMBOL(msm_audio_ion_dma_map);
+EXPORT_SYMBOL(spf_msm_audio_ion_dma_map);
 
 void msm_audio_fd_list_debug(void)
 {
@@ -613,7 +615,7 @@ void msm_audio_get_handle(int fd, void **handle)
 }
 
 /**
- * msm_audio_ion_import-
+ * spf_msm_audio_ion_import-
  *        Import ION buffer with given file descriptor
  *
  * @dma_buf: dma_buf for the ION memory
@@ -626,7 +628,7 @@ void msm_audio_get_handle(int fd, void **handle)
  *
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_import(struct dma_buf **dma_buf, int fd,
+int spf_msm_audio_ion_import(struct dma_buf **dma_buf, int fd,
 			unsigned long *ionflag, size_t bufsz,
 			dma_addr_t *paddr, size_t *plen, void **vaddr)
 {
@@ -676,10 +678,10 @@ err:
 	*dma_buf = NULL;
 	return rc;
 }
-EXPORT_SYMBOL(msm_audio_ion_import);
+EXPORT_SYMBOL(spf_msm_audio_ion_import);
 
 /**
- * msm_audio_ion_import_cma-
+ * spf_msm_audio_ion_import_cma-
  *        Import ION buffer with given file descriptor
  *
  * @dma_buf: dma_buf for the ION memory
@@ -692,7 +694,7 @@ EXPORT_SYMBOL(msm_audio_ion_import);
  *
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_import_cma(struct dma_buf **dma_buf, int fd,
+int spf_msm_audio_ion_import_cma(struct dma_buf **dma_buf, int fd,
 			unsigned long *ionflag, size_t bufsz,
 			dma_addr_t *paddr, size_t *plen, void **vaddr)
 {
@@ -737,17 +739,17 @@ err:
 	*dma_buf = NULL;
 	return rc;
 }
-EXPORT_SYMBOL(msm_audio_ion_import_cma);
+EXPORT_SYMBOL(spf_msm_audio_ion_import_cma);
 
 /**
- * msm_audio_ion_free -
+ * spf_msm_audio_ion_free -
  *        fress ION memory for given client and handle
  *
  * @dma_buf: dma_buf for the ION memory
  *
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_free(struct dma_buf *dma_buf)
+int spf_msm_audio_ion_free(struct dma_buf *dma_buf)
 {
 	int ret = 0;
 
@@ -764,7 +766,7 @@ int msm_audio_ion_free(struct dma_buf *dma_buf)
 
 	return 0;
 }
-EXPORT_SYMBOL(msm_audio_ion_free);
+EXPORT_SYMBOL(spf_msm_audio_ion_free);
 
 /**
  * msm_audio_ion_crash_handler -
@@ -782,7 +784,7 @@ void msm_audio_ion_crash_handler(void)
 	list_for_each_entry(msm_audio_fd_data,
 		&msm_audio_ion_data.fd_list, list) {
 		handle = msm_audio_fd_data->handle;
-		msm_audio_ion_free(handle);
+		spf_msm_audio_ion_free(handle);
 	}
 	list_for_each_safe(ptr, next,
 		&msm_audio_ion_data.fd_list) {
@@ -795,14 +797,14 @@ void msm_audio_ion_crash_handler(void)
 EXPORT_SYMBOL(msm_audio_ion_crash_handler);
 
 /**
- * msm_audio_ion_free_cma -
+ * spf_msm_audio_ion_free_cma -
  *        fress ION memory for given client and handle
  *
  * @dma_buf: dma_buf for the ION memory
  *
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_free_cma(struct dma_buf *dma_buf)
+int spf_msm_audio_ion_free_cma(struct dma_buf *dma_buf)
 {
 	if (!dma_buf) {
 		pr_err("%s: dma_buf invalid\n", __func__);
@@ -813,10 +815,10 @@ int msm_audio_ion_free_cma(struct dma_buf *dma_buf)
 
 	return 0;
 }
-EXPORT_SYMBOL(msm_audio_ion_free_cma);
+EXPORT_SYMBOL(spf_msm_audio_ion_free_cma);
 
 /**
- * msm_audio_ion_mmap -
+ * spf_msm_audio_ion_mmap -
  *       Audio ION memory map
  *
  * @abuff: audio buf pointer
@@ -824,7 +826,7 @@ EXPORT_SYMBOL(msm_audio_ion_free_cma);
  *
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_mmap(struct audio_buffer *abuff,
+int spf_msm_audio_ion_mmap(struct audio_buffer *abuff,
 		       struct vm_area_struct *vma)
 {
 	struct msm_audio_alloc_data *alloc_data = NULL;
@@ -899,10 +901,10 @@ int msm_audio_ion_mmap(struct audio_buffer *abuff,
 
 	return ret;
 }
-EXPORT_SYMBOL(msm_audio_ion_mmap);
+EXPORT_SYMBOL(spf_msm_audio_ion_mmap);
 
 /**
- * msm_audio_ion_cache_operations-
+ * spf_msm_audio_ion_cache_operations-
  *       Cache operations on cached Audio ION buffers
  *
  * @abuff: audio buf pointer
@@ -910,7 +912,7 @@ EXPORT_SYMBOL(msm_audio_ion_mmap);
  *
  * Returns 0 on success or error on failure
  */
-int msm_audio_ion_cache_operations(struct audio_buffer *abuff, int cache_op)
+int spf_msm_audio_ion_cache_operations(struct audio_buffer *abuff, int cache_op)
 {
 	unsigned long ionflag = 0;
 	int rc = 0;
@@ -949,23 +951,23 @@ int msm_audio_ion_cache_operations(struct audio_buffer *abuff, int cache_op)
 cache_op_failed:
 	return rc;
 }
-EXPORT_SYMBOL(msm_audio_ion_cache_operations);
+EXPORT_SYMBOL(spf_msm_audio_ion_cache_operations);
 
 /**
- * msm_audio_populate_upper_32_bits -
+ * spf_msm_audio_populate_upper_32_bits -
  *        retrieve upper 32bits of 64bit address
  *
  * @pa: 64bit physical address
  *
  */
-u32 msm_audio_populate_upper_32_bits(dma_addr_t pa)
+u32 spf_msm_audio_populate_upper_32_bits(dma_addr_t pa)
 {
 	if (sizeof(dma_addr_t) == sizeof(u32))
 		return msm_audio_ion_get_smmu_sid_mode32();
 	else
 		return upper_32_bits(pa);
 }
-EXPORT_SYMBOL(msm_audio_populate_upper_32_bits);
+EXPORT_SYMBOL(spf_msm_audio_populate_upper_32_bits);
 
 static int msm_audio_ion_open(struct inode *inode, struct file *file)
 {
@@ -1012,7 +1014,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 			pr_err("%s : Out of memory ret %d\n", __func__, ret);
 			return ret;
 		}
-		ret = msm_audio_ion_import((struct dma_buf **)&mem_handle, (int)ioctl_param,
+		ret = spf_msm_audio_ion_import((struct dma_buf **)&mem_handle, (int)ioctl_param,
 					NULL, 0, &paddr, &pa_len, &vaddr);
 		if (ret < 0) {
 			pr_err("%s Memory map Failed %d\n", __func__, ret);
@@ -1026,7 +1028,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		break;
 	case IOCTL_UNMAP_PHYS_ADDR:
 		msm_audio_get_handle((int)ioctl_param, &mem_handle);
-		ret = msm_audio_ion_free(mem_handle);
+		ret = spf_msm_audio_ion_free(mem_handle);
 		if (ret < 0) {
 			pr_err("%s Ion free failed %d\n", __func__, ret);
 			return ret;
