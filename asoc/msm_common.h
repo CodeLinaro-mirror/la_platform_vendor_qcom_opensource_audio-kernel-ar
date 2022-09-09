@@ -43,7 +43,6 @@ struct msm_common_pdata {
 	uint32_t num_aud_devs;
 	struct device_node *mi2s_gpio_p[MI2S_TDM_AUXPCM_MAX];
 	struct mutex lock[MI2S_TDM_AUXPCM_MAX];
-	u32 tdm_max_slots; /* Max TDM slots used */
 	atomic_t mi2s_gpio_ref_cnt[MI2S_TDM_AUXPCM_MAX];
 	atomic_t lpass_intf_clk_ref_cnt[MI2S_TDM_AUXPCM_MAX];
 	atomic_t lpass_audio_hw_vote_ref_cnt;
