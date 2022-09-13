@@ -1571,17 +1571,18 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 		pdata = snd_soc_card_get_drvdata(card);
 
 	if (pdata)
+	{
 		common_pdata = pdata->common_pdata;
-
-	slatecom_unregister_notifier(pdata->slatecom_notifier_chain, &notifier_cc_dsp_nb);
-	msm_common_snd_deinit(common_pdata);
-
+		slatecom_unregister_notifier(pdata->slatecom_notifier_chain, &notifier_cc_dsp_nb);
+		if (common_pdata)
+			msm_common_snd_deinit(common_pdata);
 #if IS_ENABLED(CONFIG_DEEPSLEEP)
-	subsys_notif_unregister_notifier(pdata->subsys_nhdl, &subsys_adsp_qb_nb);
+		subsys_notif_unregister_notifier(pdata->subsys_nhdl, &subsys_adsp_qb_nb);
 #endif
-
+	}
 	snd_event_master_deregister(&pdev->dev);
-	snd_soc_unregister_card(card);
+	if(card)
+		snd_soc_unregister_card(card);
 
 	cs.card_status = SND_CARD_STATUS_OFFLINE;
 	cs.standby = false;

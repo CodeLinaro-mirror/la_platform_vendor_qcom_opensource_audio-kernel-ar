@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -44,7 +46,7 @@ static void cc_pktzr_recv_cb(void *data, size_t size)
 			memcpy(pnode->resp_payload, msg_pkt->payload,
 						size);
 			pnode->resp_size = size;
-			complete(&ppriv->thread_complete);
+			complete(&pnode->thread_complete);
 			spin_unlock(&ppriv->cc_pktzr_lock);
 			return;
 		}
@@ -71,7 +73,7 @@ int cc_pktzr_send_packet(uint32_t opcode, void *req_payload, size_t req_size,
 	struct cc_pktzr_pkt_node *pnode = NULL, *tmp = NULL;
 	ssize_t pkt_size = 0;
 	int found = 0;
-	int ret = 0;
+	int ret = -EINVAL;
 
 	if (!ppriv || !ppriv->pktzr_init_complete) {
 		pr_err("%s: packetizer not initialized\n",
@@ -112,7 +114,7 @@ int cc_pktzr_send_packet(uint32_t opcode, void *req_payload, size_t req_size,
 	list_add_tail(&pnode->list, &ppriv->cc_list);
 	spin_unlock(&ppriv->cc_pktzr_lock);
 
-	reinit_completion(&ppriv->thread_complete);
+	init_completion(&pnode->thread_complete);
 
 	ret = audio_cc_ipc_send_pkt(ppriv->handle, msg_pkt, pkt_size);
 	if (ret < 0) {
@@ -120,7 +122,7 @@ int cc_pktzr_send_packet(uint32_t opcode, void *req_payload, size_t req_size,
 		goto err;
 	}
 
-	ret = wait_for_completion_timeout(&ppriv->thread_complete,
+	ret = wait_for_completion_timeout(&pnode->thread_complete,
 					msecs_to_jiffies(CC_THREAD_TIMEOUT_MS));
 	if (!ret) {
 		pr_err("%s: Wait for thread timedout\n", __func__);
@@ -145,8 +147,11 @@ int cc_pktzr_send_packet(uint32_t opcode, void *req_payload, size_t req_size,
 	}
 
 	spin_unlock(&ppriv->cc_pktzr_lock);
-	if (!found)
+	if (!found || (*resp_payload == NULL)) {
+		pr_err("%s: packet response not received\n", __func__);
+		ret = -EINVAL;
 		goto err;
+	}
 	return 0;
 err:
 	kfree(msg_pkt);
@@ -283,7 +288,6 @@ int cc_pktzr_init(struct device *dev)
 	ppriv->dst_port = dst_port;
 
 	cc_pktzr_register_device();
-	init_completion(&ppriv->thread_complete);
 	spin_lock_init(&ppriv->cc_pktzr_lock);
 	INIT_LIST_HEAD(&ppriv->cc_list);
 	ppriv->pktzr_init_complete = true;
@@ -311,7 +315,6 @@ void cc_pktzr_deinit(void)
 		return;
 
 	cc_pktzr_deregister_device();
-	reinit_completion(&ppriv->thread_complete);
 	if (ppriv->handle)
 		kfree(ppriv->handle);
 	if (ppriv->channel_name)

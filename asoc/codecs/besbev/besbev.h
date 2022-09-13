@@ -1,11 +1,13 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- */
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+*/
 
 #ifndef _BESBEV_H
 #define _BESBEV_H
 
-#define BESBEV_MAX_SWR_PORTS 1
+#define BESBEV_MAX_SWR_PORTS 4
 #define BESBEV_DRV_NAME "besbev_codec"
 #define CONFIG_BESBEV_COMP_SUPPORT 0
 

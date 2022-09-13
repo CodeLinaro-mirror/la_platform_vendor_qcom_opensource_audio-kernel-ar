@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -18,20 +20,13 @@
 #include "cc_defs.h"
 #include "cc_pktzr.h"
 
-#define CC_MAX_SYSFS_STRLEN 64
+#define CC_MAX_SYSFS_BUF_SZ PAGE_SIZE
 #define CC_MAX_NUM_ELEM_IN_LIST 64
 #define CC_MAX_ELEM_LIST_SIZE (2 * CC_MAX_NUM_ELEM_IN_LIST)
 
 #define CC_CODEC_STR "cc_codec"
 
-enum {
-	CC_REG_REGION_INFO_ATTR,
-	CC_REG_MAX_ADDR_ATTR,
-	CC_REG_ADDR_ATTR,
-	CC_REG_COUNT_ATTR,
-	CC_REG_VALUE_ATTR,
-	CC_REG_ATTR_MAX,
-};
+typedef uint8_t reg_val_sz_t;
 
 struct cc_id_name_map {
 	uint32_t id;
@@ -40,12 +35,11 @@ struct cc_id_name_map {
 
 struct register_region {
 	struct cc_id_name_map *region_id;
+	uint32_t min_addr;
 	uint32_t max_addr;
 	uint32_t addr;
 	uint32_t count;
-	struct device_attribute reg_region_attr[CC_REG_ATTR_MAX];
-	struct attribute *attr[CC_REG_ATTR_MAX];
-	struct attribute_group attr_grp;
+	struct device *dev;
 };
 
 struct cc_usecase_info {
@@ -134,15 +128,8 @@ struct cc_codec_priv {
 	struct cc_interface *iface;
 	struct snd_soc_dai_driver *dai;
 	struct snd_soc_component_driver cc_comp;
-};
-
-struct cc_sysfs_attr_mapping {
-	umode_t mode;
-	char *name;
-	ssize_t (*show)(struct device *dev, struct device_attribute *attr,
-			char *buf);
-	ssize_t (*store)(struct device *dev, struct device_attribute *attr,
-			 const char *buf, size_t count);
+	struct class *class;	/* Debugging only */
+	struct notifier_block cc_adsp_nb;
 };
 
 typedef int (cc_add_elem_func)(struct cc_element *, int);
@@ -171,7 +158,9 @@ static int cc_parse_id_name(struct cc_codec_priv *cc_priv,
 	uint32_t tmp_len = 0;
 	int ret = 0;
 
-	cc_priv->id_name[cc_priv->num_id].id = *(uint32_t *)ptr;
+	pr_debug("%s: Start: id: 0x%x, num_id=%u\n", __func__,
+		 *(uint32_t *) ptr, cc_priv->num_id);
+	cc_priv->id_name[cc_priv->num_id].id = *(uint32_t *) ptr;
 	ptr += sizeof(uint32_t);
 
 	ret = cc_parse_name(cc_priv->id_name[cc_priv->num_id].name,
@@ -182,8 +171,12 @@ static int cc_parse_id_name(struct cc_codec_priv *cc_priv,
 		return ret;
 	}
 
-	cc_priv->num_id++;
 	*parsed_len = (sizeof(uint32_t) + tmp_len);
+	pr_debug("%s: End: id: 0x%x, name=%s, num_id=%u, parsed_len=%u\n",
+		 __func__, cc_priv->id_name[cc_priv->num_id].id,
+		 cc_priv->id_name[cc_priv->num_id].name, cc_priv->num_id,
+		 *parsed_len);
+	cc_priv->num_id++;
 
 	return 0;
 }
@@ -375,202 +368,453 @@ static void cc_modify_enum_action_val(struct cc_action *act, uint32_t val)
 	}
 }
 
-
-static int cc_find_region_id_from_attr(struct cc_codec_priv *cc_priv,
-					struct device_attribute *attr)
+static ssize_t cc_reg_region_info_show(struct device *dev,
+				       struct device_attribute *attr, char *buf)
 {
-	int i = 0;
-	int j = 0;
-
-	for (i = 0; i < cc_priv->num_reg_region; i++) {
-		for (j = 0; j < CC_REG_ATTR_MAX; j++) {
-			if (&attr->attr == cc_priv->reg_region[i].attr[j])
-				return i;
-		}
+	struct register_region *reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
+		return -EINVAL;
 	}
 
-	return -EINVAL;
+	return snprintf(buf, CC_MAX_SYSFS_BUF_SZ, "%d:%s\n",
+			reg_region->region_id->id, reg_region->region_id->name);
 }
 
-static ssize_t cc_reg_region_info_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+static DEVICE_ATTR(info, S_IRUGO, cc_reg_region_info_show, NULL);
+
+static ssize_t cc_reg_range_show(struct device *dev,
+				 struct device_attribute *attr, char *buf)
 {
-	int id = 0;
-	struct cc_codec_priv *cc_priv = dev_get_drvdata(dev);
+	struct register_region *reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
+		return -EINVAL;
+	}
 
-	id = cc_find_region_id_from_attr(cc_priv, attr);
-	if (id < 0)
-		return id;
-
-	return snprintf(buf, CC_MAX_SYSFS_STRLEN, "%d:%s\n",
-			cc_priv->reg_region[id].region_id->id,
-			cc_priv->reg_region[id].region_id->name);
+	return snprintf(buf, CC_MAX_SYSFS_BUF_SZ, "0x%04x-0x%04x\n",
+			reg_region->min_addr, reg_region->max_addr);
 }
 
-static ssize_t cc_reg_max_addr_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
-{
-	int id = 0;
-	struct cc_codec_priv *cc_priv = dev_get_drvdata(dev);
-
-	id = cc_find_region_id_from_attr(cc_priv, attr);
-	if (id < 0)
-		return id;
-
-	return snprintf(buf, CC_MAX_SYSFS_STRLEN, "0x%04x\n",
-			cc_priv->reg_region[id].max_addr);
-}
+static DEVICE_ATTR(range, S_IRUGO, cc_reg_range_show, NULL);
 
 static ssize_t cc_reg_addr_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+				struct device_attribute *attr, char *buf)
 {
-	int id = 0;
-	struct cc_codec_priv *cc_priv = dev_get_drvdata(dev);
+	struct register_region *reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
+		return -EINVAL;
+	}
 
-	id = cc_find_region_id_from_attr(cc_priv, attr);
-	if (id < 0)
-		return id;
-
-	return snprintf(buf, CC_MAX_SYSFS_STRLEN, "0x%04x\n",
-			cc_priv->reg_region[id].addr);
+	return snprintf(buf, CC_MAX_SYSFS_BUF_SZ, "0x%04x\n", reg_region->addr);
 }
 
 static ssize_t cc_reg_addr_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
+				 struct device_attribute *attr, const char *buf,
+				 size_t count)
 {
-	int id = 0;
 	uint32_t addr = 0;
 	int ret = 0;
-	struct cc_codec_priv *cc_priv = dev_get_drvdata(dev);
-
-	id = cc_find_region_id_from_attr(cc_priv, attr);
-	if (id < 0)
-		return id;
-
-	ret = kstrtouint(buf, 16, &addr);
-	if (ret < 0)
-		return ret;
-
-	if (addr > cc_priv->reg_region[id].max_addr) {
-		dev_err(dev, "Invalid addr %x, max addr: %x\n",
-			addr, cc_priv->reg_region[id].max_addr);
+	struct register_region *reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
 
-	cc_priv->reg_region[id].addr = addr;
+	ret = kstrtouint(buf, 16, &addr);
+	if (ret < 0) {
+		dev_err(dev, "%s: error ret=%d, use hex format\n", __func__,
+			ret);
+		return ret;
+	}
+
+	if (addr < reg_region->min_addr || addr > reg_region->max_addr) {
+		dev_err(dev, "Invalid addr %x, range: 0x%04x-0x%04x\n",
+			addr, reg_region->min_addr, reg_region->max_addr);
+		return -EINVAL;
+	}
+
+	reg_region->addr = addr;
 
 	return count;
 }
 
+static DEVICE_ATTR(addr, S_IWUSR | S_IRUGO, cc_reg_addr_show,
+		   cc_reg_addr_store);
+
 static ssize_t cc_reg_count_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+				 struct device_attribute *attr, char *buf)
 {
-	int id = 0;
-	struct cc_codec_priv *cc_priv = dev_get_drvdata(dev);
+	struct register_region *reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
+		return -EINVAL;
+	}
 
-	id = cc_find_region_id_from_attr(cc_priv, attr);
-	if (id < 0)
-		return id;
-
-	return snprintf(buf, CC_MAX_SYSFS_STRLEN, "0x%04x\n",
-			cc_priv->reg_region[id].count);
+	return snprintf(buf, CC_MAX_SYSFS_BUF_SZ, "%u\n", reg_region->count);
 }
 
 static ssize_t cc_reg_count_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
 {
-	int id = 0;
-	uint32_t cnt = 0;
+	uint32_t cnt = 0, addr_range = 0;
 	int ret = 0;
-	uint32_t addr = 0;
-	uint32_t max_addr = 0;
-	struct cc_codec_priv *cc_priv = dev_get_drvdata(dev);
-
-	id = cc_find_region_id_from_attr(cc_priv, attr);
-	if (id < 0)
-		return id;
-
-	ret = kstrtouint(buf, 10, &cnt);
-	if (ret < 0)
-		return ret;
-
-	addr = cc_priv->reg_region[id].addr;
-	max_addr = cc_priv->reg_region[id].max_addr;
-	if (cnt > (max_addr - addr + 1)) {
-		dev_err(dev, "Count should be <= %d\n", (max_addr - addr + 1));
+	struct register_region *reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
 
-	cc_priv->reg_region[id].count = cnt;
+	ret = kstrtouint(buf, 10, &cnt);
+	if (ret < 0) {
+		pr_err("%s: error ret=%d, use dec format\n", __func__, ret);
+		return ret;
+	}
+
+	addr_range = reg_region->max_addr - reg_region->min_addr + 1;
+	if (cnt > addr_range) {
+		dev_err(dev, "Count should be <= %u\n", addr_range);
+		return -EINVAL;
+	}
+
+	reg_region->count = cnt;
 
 	return count;
 }
 
-static int cc_send_pkt_with_response(uint32_t opcode, void *payload, size_t size)
+static DEVICE_ATTR(count, S_IWUSR | S_IRUGO, cc_reg_count_show,
+		   cc_reg_count_store);
+
+static int cc_send_pkt_with_response(uint32_t opcode, void *payload,
+				     size_t size)
 {
 	int rc = 0;
 	struct cc_resp_generic *resp = NULL;
 	size_t resp_size = 0;
 
-	rc = cc_pktzr_send_packet(opcode, payload, size, (void **)&resp, &resp_size);
-	if (rc)
-		return rc;
+	rc = cc_pktzr_send_packet(opcode, payload, size, (void **)&resp,
+				  &resp_size);
+	if (rc) {
+		pr_err("%s: opcode: %d: send_packet error: rc=%d\n", __func__,
+		       opcode, rc);
+		return -EINVAL;
+	}
 
-	if (resp && resp_size && (resp->opcode == opcode)) {
-		if (resp->response == RESPONSE_SUCESS)
-			return 0;
-		rc = resp->response;
-		pr_err("%s: opcode: %d resp: %d\n",
-			__func__, opcode, resp->response);
+	if (!resp || resp_size < CC_MIN_IPC_PAYLOAD_SIZE
+	    || resp->opcode != opcode) {
+		pr_err("%s: opcode: %d: Invalid response\n", __func__, opcode);
+		rc = -EINVAL;
+		goto end;
+	}
+
+	if (resp->response != RESPONSE_SUCESS) {
+		rc = -EINVAL;
+		pr_err("%s: opcode: %d failure resp: %d\n",
+		       __func__, opcode, resp->response);
+	}
+
+end:
+	if (!IS_ERR_OR_NULL(resp)) {
+		kfree(resp);
+		resp = NULL;
 	}
 
 	return rc;
 }
 
 static ssize_t cc_reg_value_show(struct device *dev,
-	struct device_attribute *attr, char *buf)
+				 struct device_attribute *attr, char *buf)
 {
-	return CC_MAX_SYSFS_STRLEN;
+	int ret = 0, i, buf_len;
+	struct register_region *reg_region = NULL;
+	cc_reg_request_t read_req;
+	cc_reg_response_t *read_resp = NULL;
+	size_t req_size = 0, resp_size =
+	    0 /* register output value size */;
+	reg_val_sz_t *reg_value = NULL;
+	uint32_t valid_range = 0, resp_num_reg;
+
+	reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
+		return -EINVAL;
+	}
+
+	read_req.dev_id = reg_region->region_id->id;
+	read_req.start_addr = reg_region->addr;
+	valid_range = reg_region->max_addr - reg_region->addr + 1;
+	if (reg_region->count > valid_range) {
+		dev_err(dev,
+			 "%s: warning: requested address count(%u) exceeds possible range(%u)\n",
+			 __func__, reg_region->count, valid_range);
+		return -ERANGE;
+	}
+	read_req.num_reg = reg_region->count;
+	req_size = sizeof(cc_reg_request_t);
+
+	/* Send read register command */
+	dev_dbg(dev, "%s: input: id=%u, addr=0x%x, count=%u: req-size=%lu\n",
+		__func__, read_req.dev_id, read_req.start_addr,
+		read_req.num_reg, req_size);
+	ret =
+	    cc_pktzr_send_packet(CC_CODEC_OPCODE_READ_REGISTER, &read_req,
+				 req_size, (void **)&read_resp, &resp_size);
+	if (ret) {
+		dev_err(dev, "%s: error send_pckt=%d\n", __func__, ret);
+		return -EINVAL;
+	}
+	if (!read_resp || resp_size < CC_MIN_IPC_PAYLOAD_SIZE) {
+		dev_err(dev, "%s: Invalid response\n", __func__);
+		ret = -EINVAL;
+		goto end;
+	}
+
+	if (read_resp->success != 0) {
+		dev_err(dev, "%s: error responce=%d\n", __func__,
+			read_resp->success);
+		ret = -EINVAL;
+		goto end;
+	}
+	dev_dbg(dev, "%s: responce=%d & resp_size=%lu\n", __func__,
+		read_resp->success, resp_size);
+
+	reg_value = (reg_val_sz_t *) & read_resp->payload[0];
+	resp_num_reg =
+	    (resp_size - CC_MIN_IPC_PAYLOAD_SIZE -
+	     sizeof(cc_reg_response_t)) / sizeof(reg_val_sz_t);
+	/* Loading output values */
+	ret =
+	    scnprintf(buf, CC_MAX_SYSFS_BUF_SZ,
+		     "Reg-base is 0x%x:\nFormat(hex): Offset-Value\n",
+		     reg_region->min_addr);
+	if (ret < 0) {
+		goto end;
+	}
+	for (i = 0, buf_len = ret;
+	     i < read_req.num_reg && i < resp_num_reg; i++) {
+		/* NOTE: With this format, max 450 registers can be read */
+		ret =
+		    scnprintf(buf + buf_len, CC_MAX_SYSFS_BUF_SZ - buf_len,
+			     "%04x: %02x\n", (read_req.start_addr + i) & 0xffff,
+			     reg_value[i]);
+		if (ret < 0) {
+			break;
+		}
+
+		/* Check if it exceeds the limit */
+		if ((CC_MAX_SYSFS_BUF_SZ - buf_len - 1) < ret)
+			break;
+
+		buf_len += ret;
+	}
+
+end:
+	if (!IS_ERR_OR_NULL(read_resp)) {
+		kfree(read_resp);
+		read_resp = NULL;
+	}
+
+	return ret < 0 ? -EINVAL : buf_len;
 }
 
 static ssize_t cc_reg_value_store(struct device *dev,
-	struct device_attribute *attr, const char *buf, size_t count)
+				  struct device_attribute *attr,
+				  const char *buf, size_t count)
 {
-	return count;
+	int ret = 0, i = 0;
+	struct register_region *reg_region = NULL;
+	cc_reg_request_t *write_req = NULL;
+	size_t req_size = 0 /* register input val size */ ;
+	uint32_t valid_range = 0;
+	reg_val_sz_t *reg_value = NULL;
+	char *val_key = NULL;
+
+	reg_region = dev_get_drvdata(dev);
+	if (IS_ERR_OR_NULL(reg_region)) {
+		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+			PTR_ERR(reg_region));
+		return -EINVAL;
+	}
+
+	valid_range = reg_region->max_addr - reg_region->addr + 1;
+	if (reg_region->count > valid_range) {
+		dev_err(dev,
+			 "%s: warning: requested address count(%u) exceeds possible range(%u)\n",
+			 __func__, reg_region->count, valid_range);
+		return -ERANGE;
+	}
+
+	req_size =
+	    ((sizeof(reg_val_sz_t) * reg_region->count) +
+	     sizeof(cc_reg_request_t));
+	write_req = (cc_reg_request_t *) kzalloc(req_size, GFP_KERNEL);
+	if (IS_ERR_OR_NULL(write_req)) {
+		dev_err(dev, "%s: error write_req mem=%d\n", __func__,
+			PTR_ERR(write_req));
+		return -ENOMEM;
+	}
+
+	write_req->dev_id = reg_region->region_id->id;
+	write_req->start_addr = reg_region->addr;
+	write_req->num_reg = reg_region->count;
+	reg_value = (reg_val_sz_t *) & write_req->payload[0];
+
+	/* Loading input values */
+	for (i = 0; i < reg_region->count; i++) {
+		val_key = strsep((char **)&buf, " ");
+		if (val_key == NULL) {
+			dev_err(dev, "%s: val_key is null: i=%d\n", __func__,
+				i);
+			break;
+		}
+
+		ret = sscanf(val_key, "%hhx", reg_value + i);
+		if (ret < 0) {
+			dev_err(dev, "%s: error ret=%d, use hex format\n",
+				__func__, ret);
+			break;
+		}
+		dev_dbg(dev, "%s: Value=%hhu, ret=%d\n", __func__,
+			*(uint8_t *) (reg_value + i), ret);
+	}
+
+	if (ret < 0) {
+		goto end;
+	}
+
+	/* Check if inputs are proper */
+	if (i != reg_region->count || strsep((char **)&buf, " ") != NULL) {
+		dev_err(dev,
+			"%s: Number of input values doesn't match with count value\n",
+			__func__);
+		ret = -ERANGE;
+		goto end;
+	}
+
+	/* Send write register command */
+	dev_dbg(dev, "%s: input: id=%u, addr=0x%x, count=%u\n", __func__,
+		write_req->dev_id, write_req->start_addr, write_req->num_reg);
+	ret =
+	    cc_send_pkt_with_response(CC_CODEC_OPCODE_WRITE_REGISTER, write_req,
+				      req_size);
+	if (ret) {
+		dev_err(dev, "%s: error send_pckt=%d\n", __func__, ret);
+		ret = -EINVAL;
+	}
+
+end:
+	if (!IS_ERR_OR_NULL(write_req)) {
+		kfree(write_req);
+		write_req = NULL;
+	}
+
+	return ret < 0 ? -EINVAL : count;
 }
 
-static struct cc_sysfs_attr_mapping cc_sysfs_attr_map[] = {
-	[CC_REG_REGION_INFO_ATTR] = {
-		0444, "info", cc_reg_region_info_show, NULL,
-	},
-	[CC_REG_MAX_ADDR_ATTR] = {
-		0444, "max_addr", cc_reg_max_addr_show, NULL,
-	},
-	[CC_REG_ADDR_ATTR] = {
-		0644, "addr", cc_reg_addr_show, cc_reg_addr_store,
-	},
-	[CC_REG_COUNT_ATTR] = {
-		0644, "count", cc_reg_count_show, cc_reg_count_store,
-	},
-	[CC_REG_VALUE_ATTR] = {
-		0644, "value", cc_reg_value_show, cc_reg_value_store,
-	},
+static DEVICE_ATTR(value, S_IWUSR | S_IRUGO, cc_reg_value_show,
+		   cc_reg_value_store);
+
+static struct attribute *cc_reg_attrs[] = {
+	&dev_attr_info.attr,
+	&dev_attr_range.attr,
+	&dev_attr_addr.attr,
+	&dev_attr_count.attr,
+	&dev_attr_value.attr,
+	NULL,
 };
 
-static void cc_reg_region_init(struct register_region *reg_region,
-				char *name)
-{
-	int i = 0;
+static struct attribute_group cc_reg_attr_grp = {
+	.name = "reg_debug",
+	.attrs = cc_reg_attrs,
+};
 
-	for (i = 0; i < CC_REG_ATTR_MAX; i++) {
-		reg_region->reg_region_attr[i].attr.name =
-			cc_sysfs_attr_map[i].name;
-		reg_region->reg_region_attr[i].attr.mode =
-			cc_sysfs_attr_map[i].mode;
-		reg_region->reg_region_attr[i].show =
-			cc_sysfs_attr_map[i].show;
-		reg_region->reg_region_attr[i].store =
-			cc_sysfs_attr_map[i].store;
+static int cc_enable_reg_debugging(struct cc_codec_priv *cc_priv,
+				      struct device *dev)
+{
+	int ret = 0, i, num_dev;
+	struct register_region *reg_region = NULL;
+
+	if (!cc_priv || !dev) {
+		pr_err("%s: invalid params\n", __func__);
+		return -EINVAL;
+	}
+	num_dev = cc_priv->num_reg_region;
+
+	cc_priv->class = class_create(THIS_MODULE, CC_CODEC_STR);
+	if (IS_ERR_OR_NULL(cc_priv->class)) {
+		ret = PTR_ERR(cc_priv->class);
+		dev_err(dev, "%s: class_create failed: ret %d\n", __func__,
+			ret);
+		return ret;
+	}
+
+	for (i = 0; i < num_dev; i++) {
+		reg_region = &cc_priv->reg_region[i];
+		reg_region->dev =
+		    device_create(cc_priv->class, dev, i, reg_region,
+				  "cc_dev%d", reg_region->region_id->id);
+		if (IS_ERR_OR_NULL(reg_region->dev)) {
+			ret = PTR_ERR(reg_region->dev);
+			dev_err(dev, "%s: device_create(%d) failed: ret %d\n",
+				__func__, i, ret);
+			break;
+		}
+
+		ret =
+		    sysfs_create_group(&reg_region->dev->kobj,
+				       &cc_reg_attr_grp);
+		if (ret) {
+			device_destroy(cc_priv->class, i);
+			dev_err(dev, "%s: sysfs_create(%d) failed: ret %d\n",
+				__func__, i, ret);
+			break;
+		}
+	}
+
+	if (!ret)
+		return 0;
+
+	/* Cleanup resources */
+	for (i = i - 1; i >= 0; i--) {
+		reg_region = &cc_priv->reg_region[i];
+		sysfs_remove_group(&reg_region->dev->kobj, &cc_reg_attr_grp);
+		device_destroy(cc_priv->class, i);
+	}
+	class_destroy(cc_priv->class);
+
+	return ret;
+}
+
+static void cc_disable_reg_debugging(struct cc_codec_priv *cc_priv)
+{
+	int i, num_dev;
+	struct register_region *reg_region = NULL;
+
+	if (!cc_priv) {
+		pr_err("%s: invalid params\n", __func__);
+		return;
+	}
+	num_dev = cc_priv->num_reg_region;
+
+	if (!IS_ERR_OR_NULL(cc_priv->class)) {
+		for (i = 0; i < num_dev; i++) {
+			reg_region = &cc_priv->reg_region[i];
+			if (!IS_ERR_OR_NULL(reg_region->dev)) {
+				sysfs_remove_group(&reg_region->dev->kobj,
+						   &cc_reg_attr_grp);
+				device_destroy(cc_priv->class, i);
+			}
+		}
+		class_destroy(cc_priv->class);
 	}
 }
 
@@ -603,23 +847,28 @@ static int cc_parse_reg_region(struct cc_codec_priv *cc_priv,
 	*parsed_len = 0;
 	for (i = 0; i < num_dev; i++) {
 		ret = cc_parse_id_name(cc_priv, payload, &tmp_len);
-		if (ret)
-			return ret;
+		if (ret) {
+			dev_err(dev, "%s: parse_id_name failed for device %d\n", __func__, i);
+			break;
+		}
 		payload += tmp_len;
 		*parsed_len += tmp_len;
 
 		cc_priv->reg_region[i].region_id =
 			&cc_priv->id_name[cc_priv->num_id - 1];
 
-		cc_priv->reg_region[i].max_addr = *((uint32_t *)payload);
+		cc_priv->reg_region[i].min_addr = *((uint32_t *)payload);
+		tmp_len = sizeof(cc_priv->reg_region[i].min_addr);
 		payload += tmp_len;
 		*parsed_len += tmp_len;
 
-		cc_reg_region_init(&cc_priv->reg_region[i],
-				cc_priv->reg_region[i].region_id->name);
+		cc_priv->reg_region[i].max_addr = *((uint32_t *)payload);
+		tmp_len = sizeof(cc_priv->reg_region[i].max_addr);
+		payload += tmp_len;
+		*parsed_len += tmp_len;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int cc_parse_elem_src(struct cc_codec_priv *cc_priv,
@@ -968,6 +1217,26 @@ static int cc_trigger_uc(struct cc_element *elem, int on)
 	}
 
 	return rc;
+}
+
+static void cc_stop_all_pb_stream(struct cc_codec_priv *cc_priv)
+{
+	int i = 0;
+	struct cc_element *elem = NULL;
+
+	if (!cc_priv || !cc_priv->elems) {
+		pr_err("%s: driver data is null\n", __func__);
+		return;
+	}
+
+	for (i = 0; i < cc_priv->num_elem; i++) {
+		elem = &cc_priv->elems[i];
+		if (elem->elem_type == ELEM_TYPE_STREAM_OUT) {
+			pr_info("%s: powering down stream: %s\n",
+					__func__, elem->s_name);
+			cc_trigger_uc(elem, 0);
+		}
+	}
 }
 
 static int cc_widget_ev_func(struct snd_soc_dapm_widget *w,
@@ -1328,6 +1597,10 @@ static int cc_action_set(uint32_t id, void *ptr, size_t size)
 	param_sz = sizeof(*set_param) - sizeof(set_param->payload) + size;
 
 	set_param = (struct cc_set_get_param_t *)kzalloc(param_sz, GFP_KERNEL);
+
+	if(!set_param)
+		return -ENOMEM;
+
 	set_param->action_id = id;
 	memcpy(set_param->payload, ptr, size);
 
@@ -1574,11 +1847,14 @@ static int cc_action_ctl_array_put(struct snd_kcontrol *kcontrol,
 	list_for_each_safe(node, next, &act_ifaces->iface->action_value_list) {
 		act_val = list_entry(node,
 				struct cc_action_value_list, list);
-		if (act_val->action_id == act->act_id->id) {
+		if (act_val && act_val->action_id == act->act_id->id) {
 			found = 1;
 			break;
 		}
 	}
+
+	if (!act_val)
+		return 0;
 
 	switch (act->action_type) {
 	case ACTION_TYPE_CHAR_ARRAY:
@@ -1983,7 +2259,7 @@ static int cc_parse_interface(struct cc_codec_priv *cc_priv,
 
 	cc_priv->dai = kzalloc(
 		num_intf * sizeof(struct snd_soc_dai_driver), GFP_KERNEL);
-	if (!cc_priv->iface)
+	if (!cc_priv->dai)
 		return -ENOMEM;
 
 	*parsed_len = 0;
@@ -2106,14 +2382,15 @@ static int cc_parse_plat_info(struct cc_codec_priv *cc_priv,
 	uint32_t tmp_len = 0;
 	int ret = 0;
 
-	if (size < CC_MIN_PLATINFO_SIZE) {
+	if (size < CC_MIN_IPC_PAYLOAD_SIZE) {
 		pr_err("%s: Invalid payload\n", __func__);
 		return -EINVAL;
 	}
 
 	pinfo = (struct cc_plat_info_t *)plat_info;
-	pr_debug("id:%d, dev:%d, elem:%d, act:%d, route:%d, iface: %d\n",
-		pinfo->num_id, pinfo->num_dev, pinfo->num_elem,
+
+	dev_dbg(dev, "%s: id=%d, dev=%d, elem=%d, act=%d, route=%d, iface=%d\n",
+		__func__, pinfo->num_id, pinfo->num_dev, pinfo->num_elem,
 		pinfo->num_action, pinfo->num_route, pinfo->num_intf);
 
 	cc_priv->id_name = kzalloc(pinfo->num_id *
@@ -2128,26 +2405,31 @@ static int cc_parse_plat_info(struct cc_codec_priv *cc_priv,
 	if (ret)
 		return ret;
 	tmp += tmp_len;
+	dev_dbg(dev, "%s: reg_region %u\n", __func__, tmp_len);
 
 	ret = cc_parse_element(cc_priv, tmp, pinfo->num_elem, &tmp_len);
 	if (ret)
 		return ret;
 	tmp += tmp_len;
+	dev_dbg(dev, "%s: element %u\n", __func__, tmp_len);
 
 	ret = cc_parse_action(cc_priv, tmp, pinfo->num_action, &tmp_len);
 	if (ret)
 		return ret;
 	tmp += tmp_len;
+	dev_dbg(dev, "%s: action %u\n", __func__, tmp_len);
 
 	ret = cc_parse_route(cc_priv, tmp, pinfo->num_route, &tmp_len);
 	if (ret)
 		return ret;
 	tmp += tmp_len;
+	dev_dbg(dev, "%s: route %u\n", __func__, tmp_len);
 
 	ret = cc_parse_interface(cc_priv, tmp, pinfo->num_intf, &tmp_len);
 	if (ret)
 		return ret;
 	tmp += tmp_len;
+	dev_dbg(dev, "%s: interface %u\n", __func__, tmp_len);
 
 	return 0;
 }
@@ -2379,7 +2661,15 @@ static void cc_cleanup(struct cc_codec_priv *cc_priv)
 		for (i = 0; i < cc_priv->num_elem; i++)
 			cc_cleanup_element(&cc_priv->elems[i]);
 		kfree(cc_priv->elems);
+		cc_priv->elems = NULL;
 		cc_priv->num_elem = 0;
+	}
+
+	if (cc_priv->reg_region) {
+		cc_disable_reg_debugging(cc_priv);
+		kfree(cc_priv->reg_region);
+		cc_priv->reg_region = NULL;
+		cc_priv->num_reg_region = 0;
 	}
 
 	if (cc_priv->id_name) {
@@ -2424,6 +2714,21 @@ static const struct snd_event_ops cc_cdc_ssr_ops = {
 	.disable = cc_cdc_ssr_disable,
 };
 
+static int cc_cdc_notifier_service_cb(struct notifier_block *this,
+				      unsigned long opcode, void *ptr)
+{
+	struct cc_codec_priv *cc_priv = NULL;
+
+	cc_priv = container_of(this, struct cc_codec_priv, cc_adsp_nb);
+	if (!cc_priv)
+		return NOTIFY_OK;
+
+	if (opcode == AUDIO_NOTIFIER_SERVICE_DOWN)
+		cc_stop_all_pb_stream(cc_priv);
+
+	return NOTIFY_OK;
+}
+
 static int cc_cdc_probe(struct platform_device *pdev)
 {
 	struct cc_codec_priv *cc_priv = NULL;
@@ -2453,8 +2758,19 @@ static int cc_cdc_probe(struct platform_device *pdev)
 
 	ret = cc_parse_plat_info(cc_priv, &pdev->dev,
 				plat_info, plat_info_size);
-	if (ret)
+	if (ret) {
+		dev_err(&pdev->dev, "%s: parse plat info, failed: ret:%d\n",
+				__func__, ret);
 		goto free_priv;
+	}
+
+	ret = cc_enable_reg_debugging(cc_priv, &pdev->dev);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"%s: enable register debug, failed: ret:%d\n", __func__,
+			ret);
+		goto free_priv;
+	}
 
 	cc_priv->cc_comp.probe = cc_soc_codec_probe;
 	cc_priv->cc_comp.remove = cc_soc_codec_remove;
@@ -2475,6 +2791,15 @@ static int cc_cdc_probe(struct platform_device *pdev)
 	else
 		dev_err(&pdev->dev, "%s: Registration with SND event fwk failed ret = %d\n",
 			__func__, ret);
+
+	cc_priv->cc_adsp_nb.notifier_call = cc_cdc_notifier_service_cb;
+	cc_priv->cc_adsp_nb.priority = 0;
+	ret = audio_notifier_register(CC_CODEC_STR, AUDIO_NOTIFIER_ADSP_DOMAIN,
+						&cc_priv->cc_adsp_nb);
+	if (ret)
+		dev_err(&pdev->dev, "%s: ADSP ssr register fail ret:%d\n",
+			__func__, ret);
+
 	return 0;
 
 free_priv:
@@ -2489,6 +2814,7 @@ static int cc_cdc_remove(struct platform_device *pdev)
 {
 	struct cc_codec_priv *cc_priv = dev_get_drvdata(&pdev->dev);
 
+	audio_notifier_deregister(CC_CODEC_STR);
 	cc_pktzr_deinit();
 	snd_event_client_deregister(&pdev->dev);
 	snd_soc_unregister_component(&pdev->dev);

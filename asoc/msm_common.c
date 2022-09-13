@@ -8,6 +8,8 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/gpio.h>
@@ -380,7 +382,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 	struct chmap_pdata *kctl_pdata =
 			(struct chmap_pdata *)kcontrol->private_data;
 	struct snd_soc_dai *codec_dai;
-	int backend_id = kctl_pdata->id;
+	int backend_id;
 	uint32_t rx_ch[MAX_PORT], tx_ch[MAX_PORT];
 	uint32_t rx_ch_cnt = 0, tx_ch_cnt = 0;
 	uint32_t *chmap_data = NULL;
@@ -390,7 +392,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		pr_debug("%s: chmap_pdata is not initialized\n", __func__);
 		return -EINVAL;
 	}
-
+	backend_id = kctl_pdata->id;
 	codec_dai = kctl_pdata->dai;
 	ret = snd_soc_dai_get_channel_map(codec_dai,
 			&tx_ch_cnt, tx_ch, &rx_ch_cnt, rx_ch);

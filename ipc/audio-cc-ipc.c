@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
+
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -19,6 +21,7 @@
 #include <linux/poll.h>
 #include <linux/vmalloc.h>
 #include <linux/rpmsg.h>
+#include <linux/delay.h>
 #include <ipc/audio-cc-ipc.h>
 #include <dsp/audio_notifier.h>
 #include <soc/snd_event.h>
@@ -27,6 +30,10 @@
 #define CC_IPC_NAME_MAX_LEN 32
 #define CC_IPC_MAX_DEV		2
 #define CC_IPC_MAX_CLIENTS	2
+
+#define CC_IPC_RETRY_COUNT	5
+#define CC_IPC_RETRY_DELAY_US_LOW	500
+#define CC_IPC_RETRY_DELAY_US_HIGH	550
 
 #define MINOR_NUMBER_COUNT 1
 #define TIMEOUT_MS 2000
@@ -91,9 +98,10 @@ struct cc_ipc_plat_private {
 	struct cc_ipc_priv *g_ipriv[CC_IPC_MAX_DEV];
 	struct work_struct add_child_dev_work;
 	struct mutex g_ipriv_lock;
-	struct delayed_work ssr_snd_event_work;
+	struct work_struct ssr_snd_event_work;
 	atomic_t audio_cc_state;
 	int cc_ipc_num_cdev;
+	int cc_ipc_dev_cnt;
 };
 
 struct cc_ipc_plat_private *cc_ipc_plat_priv;
@@ -213,6 +221,7 @@ static unsigned int cc_ipc_fpoll(struct file *file, poll_table *wait)
 static int cc_ipc_send_pkt(struct cc_ipc_priv *ipriv, void *pkt, uint32_t pkt_size)
 {
 	int ret;
+	int i = 0;
 
 	if (!ipriv) {
 		pr_err("%s: Invalid private data\n", __func__);
@@ -227,7 +236,15 @@ static int cc_ipc_send_pkt(struct cc_ipc_priv *ipriv, void *pkt, uint32_t pkt_si
 	}
 
 	mutex_lock(&cc_ipc_plat_priv->g_ipriv_lock);
-	ret = rpmsg_send(ipriv->ch, pkt, pkt_size);
+	for (i = 0; i < CC_IPC_RETRY_COUNT; i++) {
+		ret = rpmsg_send(ipriv->ch, pkt, pkt_size);
+		if (ret != -EAGAIN)
+			break;
+
+		usleep_range(CC_IPC_RETRY_DELAY_US_LOW,
+				CC_IPC_RETRY_DELAY_US_HIGH);
+	}
+
 	mutex_unlock(&cc_ipc_plat_priv->g_ipriv_lock);
 	if (ret < 0)
 		dev_err_ratelimited(ipriv->pdev, "%s: failed, ch %s, ret %d\n",
@@ -597,10 +614,10 @@ static int cc_ipc_notifier_service_cb(struct notifier_block *this,
 		break;
 	case AUDIO_NOTIFIER_SERVICE_UP:
 		/*
-		 * Delaying work to call SND_EVENT_UP after rpmsg probe
+		 * In case of SSR, domain state is not updated as part of audio notifier register
+		 * and service call back can't be triggered from audio notifier.
+		 * Trigger SND_EVENT_UP notification as part of rpmsg probe.
 		 */
-		schedule_delayed_work(&cc_ipc_plat_priv->ssr_snd_event_work,
-				msecs_to_jiffies(3 * 1000));
 		break;
 	default:
 		break;
@@ -796,6 +813,13 @@ static int cc_ipc_rpmsg_probe(struct rpmsg_device *rpdev)
 		schedule_work(&cc_ipc_plat_priv->add_child_dev_work);
 	}
 
+	cc_ipc_plat_priv->cc_ipc_dev_cnt++;
+	if (cc_ipc_plat_priv->cc_ipc_dev_cnt == CC_IPC_MAX_DEV)
+		schedule_work(&cc_ipc_plat_priv->ssr_snd_event_work);
+	else if (cc_ipc_plat_priv->cc_ipc_dev_cnt > CC_IPC_MAX_DEV)
+		dev_err(dev, "%s: dev cnt %d excedded max cnt %d\n", __func__,
+			    cc_ipc_plat_priv->cc_ipc_dev_cnt, CC_IPC_MAX_DEV);
+
 	return 0;
 
 cleanup:
@@ -816,9 +840,12 @@ static void cc_ipc_rpmsg_remove(struct rpmsg_device *rpdev)
 		ipriv->rpdev = NULL;
 		mutex_unlock(&cc_ipc_plat_priv->g_ipriv_lock);
 		dev_set_drvdata(dev, NULL);
+		cc_ipc_plat_priv->cc_ipc_dev_cnt--;
 	} else {
 		dev_err(dev, "%s: no ipc g_ipriv\n", __func__);
 	}
+
+	dev_dbg(dev, "%s: dev cnt %d\n", __func__, cc_ipc_plat_priv->cc_ipc_dev_cnt);
 }
 
 static const struct of_device_id cc_ipc_of_match[] = {
@@ -852,7 +879,7 @@ static int audio_cc_ipc_platform_driver_probe(struct platform_device *pdev)
 	mutex_init(&cc_ipc_plat_priv->g_ipriv_lock);
 
 	INIT_WORK(&cc_ipc_plat_priv->add_child_dev_work, cc_ipc_add_child_dev_func);
-	INIT_DELAYED_WORK(&cc_ipc_plat_priv->ssr_snd_event_work, cc_ipc_snd_event_func);
+	INIT_WORK(&cc_ipc_plat_priv->ssr_snd_event_work, cc_ipc_snd_event_func);
 
 	ret = cc_ipc_plat_init(cc_ipc_plat_priv);
 	if (ret < 0) {
@@ -886,6 +913,7 @@ static int audio_cc_ipc_platform_driver_probe(struct platform_device *pdev)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",	__func__, ret);
 
 	cc_ipc_plat_priv->is_initial_boot = true;
+	cc_ipc_plat_priv->cc_ipc_dev_cnt = 0;
 
 	return 0;
 
