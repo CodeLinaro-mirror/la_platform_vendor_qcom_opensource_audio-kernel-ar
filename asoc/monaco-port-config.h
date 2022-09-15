@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _MONACO_PORT_CONFIG
@@ -49,7 +50,7 @@ static struct port_params rx_frame_params_besbev[SWR_MSTR_PORT_LEN] = {
 	{7,  1,  0,  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0}, /* AUX OUT */
 	{0,  0,  0,  0xFF, 0xFF, 0xFF, 0xFF, 0,    0, 0, 0},
 	{0,  0,  0,  0xFF, 0xFF, 0xFF, 0xFF, 0,    0, 0, 0},
-	{3,  3,  0,  0xFF, 0xFF, 0xFF, 0x1, 0xFF,  0, 1, 1}, /* AMIC PCM IN */
+	{3,  2,  0,  0xFF, 0xFF, 0xFF, 0x1, 0xFF,  0, 1, 1}, /* AMIC PCM IN */
 };
 
 static struct swr_mstr_port_map sm_port_map[] = {
