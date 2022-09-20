@@ -74,6 +74,8 @@ struct chmap_pdata {
 #define TDM_SLOT_INFO_NAME "slot info"
 #define RX_FILTER "-RX-"
 #define TX_FILTER "-TX-"
+#define DEFAULT_NUM_TDM_SLOTS 8
+#define DEFAULT_TDM_SLOT_WIDTH 32
 struct tdm_slot_info_t {
 	uint32_t num_tdm_slot;
 	uint32_t tdm_slot_width;
@@ -1122,6 +1124,9 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 
 		if (is_tdm_slot_info_mixer_reg[index] == true)
 			goto free_backend;
+		/* Setting default num_tdm_slot and tdm_slot_width to 8 amd 32 */
+		tdm_slot_info[index].num_tdm_slot = DEFAULT_NUM_TDM_SLOTS;
+		tdm_slot_info[index].tdm_slot_width = DEFAULT_TDM_SLOT_WIDTH;
 		tdm_pdata = devm_kzalloc(dev, sizeof(struct tdm_slot_info_pdata_t), GFP_KERNEL);
 		if (!tdm_pdata) {
 			ret = -ENOMEM;
