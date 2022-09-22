@@ -52,6 +52,6 @@ int msm_audio_ion_phys_assign(void **mem_hdl, int fd, dma_addr_t *paddr,
 int msm_audio_ion_phys_free(void *mem_hdl, dma_addr_t *paddr,
 			size_t *pa_len, u8 assign_type, int id, int key);
 bool msm_audio_is_hypervisor_supported(void);
-int msm_audio_get_phy_addr(int fd, dma_addr_t *paddr);
+int msm_audio_get_phy_addr(int fd, dma_addr_t *paddr, size_t *pa_len);
 void msm_audio_ion_crash_handler(void);
 #endif /* _LINUX_MSM_AUDIO_ION_H */
