@@ -806,9 +806,6 @@ static int lpass_cdc_wsa2_macro_mute_stream(struct snd_soc_dai *dai, int mute, i
 	struct snd_soc_component *component = dai->component;
 	struct device *wsa2_dev = NULL;
 	struct lpass_cdc_wsa2_macro_priv *wsa2_priv = NULL;
-	uint16_t j = 0, reg = 0, mix_reg = 0, dsm_reg = 0;
-	u16 int_mux_cfg0 = 0, int_mux_cfg1 = 0;
-	u8 int_mux_cfg0_val = 0, int_mux_cfg1_val = 0;
 	bool adie_lb = false;
 
 	if (mute)
@@ -817,42 +814,11 @@ static int lpass_cdc_wsa2_macro_mute_stream(struct snd_soc_dai *dai, int mute, i
 	if (!lpass_cdc_wsa2_macro_get_data(component, &wsa2_dev, &wsa2_priv, __func__))
 		return -EINVAL;
 
-	switch (dai->id) {
-	case LPASS_CDC_WSA2_MACRO_AIF1_PB:
-	case LPASS_CDC_WSA2_MACRO_AIF_MIX1_PB:
-	for (j = 0; j < NUM_INTERPOLATORS; j++) {
-		reg = LPASS_CDC_WSA2_RX0_RX_PATH_CTL +
-				(j * LPASS_CDC_WSA2_MACRO_RX_PATH_OFFSET);
-		mix_reg = LPASS_CDC_WSA2_RX0_RX_PATH_MIX_CTL +
-				(j * LPASS_CDC_WSA2_MACRO_RX_PATH_OFFSET);
-		dsm_reg = LPASS_CDC_WSA2_RX0_RX_PATH_CTL +
-				(j * LPASS_CDC_WSA2_MACRO_RX_PATH_OFFSET) +
-				LPASS_CDC_WSA2_MACRO_RX_PATH_DSMDEM_OFFSET;
-		int_mux_cfg0 = LPASS_CDC_WSA2_RX_INP_MUX_RX_INT0_CFG0 + j * 8;
-		int_mux_cfg1 = int_mux_cfg0 + 4;
-		int_mux_cfg0_val = snd_soc_component_read(component,
-							int_mux_cfg0);
-		int_mux_cfg1_val = snd_soc_component_read(component,
-							int_mux_cfg1);
-		if (snd_soc_component_read(component, dsm_reg) & 0x01) {
-			if (int_mux_cfg0_val || (int_mux_cfg1_val & 0x38))
-				snd_soc_component_update_bits(component, reg,
-							0x20, 0x20);
-			if (int_mux_cfg1_val & 0x07) {
-				snd_soc_component_update_bits(component, reg,
-							0x20, 0x20);
-				snd_soc_component_update_bits(component,
-						mix_reg, 0x20, 0x20);
-			}
-		}
-	}
 	lpass_cdc_wsa_pa_on(wsa2_dev, adie_lb);
-		break;
-	default:
-		break;
-	}
+
 	return 0;
 }
+
 static int lpass_cdc_wsa2_macro_mclk_enable(
 				struct lpass_cdc_wsa2_macro_priv *wsa2_priv,
 				 bool mclk_enable, bool dapm)
@@ -1226,6 +1192,7 @@ static int lpass_cdc_wsa2_macro_enable_mix_path(struct snd_soc_dapm_widget *w,
 	u16 gain_reg;
 	int offset_val = 0;
 	int val = 0;
+	uint16_t mix_reg = 0;
 
 	dev_dbg(component->dev, "%s %d %s\n", __func__, event, w->name);
 
@@ -1239,8 +1206,12 @@ static int lpass_cdc_wsa2_macro_enable_mix_path(struct snd_soc_dapm_widget *w,
 		return 0;
 	}
 
+	mix_reg = LPASS_CDC_WSA2_RX0_RX_PATH_MIX_CTL +
+				(LPASS_CDC_WSA2_MACRO_RX_PATH_OFFSET * w->shift);
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		snd_soc_component_update_bits(component,
+					mix_reg, 0x20, 0x20);
 		lpass_cdc_wsa2_macro_enable_swr(w, kcontrol, event);
 		val = snd_soc_component_read(component, gain_reg);
 		val += offset_val;
@@ -1441,10 +1412,10 @@ static int lpass_cdc_wsa2_macro_enable_main_path(struct snd_soc_dapm_widget *w,
 			LPASS_CDC_WSA2_MACRO_RX_PATH_OFFSET * w->shift;
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
+		snd_soc_component_update_bits(component,
+				reg, 0x20, 0x20);
 		if (lpass_cdc_wsa2_macro_adie_lb(component, w->shift)) {
 			adie_lb = true;
-			snd_soc_component_update_bits(component,
-						reg, 0x20, 0x20);
 			lpass_cdc_wsa_pa_on(wsa2_dev, adie_lb);
 		}
 		break;
