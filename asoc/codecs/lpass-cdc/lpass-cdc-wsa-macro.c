@@ -1264,6 +1264,12 @@ static int lpass_cdc_wsa_macro_config_compander(struct snd_soc_component *compon
 	if (!lpass_cdc_wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
 		return -EINVAL;
 
+	if (comp >= LPASS_CDC_WSA_MACRO_COMP_MAX || comp < 0) {
+		dev_err(component->dev, "%s: Invalid compander value: %d\n",
+					__func__, comp);
+		return -EINVAL;
+	}
+
 	dev_dbg(component->dev, "%s: event %d compander %d, enabled %d\n",
 		__func__, event, comp + 1, wsa_priv->comp_enabled[comp]);
 
@@ -1271,6 +1277,8 @@ static int lpass_cdc_wsa_macro_config_compander(struct snd_soc_component *compon
 		return 0;
 
 	mode = wsa_priv->comp_mode[comp];
+	if (mode >= WSA_MODE_MAX || mode < 0)
+		mode = 0;
 	comp_ctl0_reg = LPASS_CDC_WSA_COMPANDER0_CTL0 +
 					(comp * LPASS_CDC_WSA_MACRO_RX_COMP_OFFSET);
 	comp_ctl8_reg = LPASS_CDC_WSA_COMPANDER0_CTL8 +
@@ -2126,7 +2134,11 @@ static int lpass_cdc_wsa_macro_comp_mode_put(struct snd_kcontrol *kcontrol,
 		idx = LPASS_CDC_WSA_MACRO_COMP1;
 	if (strnstr(kcontrol->id.name, "RX1", sizeof("WSA_RX1")))
 		idx = LPASS_CDC_WSA_MACRO_COMP2;
-	wsa_priv->comp_mode[idx] =  ucontrol->value.integer.value[0];
+
+	if (ucontrol->value.integer.value[0] < WSA_MODE_MAX && ucontrol->value.integer.value[0] >= 0)
+		wsa_priv->comp_mode[idx] = ucontrol->value.integer.value[0];
+	else
+		return 0;
 
 	dev_dbg(component->dev, "%s: comp_mode = %d\n", __func__,
 		wsa_priv->comp_mode[idx]);
@@ -2176,7 +2188,7 @@ static int lpass_cdc_wsa_macro_rx_mux_put(struct snd_kcontrol *kcontrol,
 			dev_err(wsa_dev, "%s: AIF reset already\n", __func__);
 			return 0;
 		}
-		if (aif_rst >= LPASS_CDC_WSA_MACRO_RX_MAX) {
+		if (aif_rst >= LPASS_CDC_WSA_MACRO_MAX_DAIS) {
 			dev_err(wsa_dev, "%s: Invalid AIF reset\n", __func__);
 			return 0;
 		}
