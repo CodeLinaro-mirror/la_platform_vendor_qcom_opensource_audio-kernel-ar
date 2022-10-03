@@ -798,7 +798,12 @@ static int wsa_dev_mode_put(struct snd_kcontrol *kcontrol,
 	int dev_mode;
 	int wsa_dev_index;
 
-	dev_mode = ucontrol->value.integer.value[0];
+	if ((ucontrol->value.integer.value[0] >= SPEAKER) &&
+			(ucontrol->value.integer.value[0] < MAX_DEV_MODE))
+		dev_mode = ucontrol->value.integer.value[0];
+	else
+		return -EINVAL;
+
 	dev_dbg(component->dev, "%s: Dev Mode current: %d, new: %d\n",
 		__func__, wsa884x->dev_mode, dev_mode);
 
@@ -2396,7 +2401,9 @@ static int wsa884x_swr_suspend(struct device *dev)
 		return -EINVAL;
 	}
 	dev_dbg(dev, "%s: system suspend\n", __func__);
-	if (wsa884x->dapm_bias_off) {
+	if (wsa884x->dapm_bias_off ||
+		(snd_soc_component_get_bias_level(wsa884x->component) ==
+		 SND_SOC_BIAS_OFF)) {
 		msm_cdc_set_supplies_lpm_mode(dev, wsa884x->supplies,
 					wsa884x->regulator,
 					wsa884x->num_supplies,
