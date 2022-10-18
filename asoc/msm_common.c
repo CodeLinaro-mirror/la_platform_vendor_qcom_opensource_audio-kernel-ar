@@ -18,6 +18,7 @@
 #include <sound/info.h>
 #include <dsp/audio_prm.h>
 #include <dsp/digital-cdc-rsc-mgr.h>
+#include <linux/string.h>
 
 #include "msm_common.h"
 
@@ -69,6 +70,21 @@ struct chmap_pdata {
 	uint32_t num_codec_dai;
 	struct snd_soc_dai *dai[MAX_CODEC_DAI];
 };
+
+#define TDM_SLOT_INFO_NAME "slot info"
+#define RX_FILTER "-RX-"
+#define TX_FILTER "-TX-"
+#define DEFAULT_NUM_TDM_SLOTS 8
+#define DEFAULT_TDM_SLOT_WIDTH 32
+struct tdm_slot_info_t {
+	uint32_t num_tdm_slot;
+	uint32_t tdm_slot_width;
+};
+struct tdm_slot_info_pdata_t {
+	uint32_t index;
+};
+static bool is_tdm_slot_info_mixer_reg[MI2S_TDM_AUXPCM_MAX];
+static struct tdm_slot_info_t tdm_slot_info[MI2S_TDM_AUXPCM_MAX];
 
 #define MAX_USR_INPUT 10
 
@@ -399,7 +415,8 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 		mutex_lock(&pdata->lock[index]);
 		if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) == 0) {
 			if ((strnstr(stream_name, "TDM", strlen(stream_name)))) {
-				slots = pdata->tdm_max_slots;
+				slots = tdm_slot_info[index].num_tdm_slot;
+				slot_width = tdm_slot_info[index].tdm_slot_width;
 				rate = params_rate(params);
 
 				ret = get_tdm_clk_id(index);
@@ -660,19 +677,6 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 	for (count = 0; count < MI2S_TDM_AUXPCM_MAX; count++) {
 		mutex_init(&common_pdata->lock[count]);
 		atomic_set(&common_pdata->mi2s_gpio_ref_cnt[count], 0);
-	}
-
-	ret = of_property_read_u32(pdev->dev.of_node, "qcom,tdm-max-slots",
-				&common_pdata->tdm_max_slots);
-	if (ret) {
-		dev_info(&pdev->dev, "%s: No DT match for tdm max slots\n",
-			__func__);
-	}
-	if ((common_pdata->tdm_max_slots <= 0) || (common_pdata->tdm_max_slots >
-			TDM_MAX_SLOTS)) {
-		common_pdata->tdm_max_slots = TDM_MAX_SLOTS;
-		dev_info(&pdev->dev, "%s: Using default tdm max slot: %d\n",
-			__func__, common_pdata->tdm_max_slots);
 	}
 
 	/* Register LPASS audio hw vote */
@@ -992,6 +996,88 @@ static int register_pm_qos_latency_controls(struct snd_soc_pcm_runtime *rtd) {
 	return 0;
 }
 
+static int msm_tdm_kcontrol_info(struct snd_kcontrol *kcontrol,
+			struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 2;
+	uinfo->value.integer.min = 0;
+	/* maximum num_tdm_slot and tdm_slot_width supported is 32. */
+	uinfo->value.integer.max = 32;
+
+	return 0;
+}
+
+static int msm_slot_info_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct tdm_slot_info_pdata_t *kctl_pdata =
+			(struct tdm_slot_info_pdata_t *)kcontrol->private_data;
+
+	ucontrol->value.integer.value[0] = tdm_slot_info[kctl_pdata->index].num_tdm_slot;
+	ucontrol->value.integer.value[1] = tdm_slot_info[kctl_pdata->index].tdm_slot_width;
+
+	return 0;
+}
+
+static int msm_slot_info_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct tdm_slot_info_pdata_t *kctl_pdata =
+			(struct tdm_slot_info_pdata_t *)kcontrol->private_data;
+
+	if ((ucontrol->value.integer.value[0] < 0 ||
+		ucontrol->value.integer.value[0] > 32) ||
+		(ucontrol->value.integer.value[1] < 0 ||
+		ucontrol->value.integer.value[1] > 32)) {
+		pr_err("%s: invalid value passed", __func__);
+		return -EINVAL;
+	}
+	tdm_slot_info[kctl_pdata->index].num_tdm_slot  = ucontrol->value.integer.value[0];
+	tdm_slot_info[kctl_pdata->index].tdm_slot_width = ucontrol->value.integer.value[1];
+
+	return 0;
+}
+
+char* msm_common_get_tdm_mixer_name(const char *stream_name)
+{
+	char *mixer_name = NULL;
+	char *mixer_be_name = NULL;
+	int ctl_len = 0;
+	int mixer_be_len = 0;
+	char *delimit = NULL;
+	int copy_len = 0;
+
+	delimit = strstr(stream_name, RX_FILTER);
+	if (delimit == NULL)
+		delimit = strstr(stream_name, TX_FILTER);
+	if (delimit == NULL)
+		goto error;
+
+	mixer_be_len = strlen(stream_name) - strlen(RX_FILTER) + 2;
+	mixer_be_name = kzalloc(mixer_be_len, GFP_KERNEL);
+	if (!mixer_be_name)
+		goto error;
+	copy_len = (delimit - stream_name) * sizeof(char);
+	memcpy(mixer_be_name, stream_name, copy_len);
+	memcpy(mixer_be_name + copy_len, stream_name + copy_len + strlen(RX_FILTER) - 1,
+			strlen(stream_name) - (copy_len + strlen(RX_FILTER) - 1));
+
+	ctl_len =  strlen(mixer_be_name) + 1 + strlen(TDM_SLOT_INFO_NAME) + 1;
+	mixer_name = kzalloc(ctl_len, GFP_KERNEL);
+	if (!mixer_name)
+		goto free_mixer_be_name;
+	snprintf(mixer_name, ctl_len, "%s %s", mixer_be_name, TDM_SLOT_INFO_NAME);
+
+free_mixer_be_name:
+	kfree(mixer_be_name);
+	mixer_be_name = NULL;
+
+error:
+
+	return mixer_name;
+}
+
 int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 {
 	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
@@ -1006,18 +1092,17 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 	char *backend_name = NULL;
 	uint32_t ctl_len = 0;
 	struct chmap_pdata *pdata;
+	struct tdm_slot_info_pdata_t *tdm_pdata;
 	struct snd_kcontrol *kctl;
-	struct snd_kcontrol_new msm_common_channel_map[1] = {
+
+	struct snd_kcontrol_new msm_common_snd_ctrl[1] = {
 		{
 			.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
 			.name = "?",
 			.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
-			.info = msm_channel_map_info,
-			.get = msm_channel_map_get,
 			.private_value = 0,
 		}
 	};
-
 	if (!codec_dai) {
 		pr_err("%s: failed to get codec dai", __func__);
 		return -EINVAL;
@@ -1030,14 +1115,55 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 		return -EINVAL;
 	}
 
-	pdata = devm_kzalloc(dev, sizeof(struct chmap_pdata), GFP_KERNEL);
-	if (!pdata) {
-		ret = -ENOMEM;
-		goto free_backend;
-	}
+	if (!strncmp(backend_name, "TDM", strlen("TDM"))) {
+		index = get_mi2s_tdm_auxpcm_intf_index(dai_link->stream_name);
+		if (index < 0) {
+			ret = -ENOMEM;
+			goto free_backend;
+		}
 
+		if (is_tdm_slot_info_mixer_reg[index] == true)
+			goto free_backend;
+		/* Setting default num_tdm_slot and tdm_slot_width to 8 amd 32 */
+		tdm_slot_info[index].num_tdm_slot = DEFAULT_NUM_TDM_SLOTS;
+		tdm_slot_info[index].tdm_slot_width = DEFAULT_TDM_SLOT_WIDTH;
+		tdm_pdata = devm_kzalloc(dev, sizeof(struct tdm_slot_info_pdata_t), GFP_KERNEL);
+		if (!tdm_pdata) {
+			ret = -ENOMEM;
+			goto free_backend;
+		}
+
+		mixer_str = msm_common_get_tdm_mixer_name(dai_link->stream_name);
+		if (mixer_str == NULL) {
+			pr_err("failed to get mixer control\n");
+			ret = -EINVAL;
+			goto free_backend;
+		}
+		msm_common_snd_ctrl[0].name = mixer_str;
+		msm_common_snd_ctrl[0].put = msm_slot_info_put;
+		msm_common_snd_ctrl[0].get = msm_slot_info_get;
+		msm_common_snd_ctrl[0].info = msm_tdm_kcontrol_info;
+		pr_debug("Registering new mixer ctl %s\n", mixer_str);
+		ret = snd_soc_add_component_controls(component,
+				msm_common_snd_ctrl,
+				ARRAY_SIZE(msm_common_snd_ctrl));
+		kctl = snd_soc_card_get_kcontrol(rtd->card, mixer_str);
+		if (!kctl) {
+			pr_err("failed to get kctl %s\n", mixer_str);
+			ret = -EINVAL;
+			goto free_mixer_str;
+		}
+		tdm_pdata->index = index;
+		kctl->private_data = tdm_pdata;
+		is_tdm_slot_info_mixer_reg[index] = true;
+	}
 	if ((!strncmp(backend_name, "SLIM", strlen("SLIM"))) ||
 		(!strncmp(backend_name, "CODEC_DMA", strlen("CODEC_DMA")))) {
+		pdata = devm_kzalloc(dev, sizeof(struct chmap_pdata), GFP_KERNEL);
+		if (!pdata) {
+			ret = -ENOMEM;
+			goto free_backend;
+		}
 		ctl_len = strlen(dai_link->stream_name) + 1 +
 				strlen(mixer_ctl_name) + 1;
 		mixer_str = kzalloc(ctl_len, GFP_KERNEL);
@@ -1048,12 +1174,14 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 
 		snprintf(mixer_str, ctl_len, "%s %s", dai_link->stream_name,
 				mixer_ctl_name);
-		msm_common_channel_map[0].name = mixer_str;
-		msm_common_channel_map[0].private_value = 0;
+		msm_common_snd_ctrl[0].name = mixer_str;
+		msm_common_snd_ctrl[0].get = msm_channel_map_get;
+		msm_common_snd_ctrl[0].info = msm_channel_map_info;
+
 		pr_debug("Registering new mixer ctl %s\n", mixer_str);
 		ret = snd_soc_add_component_controls(component,
-				msm_common_channel_map,
-				ARRAY_SIZE(msm_common_channel_map));
+				msm_common_snd_ctrl,
+				ARRAY_SIZE(msm_common_snd_ctrl));
 		kctl = snd_soc_card_get_kcontrol(rtd->card, mixer_str);
 		if (!kctl) {
 			pr_err("failed to get kctl %s\n", mixer_str);
