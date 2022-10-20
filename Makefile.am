@@ -1,11 +1,12 @@
+PWD=$(shell pwd)
 AUDIO_ROOT=$(PWD)
 UAPI_OUT=$(PWD)
 HEADER_INSTALL_DIR=$(KERNEL_SRC)/scripts
-KERNEL_BINARY_DIR=$(KERNEL_SRC)/../kernel-build-artifacts
+KERNEL_BINARY_DIR=${KERNEL_UAPI_HEADERS_DIR}
 
-KBUILD_OPTIONS := AUDIO_ROOT=$(PWD)
+KBUILD_OPTIONS := AUDIO_ROOT=${AUDIO_ROOT}
 KBUILD_OPTIONS += MODNAME=audio
-KBUILD_OPTIONS += UAPI_OUT=$(PWD)
+KBUILD_OPTIONS += UAPI_OUT=${UAPI_OUT}
 
 AUDIO_KERNEL_HEADERS_PATH1 =  $(shell ls ./include/uapi/audio/linux/*.h)
 AUDIO_KERNEL_HEADERS_PATH2 =  $(shell ls ./include/uapi/audio/linux/mfd/wcd9xxx/*.h)
@@ -56,9 +57,19 @@ obj-m += soc/
 ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa8155 sa8155ivi sa8195 qtiquingvm))
 KBUILD_OPTIONS += CONFIG_SND_SOC_SA8155=m
 endif
+endif
 ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa6155))
 KBUILD_OPTIONS += CONFIG_SND_SOC_SA6155=m
 endif
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), kalama))
+KBUILD_OPTIONS += CONFIG_ARCH_KALAMA=y
+KBUILD_OPTIONS += CONFIG_SND_SOC_KALAMA=m
+KBUILD_OPTIONS += CONFIG_SND_SOC_KALAMA_LE=y
+obj-m := ipc/
+obj-m += dsp/
+obj-m += asoc/
+obj-m += asoc/codecs/
+obj-m += soc/
 endif
 
 define PROCESS_HEADERS
