@@ -759,8 +759,19 @@ static int lpass_cdc_wsa2_macro_get_channel_map(struct snd_soc_dai *dai,
 
 	switch (dai->id) {
 	case LPASS_CDC_WSA2_MACRO_AIF_VI:
-		*tx_slot = wsa2_priv->active_ch_mask[dai->id];
-		*tx_num = wsa2_priv->active_ch_cnt[dai->id];
+		for_each_set_bit(temp, &wsa2_priv->active_ch_mask[dai->id],
+					LPASS_CDC_WSA2_MACRO_TX_MAX) {
+			mask |= (1 << temp);
+			if (++cnt == LPASS_CDC_WSA2_MACRO_MAX_DMA_CH_PER_PORT)
+				break;
+		}
+		if (mask & 0x30)
+			mask = mask >> 0x4;
+		if (mask & 0x03)
+			mask = mask << 0x2;
+
+		*tx_slot = mask;
+		*tx_num = cnt;
 		break;
 	case LPASS_CDC_WSA2_MACRO_AIF1_PB:
 	case LPASS_CDC_WSA2_MACRO_AIF_MIX1_PB:
