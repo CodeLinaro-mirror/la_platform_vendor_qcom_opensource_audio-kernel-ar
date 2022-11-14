@@ -22,6 +22,7 @@
 #define BOOT_CMD 1
 #define SSR_RESET_CMD 1
 #define IMAGE_UNLOAD_CMD 0
+#define MDF_LOAD_CMD 3
 #define MAX_FW_IMAGES 4
 
 enum apr_subsys_state {
@@ -59,6 +60,7 @@ static struct attribute *attrs[] = {
 };
 
 static struct work_struct adsp_ldr_work;
+static struct work_struct mdf_ldr_work;
 static struct platform_device *adsp_private;
 static void adsp_loader_unload(struct platform_device *pdev);
 
@@ -217,9 +219,85 @@ success:
 	return;
 }
 
+static void mdf_load_fw(struct work_struct *mdf_ldr_work)
+{
+	struct platform_device *pdev = adsp_private;
+	struct adsp_loader_private *priv = NULL;
+	const char *adsp_dt = "qcom,adsp-state";
+	int rc = 0;
+	u32 adsp_state;
+
+	if (!pdev) {
+		dev_err(&pdev->dev, "%s: Platform device null\n", __func__);
+		goto fail;
+	}
+
+	if (!pdev->dev.of_node) {
+		dev_err(&pdev->dev,
+			"%s: Device tree information missing\n", __func__);
+		goto fail;
+	}
+
+	rc = of_property_read_u32(pdev->dev.of_node, adsp_dt, &adsp_state);
+	if (rc) {
+		dev_err(&pdev->dev,
+			"%s: ADSP state = %x\n", __func__, adsp_state);
+		goto fail;
+	}
+
+	adsp_state = spf_core_is_apm_ready();
+	if (adsp_state == APR_SUBSYS_DOWN) {
+		priv = platform_get_drvdata(pdev);
+		if (!priv) {
+			dev_err(&pdev->dev,
+			" %s: Private data get failed\n", __func__);
+			goto fail;
+		}
+		if (!priv->adsp_fw_name) {
+			dev_dbg(&pdev->dev, "%s: Load default ADSP\n",
+				__func__);
+			priv->pil_h = subsystem_get("adsp");
+		} else {
+			dev_dbg(&pdev->dev, "%s: Load ADSP with fw name %s\n",
+				__func__, priv->adsp_fw_name);
+			priv->pil_h = subsystem_get_with_fwname("adsp", priv->adsp_fw_name);
+		}
+
+		if (IS_ERR(priv->pil_h)) {
+			dev_err(&pdev->dev, "%s: pil get ADSP failed,\n",
+				__func__);
+			goto fail;
+		}
+
+		/* load modem for mdf*/
+		priv->pil_h = subsystem_get("modem");
+		if (IS_ERR(priv->pil_h)) {
+			dev_err(&pdev->dev, "%s: pil get MODEM failed,\n",
+				__func__);
+			goto fail;
+		}
+	} else if (adsp_state == APR_SUBSYS_LOADED) {
+		dev_dbg(&pdev->dev,
+		"%s: ADSP state = %x\n", __func__, adsp_state);
+	}
+
+	dev_dbg(&pdev->dev, "%s: Q6/ADSP image is loaded\n", __func__);
+	goto success;
+
+fail:
+	dev_err(&pdev->dev, "%s: Q6 image loading failed\n", __func__);
+success:
+	return;
+}
+
 static void adsp_loader_do(struct platform_device *pdev)
 {
 	schedule_work(&adsp_ldr_work);
+}
+
+static void mdf_loader_do(struct platform_device *pdev)
+{
+	schedule_work(&mdf_ldr_work);
 }
 
 static ssize_t adsp_ssr_store(struct kobject *kobj,
@@ -267,6 +345,9 @@ static ssize_t adsp_boot_store(struct kobject *kobj,
 	} else if (boot == IMAGE_UNLOAD_CMD) {
 		pr_debug("%s: going to call adsp_unloader\n", __func__);
 		adsp_loader_unload(adsp_private);
+	} else if (boot == MDF_LOAD_CMD) {
+		pr_debug("%s: going to call mdf_loader_do\n", __func__);
+		mdf_loader_do(adsp_private);
 	}
 	return count;
 }
@@ -502,6 +583,7 @@ static int adsp_loader_probe(struct platform_device *pdev)
 	}
 wqueue:
 	INIT_WORK(&adsp_ldr_work, adsp_load_fw);
+	INIT_WORK(&mdf_ldr_work, mdf_load_fw);
 	if (adsp_fw_bit_values)
 		devm_kfree(&pdev->dev, adsp_fw_bit_values);
 	if (adsp_fw_name_array)
