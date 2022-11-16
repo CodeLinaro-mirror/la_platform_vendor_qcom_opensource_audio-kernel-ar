@@ -87,6 +87,7 @@ enum hyp_assign_type {
 	HYP_UNASSIGN,
 	HYP_ASSIGN_CMA,
 	HYP_ASSIGN_MDF,
+	HYP_ASSIGN_AMS,
 };
 
 struct msm_audio_fd_data {
@@ -1065,6 +1066,9 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	struct msm_audio_ion_private *ion_data =
 			container_of(file->f_inode->i_cdev, struct msm_audio_ion_private, cdev);
 
+	int ams_dest_vm_map[2] = {VMID_HLOS, VMID_MSS_MBA};
+	int ams_dest_perms_map[2] = { PERM_READ | PERM_WRITE | PERM_EXEC, PERM_READ | PERM_WRITE | PERM_EXEC };
+
 	pr_debug("%s ioctl num %u\n", __func__, ioctl_num);
 	switch (ioctl_num) {
 	case IOCTL_MAP_PHYS_ADDR:
@@ -1172,6 +1176,64 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		msm_audio_set_hyp_assign((int)ioctl_param, HYP_UNASSIGN);
 		pr_debug("%s: hyp_unassign_phys mdf success\n", __func__);
 	    break;
+	case IOCTL_MAP_AMS_MEM:
+		msm_audio_fd_data = kzalloc((sizeof(struct msm_audio_fd_data)),
+					GFP_KERNEL);
+		if (!msm_audio_fd_data) {
+			ret = -ENOMEM;
+			pr_err("%s : Out of memory ret %d\n", __func__, ret);
+			return ret;
+		}
+		if (ion_data == &msm_audio_ion_data) {
+			ret = spf_msm_audio_ion_import((struct dma_buf **)&mem_handle, (int)ioctl_param,
+						NULL, 0, &paddr, &pa_len, &vaddr);
+		} else {
+			ret = spf_msm_audio_ion_import_cma((struct dma_buf **)&mem_handle, (int)ioctl_param,
+						NULL, 0, &paddr, &pa_len, &vaddr);
+		}
+		if (ret < 0) {
+			pr_err("%s Memory map Failed %d\n", __func__, ret);
+			kfree(msm_audio_fd_data);
+			return ret;
+		}
+		ret = hyp_assign_phys(paddr, pa_len, source_vm_map, 1,
+		                    ams_dest_vm_map, ams_dest_perms_map, 2);
+		if (ret) {
+			pr_err("%s: hyp assign failed result = %d addr = 0x%pK size = %d\n",
+					__func__, ret, paddr, pa_len);
+			kfree(msm_audio_fd_data);
+			return ret;
+		}
+		msm_audio_fd_data->fd = (int)ioctl_param;
+		msm_audio_fd_data->handle = mem_handle;
+		msm_audio_fd_data->paddr = paddr;
+		msm_audio_fd_data->pa_len = pa_len;
+		msm_audio_fd_data->hyp_assign_type = HYP_ASSIGN_AMS;
+		msm_audio_fd_data->dev = ion_data->cb_dev;
+		msm_audio_update_fd_list(msm_audio_fd_data);
+		break;
+	case IOCTL_UNMAP_AMS_MEM:
+		msm_audio_get_phy_addr((int)ioctl_param, &paddr, &pa_len);
+
+		ret = hyp_assign_phys(paddr, pa_len, ams_dest_vm_map, 2,
+		                    source_vm_map, dest_perms_unmap, 1);
+		if (ret) {
+			pr_err("%s: hyp un-assign failed result = %d addr = 0x%pK size = %d\n",
+					__func__, ret, paddr, pa_len);
+			return ret;
+		}
+		msm_audio_get_handle((int)ioctl_param, &mem_handle);
+		if (ion_data == &msm_audio_ion_data) {
+			ret = spf_msm_audio_ion_free(mem_handle);
+		} else {
+			ret = spf_msm_audio_ion_free_cma(mem_handle);
+		}
+		if (ret < 0) {
+			pr_err("%s Ion free failed %d\n", __func__, ret);
+			return ret;
+		}
+		msm_audio_delete_fd_entry(mem_handle);
+		break;
 	default:
 		pr_err("%s Entered default. Invalid ioctl num %u",
 			__func__, ioctl_num);
