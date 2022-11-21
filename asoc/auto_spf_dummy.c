@@ -1043,6 +1043,18 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.ignore_pmdown_time = 1,
         .id = IDX_HSIF4_TDM_TX_0,
 	SND_SOC_DAILINK_REG(hs_if4_tdm_tx_0),
+},
+{
+	.name = "QUAT_TDM_RX_0",
+	.stream_name = "TDM-LPAIF-RX-QUATERNARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	.id = IDX_QUATERNARY_TDM_RX_0,
+	SND_SOC_DAILINK_REG(quat_tdm_rx_0),
 }
 };
 
