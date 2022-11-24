@@ -46,6 +46,10 @@ ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa8295))
 KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
 KBUILD_OPTIONS += CONFIG_SND_SOC_SA8295=m
 endif
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), lemans))
+KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
+KBUILD_OPTIONS += CONFIG_SND_SOC_SA8255=m
+endif
 
 define PROCESS_HEADERS
 	$(foreach name,$(1),$(shell cd $(KERNEL_BINARY_DIR) && $(KERNEL_SRC)/scripts/headers_install.sh $(2)$(name) $(3)$(name)))
