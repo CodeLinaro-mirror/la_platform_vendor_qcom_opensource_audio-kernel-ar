@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (c) 2012, 2014, 2017, 2020, 2021 The Linux Foundation. All rights reserved.
- * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _UAPI_LINUX_MSM_AUDIO_H
@@ -13,6 +13,9 @@
 #include <linux/ioctl.h>
 
 #define AUDIO_IOCTL_MAGIC 'a'
+
+#define COMPAT_IOCTL_MAP_PHYS_ADDR 97
+#define COMPAT_IOCTL_UNMAP_PHYS_ADDR 98
 
 #define IOCTL_MAP_PHYS_ADDR _IOW(AUDIO_IOCTL_MAGIC, 97, int)
 #define IOCTL_UNMAP_PHYS_ADDR _IOW(AUDIO_IOCTL_MAGIC, 98, int)
