@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
-   Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+   Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -868,6 +868,13 @@ static int lpass_cdc_wsa2_macro_mclk_enable(
 			regmap_update_bits(regmap,
 				LPASS_CDC_WSA2_CLK_RST_CTRL_MCLK_CONTROL,
 				0x01, 0x01);
+			/* Toggle fs_cntr_clr bit*/
+			regmap_update_bits(regmap,
+				LPASS_CDC_WSA_CLK_RST_CTRL_FS_CNT_CONTROL,
+				0x02, 0x02);
+			regmap_update_bits(regmap,
+				LPASS_CDC_WSA_CLK_RST_CTRL_FS_CNT_CONTROL,
+				0x02, 0x0);
 			regmap_update_bits(regmap,
 				LPASS_CDC_WSA2_CLK_RST_CTRL_FS_CNT_CONTROL,
 				0x01, 0x01);
