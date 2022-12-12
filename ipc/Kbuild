@@ -14,6 +14,12 @@ ifeq ($(KERNEL_BUILD), 1)
 	AUDIO_ROOT := $(KDIR)/techpack/audio
 endif
 
+ifeq ($(TARGET_SUPPORT), sa525m)
+	include $(AUDIO_ROOT)/config/sa525mauto.conf
+	export
+	INCS    +=  -include $(AUDIO_ROOT)/config/sa525mautoconf.h
+endif
+
 ifeq ($(CONFIG_SND_SOC_AUTO), y)
 	ifdef CONFIG_SND_SOC_SA8155
 		include $(AUDIO_ROOT)/config/sa8155auto.conf
@@ -144,6 +150,10 @@ ifdef CONFIG_AUDIO_PKT
 AUDIO_PKT += audio-pkt.o
 endif
 
+ifdef CONFIG_AUDIO_CC_IPC
+AUDIO_CC_IPC += audio-cc-ipc.o
+endif
+
 LINUX_INC += -Iinclude/linux
 
 INCS +=	$(COMMON_INC) \
@@ -198,6 +208,9 @@ gpr_dlkm-y := $(GPRV_GLINK)
 
 obj-$(CONFIG_AUDIO_PKT) += audio_pkt_dlkm.o
 audio_pkt_dlkm-y := $(AUDIO_PKT)
+
+obj-$(CONFIG_AUDIO_CC_IPC) += audio_cc_ipc_dlkm.o
+audio_cc_ipc_dlkm-y := $(AUDIO_CC_IPC)
 
 # inject some build related information
 CDEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
