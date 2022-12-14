@@ -586,7 +586,7 @@ int msm_audio_hyp_unassign(struct msm_audio_fd_data *msm_audio_fd_data) {
 		ret = hyp_assign_phys(msm_audio_fd_data->paddr, msm_audio_fd_data->plen,
 			source_vm_unmap, 2, dest_vm_unmap, dest_perms_unmap, 1);
 		if (ret < 0) {
-			pr_err("%s: hyp unassign failed result = %d addr = 0x%pK size = %d\n",
+			pr_err("%s: hyp unassign failed result = %d addr = 0x%lld size = %ld\n",
 			__func__, ret, msm_audio_fd_data->paddr, msm_audio_fd_data->plen);
 		}
 		msm_audio_fd_data->hyp_assign = false;
@@ -722,7 +722,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		ret = hyp_assign_phys(paddr, pa_len, source_vm_map, 1,
 		                      dest_vm_map, dest_perms_map, 2);
 		if (ret < 0) {
-			pr_err("%s: hyp assign failed result = %d addr = 0x%pK size = %d\n",
+			pr_err("%s: hyp assign failed result = %d addr = 0x%lld size = %ld\n",
 					__func__, ret, paddr, pa_len);
 			return ret;
 		}
@@ -740,7 +740,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		ret = hyp_assign_phys(paddr, pa_len, source_vm_unmap, 2,
 		                      dest_vm_unmap, dest_perms_unmap, 1);
 		if (ret < 0) {
-			pr_err("%s: hyp unassign failed result = %d addr = 0x%pK size = %d\n",
+			pr_err("%s: hyp unassign failed result = %d addr = 0x%lld size = %ld\n",
 					__func__, ret, paddr, pa_len);
 			return ret;
 		}
@@ -788,10 +788,16 @@ static int __audio_mem_hyp_assign(struct device *dev, int *source_vms,
 static int audio_mem_hyp_assign(struct device *dev)
 {
 	int source_vm_map[1] = {VMID_HLOS};
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	int dest_vm_map[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
 	int dest_perms_map[4] = {
 		[0 ... 3] = PERM_READ | PERM_WRITE,
 	};
+#else
+	int dest_vm_map[2] = {VMID_MSS_MSA, VMID_HLOS};
+	int dest_perms_map[2] = {PERM_READ | PERM_WRITE,
+							PERM_READ | PERM_WRITE};
+#endif
 
 	return __audio_mem_hyp_assign(dev, source_vm_map,
 					   ARRAY_SIZE(source_vm_map),
@@ -801,7 +807,11 @@ static int audio_mem_hyp_assign(struct device *dev)
 
 static int audio_mem_hyp_unassign(struct device *dev)
 {
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	int source_vm_unmap[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
+#else
+	int source_vm_unmap[2] = {VMID_MSS_MSA, VMID_HLOS};
+#endif
 	int dest_vm_unmap[1] = {VMID_HLOS};
 	int dest_perms_unmap[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
 
@@ -980,7 +990,11 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 		msm_audio_ion_data->smmu_sid_bits =
 			smmu_sid << MSM_AUDIO_SMMU_SID_OFFSET;
 	} else {
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 		msm_audio_ion_data->driver_name = "msm_audio_ion_cma";
+#else
+		msm_audio_ion_data->driver_name = "msm_audio_ion";
+#endif
 	}
 
 	if (!rc)

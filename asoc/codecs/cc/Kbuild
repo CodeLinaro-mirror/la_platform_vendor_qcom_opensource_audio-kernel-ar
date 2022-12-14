@@ -11,46 +11,8 @@ endif
 ifeq ($(KERNEL_BUILD), 1)
 	# These are configurable via Kconfig for kernel-based builds
 	# Need to explicitly configure for Android-based builds
-	AUDIO_BLD_DIR := $(shell pwd)/kernel/msm-5.4
+	AUDIO_BLD_DIR := $(ANDROID_BUILD_TOP)/kernel/msm-5.4
 	AUDIO_ROOT := $(AUDIO_BLD_DIR)/techpack/audio
-endif
-
-ifeq ($(KERNEL_BUILD), 0)
-	ifeq ($(CONFIG_ARCH_SM6150), y)
-		include $(AUDIO_ROOT)/config/sm6150auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sm6150autoconf.h
-	endif
-	ifeq ($(CONFIG_ARCH_TRINKET), y)
-		include $(AUDIO_ROOT)/config/sm6150auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sm6150autoconf.h
-	endif
-	ifeq ($(CONFIG_ARCH_SM8150), y)
-		include $(AUDIO_ROOT)/config/sm8150auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sm8150autoconf.h
-	endif
-	ifeq ($(CONFIG_ARCH_SDMSHRIKE), y)
-		include $(AUDIO_ROOT)/config/sm8150auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sm8150autoconf.h
-	endif
-	ifeq ($(CONFIG_ARCH_SDXLEMUR), y)
-		include $(AUDIO_ROOT)/config/sdxlemurauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sdxlemurautoconf.h
-	endif
-	ifeq ($(CONFIG_ARCH_SDXPINN), y)
-		include $(AUDIO_ROOT)/config/sdxpinnauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sdxpinnautoconf.h
-	endif
-	ifeq ($(CONFIG_ARCH_SDXBAAGHA), y)
-		include $(AUDIO_ROOT)/config/sdxbaaghaauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sdxbaaghaautoconf.h
-	endif
 endif
 
 # As per target team, build is done as follows:
@@ -70,25 +32,20 @@ endif
 # config.
 
 ############ UAPI ############
-UAPI_DIR :=	uapi/audio
+UAPI_DIR :=	uapi
 UAPI_INC :=	-I$(AUDIO_ROOT)/include/$(UAPI_DIR)
 
 ############ COMMON ############
 COMMON_DIR :=	include
 COMMON_INC :=	-I$(AUDIO_ROOT)/$(COMMON_DIR)
 
-############ WCD934X ############
+############ CC ############
 
-# for WCD934X Codec
-ifdef CONFIG_SND_SOC_WCD934X
-	WCD934X_OBJS += wcd934x.o
-	WCD934X_OBJS += wcd934x-mbhc.o
-	WCD934X_OBJS += wcd934x-dsd.o
-ifndef CONFIG_SND_SOC_SDX
-	WCD934X_OBJS += wcd934x-dsp-cntl.o
+# for CC Codec
+ifdef CONFIG_SND_SOC_CC
+	CC_OBJS += cc_codec.o
+	CC_OBJS += cc_pktzr.o
 endif
-endif
-
 
 LINUX_INC +=	-Iinclude/linux
 
@@ -132,8 +89,8 @@ KBUILD_EXTRA_SYMBOLS +=$(OUT)/obj/vendor/qcom/opensource/audio-kernel/soc/Module
 endif
 
 # Module information used by KBuild framework
-obj-$(CONFIG_SND_SOC_WCD934X) += wcd934x_dlkm.o
-wcd934x_dlkm-y := $(WCD934X_OBJS)
+obj-$(CONFIG_SND_SOC_CC) += cc_dlkm.o
+cc_dlkm-y := $(CC_OBJS)
 
 # inject some build related information
 DEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
