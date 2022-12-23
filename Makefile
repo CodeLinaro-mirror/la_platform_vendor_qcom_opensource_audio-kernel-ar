@@ -1,3 +1,19 @@
+#QTI_TECHPACK is used since kernel 5.15
+ifeq ($(QTI_TECHPACK), true)
+AUDIO_KERNEL_PATH=$(PWD)/../vendor/qcom/opensource/audio-kernel-ar/
+AUDIO_ROOT=$(AUDIO_KERNEL_PATH)
+endif
+
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), lemans))
+KBUILD_OPTIONS := CONFIG_SND_SOC_AUTO=y
+KBUILD_OPTIONS += CONFIG_SND_SOC_SA8255=m
+endif
+
+ifeq ($(AUTO_GVM), yes)
+KBUILD_OPTIONS := CONFIG_SND_SOC_AUTO=y
+KBUILD_OPTIONS += CONFIG_SND_SOC_GVM=y
+endif
+
 ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sdxpinn sdxbaagha))
 
 AUDIO_ROOT=$(KERNEL_SRC)/$(M)
