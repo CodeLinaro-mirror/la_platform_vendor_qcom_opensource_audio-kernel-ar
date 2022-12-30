@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2019-2022, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _MSM_AUDIO_DEFS_H
@@ -110,6 +110,7 @@
 #define LPASS_BE_TX_CDC_DMA_TX_4 "CODEC_DMA-LPAIF_RXTX-TX-4"
 #define LPASS_BE_TX_CDC_DMA_TX_5 "CODEC_DMA-LPAIF_RXTX-TX-5"
 
+#define LPASS_BE_VA_CDC_CC "AUDIOSS_DMA-LPAIF_VA-TX-0"
 #define LPASS_BE_RT_PROXY_PCM_RX "PCM_RT_PROXY-RX-1"
 #define LPASS_BE_RT_PROXY_PCM_TX "PCM_RT_PROXY-TX-1"
 

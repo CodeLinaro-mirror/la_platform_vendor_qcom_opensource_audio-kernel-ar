@@ -61,8 +61,13 @@ do {									      \
 
 #define MODULE_NAME "audio-pkt"
 #define MINOR_NUMBER_COUNT 1
+#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+#define AUDPKT_DRIVER_NAME "aud_pasthru_modem"
+#define CHANNEL_NAME "modem_apps"
+#else
 #define AUDPKT_DRIVER_NAME "aud_pasthru_adsp"
 #define CHANNEL_NAME "adsp_apps"
+#endif
 #define MAX_PACKET_SIZE 4096
 
 
@@ -302,7 +307,7 @@ int audpkt_chk_and_update_physical_addr(struct audio_gpr_pkt *gpr_pkt)
 {
 	int ret = 0;
         size_t pa_len = 0;
-	dma_addr_t paddr;
+	u64 paddr;
 
 	if (gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
 				APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE) {
@@ -316,8 +321,9 @@ int audpkt_chk_and_update_physical_addr(struct audio_gpr_pkt *gpr_pkt)
 		}
 		AUDIO_PKT_INFO("%s physical address %pK", __func__,
 				(void *) paddr);
-		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (uint32_t) paddr;
-		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw = (uint64_t) paddr >> 32;
+		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (u32) paddr;
+		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw = (u32) (paddr >> 32);
+
 	}
 	return ret;
 }
@@ -586,6 +592,9 @@ static int audio_pkt_plaform_driver_register_gpr(struct platform_device *pdev,
 	if (!ap_priv)
 		return -ENOMEM;
 
+	mutex_init(&ap_priv->lock);
+	ap_priv->status = AUDIO_PKT_INIT;
+
 	ret = gpr_driver_register(&audio_pkt_driver);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "%s: registering to gpr driver failed, err = %d\n",
@@ -593,8 +602,6 @@ static int audio_pkt_plaform_driver_register_gpr(struct platform_device *pdev,
 		goto err;
 	}
 
-	mutex_init(&ap_priv->lock);
-	ap_priv->status = AUDIO_PKT_INIT;
 	ap_priv->ap_dev = audpkt_dev;
 	ap_priv->dev = audpkt_dev->dev;
 err:

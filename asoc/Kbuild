@@ -13,6 +13,12 @@ ifeq ($(KERNEL_BUILD), 1)
 	AUDIO_ROOT := $(AUDIO_BLD_DIR)/techpack/audio
 endif
 
+ifeq ($(TARGET_SUPPORT), sa525m)
+	include $(AUDIO_ROOT)/config/sa525mauto.conf
+	export
+	INCS    +=  -include $(AUDIO_ROOT)/config/sa525mautoconf.h
+endif
+
 ifeq ($(CONFIG_SND_SOC_AUTO), y)
 	ifdef CONFIG_SND_SOC_SA8155
 		include $(AUDIO_ROOT)/config/sa8155auto.conf
@@ -75,6 +81,10 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/bengalautoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_MONACO), y)
+		include $(AUDIO_ROOT)/config/monacoauto.conf
+		INCS    +=  -include $(AUDIO_ROOT)/config/monacoautoconf.h
+	endif
 	ifeq ($(CONFIG_ARCH_SDMSHRIKE), y)
 		ifdef CONFIG_SND_SOC_SA8155
 			include $(AUDIO_ROOT)/config/sa8155auto.conf
@@ -100,6 +110,16 @@ ifeq ($(KERNEL_BUILD), 0)
 		include $(AUDIO_ROOT)/config/sdxlemurauto.conf
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdxlemurautoconf.h
+	endif
+	ifeq ($(CONFIG_ARCH_SDXPINN), y)
+		include $(AUDIO_ROOT)/config/sdxpinnauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sdxpinnautoconf.h
+	endif
+	ifeq ($(CONFIG_ARCH_SDXBAAGHA), y)
+		include $(AUDIO_ROOT)/config/sdxbaaghaauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sdxbaaghaautoconf.h
 	endif
 endif
 endif
@@ -188,6 +208,11 @@ ifdef CONFIG_SND_SOC_BENGAL
 	MACHINE_OBJS += bengal.o
 endif
 
+# for MONACO sound card driver
+ifdef CONFIG_SND_SOC_MONACO
+	MACHINE_OBJS += monaco.o
+endif
+
 # for sa8155 sound card driver
 ifdef CONFIG_SND_SOC_SA8155
 	MACHINE_OBJS += sa8155.o
@@ -199,6 +224,10 @@ endif
 
 ifdef CONFIG_SND_SOC_SDX
 	MACHINE_OBJS += sdx-target.o
+endif
+
+ifdef CONFIG_SND_SOC_SA525M
+	MACHINE_OBJS += sdx-auto-target.o
 endif
 
 LINUX_INC +=	-Iinclude/linux
@@ -273,10 +302,16 @@ machine_dlkm-y := $(MACHINE_OBJS)
 obj-$(CONFIG_SND_SOC_BENGAL) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
+obj-$(CONFIG_SND_SOC_MONACO) += machine_dlkm.o
+machine_dlkm-y := $(MACHINE_OBJS)
+
 obj-$(CONFIG_SND_SOC_SA8155) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_SDX) += machine_dlkm.o
+machine_dlkm-y := $(MACHINE_OBJS)
+
+obj-$(CONFIG_SND_SOC_SA525M) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 # inject some build related information
