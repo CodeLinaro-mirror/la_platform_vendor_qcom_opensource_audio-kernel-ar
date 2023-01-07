@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/init.h>
@@ -137,6 +137,7 @@ static int msm_audio_ion_map_kernel(struct dma_buf *dma_buf,
 	if (rc) {
 		pr_err("%s: kernel mapping of dma_buf failed\n",
 		       __func__);
+		dma_buf_end_cpu_access(dma_buf, DMA_BIDIRECTIONAL);
 		goto exit;
 	}
 
@@ -222,6 +223,7 @@ static int msm_audio_dma_buf_map(struct dma_buf *dma_buf,
 		alloc_data->vmap = dma_vmap;
 	} else {
 		*addr = MSM_AUDIO_ION_PHYS_ADDR(alloc_data);
+		kfree(dma_vmap);
 	}
 
 	msm_audio_ion_add_allocation(ion_data, alloc_data);
