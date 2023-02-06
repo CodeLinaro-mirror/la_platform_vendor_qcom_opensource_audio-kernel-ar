@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -415,6 +415,30 @@ static int msm_audio_adsp_ssr_register(struct device *dev)
 
 	return ret;
 }
+
+static int auto_adsp_notifier_service_cb(struct notifier_block *this,
+					 unsigned long opcode, void *ptr)
+{
+	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+
+	switch (opcode) {
+	case AUDIO_NOTIFIER_SERVICE_DOWN:
+		snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
+		break;
+	case AUDIO_NOTIFIER_SERVICE_UP:
+		snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block service_nb = {
+	.notifier_call  = auto_adsp_notifier_service_cb,
+	.priority = -INT_MAX,
+};
 
 static int msm_set_pinctrl(struct msm_pinctrl_info *pinctrl_info,
 				enum pinctrl_pin_state new_state)
@@ -1623,13 +1647,15 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		pr_err("%s: Registration with modem PDR failed ret = %d\n",
 			__func__, ret);
 #endif
-
 	ret = msm_audio_adsp_ssr_register(&pdev->dev);
 	if (ret)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
 			__func__, ret);
 
 	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+        ret = audio_notifier_register("auto_spf", AUDIO_NOTIFIER_ADSP_DOMAIN,
+                                       &service_nb);
+
 	return 0;
 err:
 	msm_release_mclk_pinctrl(pdev);
