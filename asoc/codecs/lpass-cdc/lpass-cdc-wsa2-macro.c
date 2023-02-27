@@ -1487,6 +1487,8 @@ static int lpass_cdc_wsa2_macro_enable_main_path(struct snd_soc_dapm_widget *w,
 		if (lpass_cdc_wsa2_macro_adie_lb(component, w->shift)) {
 			adie_lb = true;
 			lpass_cdc_wsa_pa_on(wsa2_dev, adie_lb);
+			snd_soc_component_update_bits(component,
+						reg, 0x10, 0x00);
 		}
 		break;
 	default:
