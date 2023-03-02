@@ -697,6 +697,30 @@ static int msm_tdm_get_intf_idx(u16 id)
 	}
 }
 
+static int auto_adsp_notifier_service_cb(struct notifier_block *this,
+					 unsigned long opcode, void *ptr)
+{
+	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+
+	switch (opcode) {
+	case AUDIO_NOTIFIER_SERVICE_DOWN:
+		snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
+		break;
+	case AUDIO_NOTIFIER_SERVICE_UP:
+		snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block service_nb = {
+	.notifier_call  = auto_adsp_notifier_service_cb,
+	.priority = -INT_MAX,
+};
+
 static int msm_set_pinctrl(struct msm_pinctrl_info *pinctrl_info,
                                 enum pinctrl_pin_state new_state)
 {
@@ -849,28 +873,28 @@ static struct snd_soc_ops tdm_be_ops = {
 static struct snd_soc_dai_link msm_common_dai_links[] = {
 /* BackEnd DAI Links */
 {
-	.name = "PRI_TDM_RX_0",
-	.stream_name = "TDM-LPAIF-RX-PRIMARY",
+	.name = "LPASS_BE_AUXPCM_RX_DUMMY",
+	.stream_name = "AUXPCM-LPAIF-RX-PRIMARY",
 	.dpcm_playback = 1,
+	.ops = &tdm_be_ops,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
-	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
 	.id = IDX_PRIMARY_TDM_RX_0,
-	SND_SOC_DAILINK_REG(pri_tdm_rx_0),
+	SND_SOC_DAILINK_REG(lpass_be_auxpcm_rx_dummy),
 },
 {
-	.name = "PRI_TDM_TX_0",
-	.stream_name = "TDM-LPAIF-TX-PRIMARY",
+	.name = "LPASS_BE_AUXPCM_TX_DUMMY",
+	.stream_name = "AUXPCM-LPAIF-TX-PRIMARY",
 	.dpcm_capture = 1,
+	.ops = &tdm_be_ops,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
-	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
 	.id = IDX_PRIMARY_TDM_TX_0,
-	SND_SOC_DAILINK_REG(pri_tdm_tx_0),
+	SND_SOC_DAILINK_REG(lpass_be_auxpcm_tx_dummy),
 },
 {
 	.name = "SEC_TDM_RX_0",
@@ -919,6 +943,106 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.ignore_pmdown_time = 1,
 	.id = IDX_TERTIARY_TDM_TX_0,
 	SND_SOC_DAILINK_REG(tert_tdm_tx_0),
+},
+{
+	.name = "QUAT_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_RXTX-RX-PRIMARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quat_tdm_rx_0),
+},
+{
+	.name = "QUAT_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_RXTX-TX-PRIMARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quat_tdm_tx_0),
+},
+{
+	.name = "QUIN_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_VA-RX-PRIMARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quin_tdm_rx_0),
+},
+{
+	.name = "QUIN_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_VA-TX-PRIMARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quin_tdm_tx_0),
+},
+{
+	.name = "SEN_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_WSA-RX-PRIMARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(sen_tdm_rx_0),
+},
+{
+	.name = "SEN_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_WSA-TX-PRIMARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(sen_tdm_tx_0),
+},
+{
+	.name = "SEP_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_AUD-RX-PRIMARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(sep_tdm_rx_0),
+},
+{
+	.name = "SEP_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_AUD-TX-PRIMARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(sep_tdm_tx_0),
+},
+{
+	.name = "OCT_TDM_RX_0",
+	.stream_name = "TDM-LPAIF_WSA2-RX-PRIMARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(oct_tdm_rx_0),
+},
+{
+	.name = "OCT_TDM_TX_0",
+	.stream_name = "TDM-LPAIF_WSA2-TX-PRIMARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(oct_tdm_tx_0),
 },
 {
 	.name = "HS_IF0_TDM_RX_0",
@@ -1039,7 +1163,47 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.ignore_pmdown_time = 1,
         .id = IDX_HSIF4_TDM_TX_0,
 	SND_SOC_DAILINK_REG(hs_if4_tdm_tx_0),
-}
+},
+{
+	.name = "QUAT_TDM_RX_0_DUMMY",
+	.stream_name = "TDM-LPAIF-RX-QUATERNARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quat_tdm_rx_0_dummy),
+},
+{
+	.name = "QUAT_TDM_TX_0_DUMMY",
+	.stream_name = "TDM-LPAIF-TX-QUATERNARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quat_tdm_tx_0_dummy),
+},
+{
+	.name = "QUIN_TDM_RX_0_DUMMY",
+	.stream_name = "TDM-LPAIF-RX-QUINARY",
+	.dpcm_playback = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quin_tdm_rx_0_dummy),
+},
+{
+	.name = "QUIN_TDM_TX_0_DUMMY",
+	.stream_name = "TDM-LPAIF-TX-QUINARY",
+	.dpcm_capture = 1,
+	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+				SND_SOC_DPCM_TRIGGER_POST},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(quin_tdm_tx_0_dummy),
+},
 };
 
 
@@ -1605,6 +1769,8 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	spdev = pdev;
 
 	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
+	ret = audio_notifier_register("auto_spf", AUDIO_NOTIFIER_ADSP_DOMAIN,
+				      &service_nb);
 
 	return 0;
 err:
