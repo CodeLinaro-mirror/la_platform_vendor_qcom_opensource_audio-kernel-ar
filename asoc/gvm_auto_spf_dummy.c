@@ -1,5 +1,5 @@
 /* Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -939,18 +939,17 @@ static long virt_sndcard_ioctl(struct file *f,
 	switch (cmd) {
 	case AUTO_VIRT_SNDCARD_OFFLINE:
 		snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
-        pr_debug("%smark sndcard offline\n", __func__);
+		pr_debug("%s: mark sndcard offline\n", __func__);
 	break;
 	case AUTO_VIRT_SNDCARD_ONLINE:
-	    snd_card_notify_user(SND_CARD_STATUS_ONLINE);
-        pr_debug("%smark sndcard online\n", __func__);
+		snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+		pr_debug("%s: mark sndcard online\n", __func__);
 	break;
 	default:
 		pr_err("%s: ioctl not found\n", __func__);
 		ret = -EFAULT;
 	break;
 	}
-//#endif /* CONFIG_AUDIO_QGKI */
 
 	return ret;
 }
@@ -1040,7 +1039,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		pr_err("snd_card_sysfs_init fail, ret=%d\n", ret);
 	}
 
-    ret = snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
+	ret = snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
 	if (ret) {
 		pr_err("snd_card_set_card_status fail, ret=%d\n", ret);
 	}
