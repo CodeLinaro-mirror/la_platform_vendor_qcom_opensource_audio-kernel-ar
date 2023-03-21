@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/gpio.h>
@@ -824,6 +824,10 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		} else {
 			chmap = tx_ch;
 			ch_cnt = tx_ch_cnt;
+		}
+		if (ch_cnt > 2) {
+			pr_err("%s: Incorrect channel count: %d\n", __func__, ch_cnt);
+			return -EINVAL;
 		}
 		len = sizeof(uint32_t) * (ch_cnt + 1);
 		chmap_data = kzalloc(len, GFP_KERNEL);
