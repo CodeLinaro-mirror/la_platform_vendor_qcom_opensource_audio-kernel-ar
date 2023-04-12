@@ -61,11 +61,10 @@ static const char *const tdm_gpio_phandle[] = {"qcom,pri-tdm-gpios",
 						"qcom,quin-tdm-gpios",
 						"qcom,sen-tdm-gpios",
 						"qcom,sep-tdm-gpios",
+						"qcom,oct-tdm-gpios",
 						"qcom,hsif0-tdm-gpios",
 						"qcom,hsif1-tdm-gpios",
 						"qcom,hsif2-tdm-gpios",
-						"qcom,hsif3-tdm-gpios",
-						"qcom,hsif4-tdm-gpios",
 						};
 
 static const char *const mclk_gpio_phandle[] = { "qcom,internal-mclk1-gpios" };
@@ -78,11 +77,10 @@ enum {
 	TDM_QUIN,
 	TDM_SEN,
 	TDM_SEP,
+	TDM_OCT,
 	TDM_HSIF0,
 	TDM_HSIF1,
 	TDM_HSIF2,
-	TDM_HSIF3,
-	TDM_HSIF4,
 	TDM_INTERFACE_MAX,
 };
 
@@ -101,6 +99,8 @@ enum {
 	IDX_SENARY_TDM_TX_0,
 	IDX_SEPTENARY_TDM_RX_0,
 	IDX_SEPTENARY_TDM_TX_0,
+	IDX_OCTONARY_TDM_RX_0,
+	IDX_OCTONARY_TDM_TX_0,
 	IDX_HSIF0_TDM_RX_0,
 	IDX_HSIF0_TDM_TX_0,
 	IDX_HSIF1_TDM_RX_0,
@@ -111,6 +111,10 @@ enum {
 	IDX_HSIF3_TDM_TX_0,
 	IDX_HSIF4_TDM_RX_0,
 	IDX_HSIF4_TDM_TX_0,
+	IDX_QUATERNARY_TDM_RX_DUMMY_0,
+	IDX_QUATERNARY_TDM_TX_DUMMY_0,
+	IDX_QUINARY_TDM_RX_DUMMY_0,
+	IDX_QUINARY_TDM_TX_DUMMY_0,
 	IDX_GROUP_TDM_MAX,
 };
 
@@ -177,9 +181,13 @@ static int msm_tdm_get_intf_idx(u16 id)
 			return TDM_TERT;
 		case IDX_QUATERNARY_TDM_RX_0:
 		case IDX_QUATERNARY_TDM_TX_0:
+		case IDX_QUATERNARY_TDM_RX_DUMMY_0:
+		case IDX_QUATERNARY_TDM_TX_DUMMY_0:
 			return TDM_QUAT;
 		case IDX_QUINARY_TDM_RX_0:
 		case IDX_QUINARY_TDM_TX_0:
+		case IDX_QUINARY_TDM_RX_DUMMY_0:
+		case IDX_QUINARY_TDM_TX_DUMMY_0:
 			return TDM_QUIN;
 		case IDX_SENARY_TDM_RX_0:
 		case IDX_SENARY_TDM_TX_0:
@@ -187,6 +195,9 @@ static int msm_tdm_get_intf_idx(u16 id)
 		case IDX_SEPTENARY_TDM_RX_0:
 		case IDX_SEPTENARY_TDM_TX_0:
 			return TDM_SEP;
+		case IDX_OCTONARY_TDM_RX_0:
+		case IDX_OCTONARY_TDM_TX_0:
+			return TDM_OCT;
 		case IDX_HSIF0_TDM_RX_0:
 		case IDX_HSIF0_TDM_TX_0:
 			return TDM_HSIF0;
@@ -195,13 +206,13 @@ static int msm_tdm_get_intf_idx(u16 id)
 			return TDM_HSIF1;
 		case IDX_HSIF2_TDM_RX_0:
 		case IDX_HSIF2_TDM_TX_0:
-                        return TDM_HSIF2;
+			return TDM_HSIF2;
 		case IDX_HSIF3_TDM_RX_0:
 		case IDX_HSIF3_TDM_TX_0:
-                        return TDM_HSIF3;
+			return TDM_SEC; //muxed
 		case IDX_HSIF4_TDM_RX_0:
 		case IDX_HSIF4_TDM_TX_0:
-                        return TDM_HSIF4;
+			return TDM_TERT; //muxed
 
 		default: return -EINVAL;
 	}
@@ -508,8 +519,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SENARY_TDM_RX_0,
 	SND_SOC_DAILINK_REG(sen_tdm_rx_0),
 },
 {
@@ -518,8 +531,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SENARY_TDM_TX_0,
 	SND_SOC_DAILINK_REG(sen_tdm_tx_0),
 },
 {
@@ -528,8 +543,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SEPTENARY_TDM_RX_0,
 	SND_SOC_DAILINK_REG(sep_tdm_rx_0),
 },
 {
@@ -538,8 +555,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SEPTENARY_TDM_TX_0,
 	SND_SOC_DAILINK_REG(sep_tdm_tx_0),
 },
 {
@@ -548,8 +567,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_OCTONARY_TDM_RX_0,
 	SND_SOC_DAILINK_REG(oct_tdm_rx_0),
 },
 {
@@ -558,8 +579,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_OCTONARY_TDM_TX_0,
 	SND_SOC_DAILINK_REG(oct_tdm_tx_0),
 },
 {
@@ -688,8 +711,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUATERNARY_TDM_RX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quat_tdm_rx_0_dummy),
 },
 {
@@ -698,8 +723,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUATERNARY_TDM_TX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quat_tdm_tx_0_dummy),
 },
 {
@@ -708,8 +735,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUINARY_TDM_RX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quin_tdm_rx_0_dummy),
 },
 {
@@ -718,8 +747,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUINARY_TDM_TX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quin_tdm_tx_0_dummy),
 },
 };
@@ -1039,13 +1070,13 @@ static int msm_pinctrl_mclk_enable(struct platform_device *pdev)
 		pinctrl_info->pinctrl = pinctrl;
 		/* get all the states handles from Device Tree */
 		pinctrl_info->sleep = pinctrl_lookup_state(pinctrl,
-			"sleep");
+			"default");
 		if (IS_ERR(pinctrl_info->sleep)) {
 			pr_err("%s: could not get sleep pin state\n", __func__);
 			goto err;
 		}
 		pinctrl_info->active = pinctrl_lookup_state(pinctrl,
-			"default");
+			"active");
 		if (IS_ERR(pinctrl_info->active)) {
 			pr_err("%s: could not get active pin state\n", __func__);
 			goto err;
