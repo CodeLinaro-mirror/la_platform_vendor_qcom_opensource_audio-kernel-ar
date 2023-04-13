@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -962,6 +963,12 @@ static void lpass_cdc_va_macro_mute_update_callback(struct work_struct *work)
 	snd_soc_component_update_bits(component, tx_vol_ctl_reg, 0x10, 0x00);
 	dev_dbg(va_priv->dev, "%s: decimator %u unmute\n",
 		__func__, decimator);
+
+    /* Set fs_cnt_clr */
+    snd_soc_component_update_bits(component, LPASS_CDC_VA_CLK_RST_CTRL_FS_CNT_CONTROL, 0x02, 0x02);
+
+    /* Clear fs_cnt_clr */
+    snd_soc_component_update_bits(component, LPASS_CDC_VA_CLK_RST_CTRL_FS_CNT_CONTROL, 0x02, 0x00);
 }
 
 static int lpass_cdc_va_macro_put_dec_enum(struct snd_kcontrol *kcontrol,
