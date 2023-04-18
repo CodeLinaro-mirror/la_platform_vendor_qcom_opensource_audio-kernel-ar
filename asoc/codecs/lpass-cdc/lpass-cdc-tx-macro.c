@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -610,10 +611,11 @@ static int lpass_cdc_tx_macro_tx_mixer_put(struct snd_kcontrol *kcontrol,
 	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
 		return -EINVAL;
 
-	if (enable) {
+	if (enable && (!test_bit(dec_id, &tx_priv->active_ch_mask[dai_id]))) {
 		set_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
 		tx_priv->active_ch_cnt[dai_id]++;
-	} else {
+	}
+	if ((!enable) && (test_bit(dec_id, &tx_priv->active_ch_mask[dai_id]))) {
 		tx_priv->active_ch_cnt[dai_id]--;
 		clear_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
 	}
