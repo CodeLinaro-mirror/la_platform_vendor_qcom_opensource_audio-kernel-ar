@@ -95,7 +95,7 @@ PRODUCT_PACKAGES += \
 	$(KERNEL_MODULES_OUT)/audio_cc_ipc_dlkm.ko
 endif	#wear_aon
 endif	#monaco
-ifeq ($(call is-board-platform-in-list,msmnile), true)
+ifeq ($(call is-board-platform-in-list,msmnile gen4), true)
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), msmnile_gvmq))
 PRODUCT_PACKAGES  += $(KERNEL_MODULES_OUT)/machine_dlkm.ko \
         $(KERNEL_MODULES_OUT)/stub_dlkm.ko

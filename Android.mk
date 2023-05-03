@@ -27,7 +27,7 @@ BOARD_OPENSOURCE_DIR ?= vendor/qcom/opensource
 BOARD_COMMON_DIR ?= device/qcom/common
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal monaco msmnile), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal monaco msmnile gen4), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -50,7 +50,7 @@ KBUILD_OPTIONS := AUDIO_ROOT=$(AUDIO_BLD_DIR)
 KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
-ifeq ($(call is-board-platform-in-list, msmnile),true)
+ifeq ($(call is-board-platform-in-list, msmnile gen4),true)
 KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), msmnile_gvmq))
 KBUILD_OPTIONS +=CONFIG_SND_SOC_GVM=y
@@ -194,7 +194,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
-ifneq ($(call is-board-platform-in-list, msmnile),true)
+ifneq ($(call is-board-platform-in-list, msmnile gen4),true)
 ############################ soc ###############################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -233,7 +233,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################  ASOC CODEC ################################
-ifneq ($(call is-board-platform-in-list, msmnile),true)
+ifneq ($(call is-board-platform-in-list, msmnile gen4),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := wcd_core_dlkm.ko
