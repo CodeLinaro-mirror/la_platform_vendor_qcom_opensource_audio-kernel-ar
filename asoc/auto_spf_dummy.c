@@ -30,6 +30,7 @@
 #include <sound/info.h>
 #include <dsp/audio_notifier.h>
 #include <dsp/audio_prm.h>
+#include <soc/snd_event.h>
 #include "msm_dailink.h"
 #include "msm_common.h"
 
@@ -61,11 +62,10 @@ static const char *const tdm_gpio_phandle[] = {"qcom,pri-tdm-gpios",
 						"qcom,quin-tdm-gpios",
 						"qcom,sen-tdm-gpios",
 						"qcom,sep-tdm-gpios",
+						"qcom,oct-tdm-gpios",
 						"qcom,hsif0-tdm-gpios",
 						"qcom,hsif1-tdm-gpios",
 						"qcom,hsif2-tdm-gpios",
-						"qcom,hsif3-tdm-gpios",
-						"qcom,hsif4-tdm-gpios",
 						};
 
 static const char *const mclk_gpio_phandle[] = { "qcom,internal-mclk1-gpios" };
@@ -78,11 +78,10 @@ enum {
 	TDM_QUIN,
 	TDM_SEN,
 	TDM_SEP,
+	TDM_OCT,
 	TDM_HSIF0,
 	TDM_HSIF1,
 	TDM_HSIF2,
-	TDM_HSIF3,
-	TDM_HSIF4,
 	TDM_INTERFACE_MAX,
 };
 
@@ -101,6 +100,8 @@ enum {
 	IDX_SENARY_TDM_TX_0,
 	IDX_SEPTENARY_TDM_RX_0,
 	IDX_SEPTENARY_TDM_TX_0,
+	IDX_OCTONARY_TDM_RX_0,
+	IDX_OCTONARY_TDM_TX_0,
 	IDX_HSIF0_TDM_RX_0,
 	IDX_HSIF0_TDM_TX_0,
 	IDX_HSIF1_TDM_RX_0,
@@ -111,12 +112,27 @@ enum {
 	IDX_HSIF3_TDM_TX_0,
 	IDX_HSIF4_TDM_RX_0,
 	IDX_HSIF4_TDM_TX_0,
+	IDX_QUATERNARY_TDM_RX_DUMMY_0,
+	IDX_QUATERNARY_TDM_TX_DUMMY_0,
+	IDX_QUINARY_TDM_RX_DUMMY_0,
+	IDX_QUINARY_TDM_TX_DUMMY_0,
 	IDX_GROUP_TDM_MAX,
 };
 
-enum {
+enum msm_mclk_index {
+	MCLK_NONE = -1,
 	MCLK1 = 0,
 	MCLK_MAX,
+};
+
+enum msm_mclk_status {
+	MCLK_DISABLED = 0,
+	MCLK_ENABLED,
+};
+
+struct msm_mclk_conf {
+	struct mutex lock;
+	enum msm_mclk_status mclk_status;
 };
 
 struct tdm_conf {
@@ -125,22 +141,15 @@ struct tdm_conf {
 };
 
 struct msm_asoc_mach_data {
-	struct snd_info_entry *codec_root;
 	struct msm_common_pdata *common_pdata;
-	struct device_node *us_euro_gpio_p; /* used by pinctrl API */
-	struct device_node *hph_en1_gpio_p; /* used by pinctrl API */
-	struct device_node *hph_en0_gpio_p; /* used by pinctrl API */
-	struct device_node *fsa_handle;
-	struct snd_soc_codec *codec;
-	struct work_struct adsp_power_up_work;
 	struct tdm_conf tdm_intf_conf[TDM_INTERFACE_MAX];
 	struct msm_pinctrl_info pinctrl_info[TDM_INTERFACE_MAX];
+	bool mclk_used;
 	struct msm_pinctrl_info mclk_pinctrl_info[MCLK_MAX];
+	struct msm_mclk_conf mclk_conf[MCLK_MAX];
 };
 
 static struct platform_device *spdev;
-
-static bool codec_reg_done;
 
 static struct clk_cfg internal_mclk[MCLK_MAX] = {
 	{
@@ -152,7 +161,7 @@ static struct clk_cfg internal_mclk[MCLK_MAX] = {
 };
 
 struct snd_soc_card sa8155_snd_soc_card_auto_msm = {
-        .name = "sa8155-adp-star-snd-card",
+	.name = "sa8155-adp-star-snd-card",
 };
 
 struct snd_soc_card sa8295_snd_soc_card_auto_msm = {
@@ -162,6 +171,20 @@ struct snd_soc_card sa8295_snd_soc_card_auto_msm = {
 struct snd_soc_card sa8255_snd_soc_card_auto_msm = {
 	.name = "sa8255-adp-star-snd-card",
 };
+
+/* FIXME: it may various on different platform,
+ * better to move to dt configuration in future
+ */
+static enum msm_mclk_index msm_get_mclk_index(int intf_idx)
+{
+	switch (intf_idx) {
+	/* for sa8255 */
+	case TDM_HSIF2:
+		return MCLK1;
+
+	default: return MCLK_NONE;
+	}
+}
 
 static int msm_tdm_get_intf_idx(u16 id)
 {
@@ -177,9 +200,13 @@ static int msm_tdm_get_intf_idx(u16 id)
 			return TDM_TERT;
 		case IDX_QUATERNARY_TDM_RX_0:
 		case IDX_QUATERNARY_TDM_TX_0:
+		case IDX_QUATERNARY_TDM_RX_DUMMY_0:
+		case IDX_QUATERNARY_TDM_TX_DUMMY_0:
 			return TDM_QUAT;
 		case IDX_QUINARY_TDM_RX_0:
 		case IDX_QUINARY_TDM_TX_0:
+		case IDX_QUINARY_TDM_RX_DUMMY_0:
+		case IDX_QUINARY_TDM_TX_DUMMY_0:
 			return TDM_QUIN;
 		case IDX_SENARY_TDM_RX_0:
 		case IDX_SENARY_TDM_TX_0:
@@ -187,6 +214,9 @@ static int msm_tdm_get_intf_idx(u16 id)
 		case IDX_SEPTENARY_TDM_RX_0:
 		case IDX_SEPTENARY_TDM_TX_0:
 			return TDM_SEP;
+		case IDX_OCTONARY_TDM_RX_0:
+		case IDX_OCTONARY_TDM_TX_0:
+			return TDM_OCT;
 		case IDX_HSIF0_TDM_RX_0:
 		case IDX_HSIF0_TDM_TX_0:
 			return TDM_HSIF0;
@@ -195,41 +225,88 @@ static int msm_tdm_get_intf_idx(u16 id)
 			return TDM_HSIF1;
 		case IDX_HSIF2_TDM_RX_0:
 		case IDX_HSIF2_TDM_TX_0:
-                        return TDM_HSIF2;
+			return TDM_HSIF2;
 		case IDX_HSIF3_TDM_RX_0:
 		case IDX_HSIF3_TDM_TX_0:
-                        return TDM_HSIF3;
+			return TDM_SEC; //muxed
 		case IDX_HSIF4_TDM_RX_0:
 		case IDX_HSIF4_TDM_TX_0:
-                        return TDM_HSIF4;
+			return TDM_TERT; //muxed
 
 		default: return -EINVAL;
 	}
 }
 
-static int auto_adsp_notifier_service_cb(struct notifier_block *this,
-					 unsigned long opcode, void *ptr)
+static int auto_ssr_enable(struct device *dev, void *data)
 {
-	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+	struct platform_device *pdev = to_platform_device(dev);
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+	int ret = 0;
 
-	switch (opcode) {
-	case AUDIO_NOTIFIER_SERVICE_DOWN:
-		snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
-		break;
-	case AUDIO_NOTIFIER_SERVICE_UP:
-		snd_card_notify_user(SND_CARD_STATUS_ONLINE);
-		break;
-	default:
-		break;
+	if (!card) {
+		dev_err(dev, "%s: card is NULL\n", __func__);
+		ret = -EINVAL;
+		goto err;
 	}
 
-	return NOTIFY_OK;
+	dev_dbg(dev, "%s: setting snd_card to ONLINE\n", __func__);
+	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+err:
+	return ret;
 }
 
-static struct notifier_block service_nb = {
-	.notifier_call  = auto_adsp_notifier_service_cb,
-	.priority = -INT_MAX,
+static void auto_ssr_disable(struct device *dev, void *data)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+
+	if (!card) {
+		dev_err(dev, "%s: card is NULL\n", __func__);
+		return;
+	}
+
+	dev_dbg(dev, "%s: setting snd_card to OFFLINE\n", __func__);
+	snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
+}
+
+static const struct snd_event_ops auto_ssr_ops = {
+	.enable = auto_ssr_enable,
+	.disable = auto_ssr_disable,
 };
+
+
+static int msm_audio_ssr_compare(struct device *dev, void *data)
+{
+	struct device_node *node = data;
+
+	dev_dbg(dev, "%s: dev->of_node = 0x%p, node = 0x%p\n",
+		__func__, dev->of_node, node);
+	return (dev->of_node && dev->of_node == node);
+}
+
+static int msm_audio_ssr_register(struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	struct snd_event_clients *ssr_clients = NULL;
+	struct device_node *node = NULL;
+	int ret = 0;
+	int i = 0;
+
+	for (i = 0; ; i++) {
+		node = of_parse_phandle(np, "qcom,msm_audio_ssr_devs", i);
+		if (!node)
+			break;
+		snd_event_mstr_add_client(&ssr_clients,
+					msm_audio_ssr_compare, node);
+	}
+
+	ret = snd_event_master_register(dev, &auto_ssr_ops,
+					ssr_clients, NULL);
+	if (!ret)
+		snd_event_notify(dev, SND_EVENT_UP);
+
+	return ret;
+}
 
 static int msm_set_pinctrl(struct msm_pinctrl_info *pinctrl_info,
                                 enum pinctrl_pin_state new_state)
@@ -295,6 +372,104 @@ err:
 	return ret;
 }
 
+
+static int msm_mclk_disable(struct snd_soc_card *card,
+		enum msm_mclk_index index)
+{
+	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+	struct msm_pinctrl_info *pinctrl_info = NULL;
+	int ret = 0;
+
+	pr_debug("%s: enter\n", __func__);
+	if (!card) {
+		pr_err("%s: failed to get snd card!", __func__);
+		return -EINVAL;
+	}
+
+	pdata = snd_soc_card_get_drvdata(card);
+	if (!pdata) {
+		pr_err("%s: no pdata\n", __func__);
+		return -EINVAL;
+	}
+	if (!pdata->mclk_used) {
+		pr_info("%s: mclk is not used\n", __func__);
+		return 0;
+	}
+
+	mutex_lock(&pdata->mclk_conf[index].lock);
+	pinctrl_info = &pdata->mclk_pinctrl_info[index];
+	if (pinctrl_info && pinctrl_info->pinctrl) {
+		ret = msm_set_pinctrl(pinctrl_info, STATE_SLEEP);
+		if (ret != 0) {
+			pr_err("%s: set pin state to sleep for mclk[%d], failed with %d\n",
+				__func__, index, ret);
+		}
+		pinctrl_info->curr_state = STATE_SLEEP;
+	}
+
+	if (pdata->mclk_conf[index].mclk_status == MCLK_ENABLED) {
+		ret = audio_prm_set_lpass_clk_cfg(&internal_mclk[index], 0);
+		if (ret < 0) {
+			pr_err("%s: audio_prm_set_lpass_clk_cfg failed to disable mclk[%d], err:%d\n",
+				__func__, index, ret);
+		}
+		pdata->mclk_conf[index].mclk_status = MCLK_DISABLED;
+	} else {
+		pr_info("%s: mclk[%d] already disabled\n", __func__, index);
+	}
+	mutex_unlock(&pdata->mclk_conf[index].lock);
+	return ret;
+}
+
+static int msm_mclk_enable(struct snd_soc_card *card,
+		enum msm_mclk_index index)
+{
+	struct msm_asoc_mach_data *pdata = NULL;
+	struct msm_pinctrl_info *pinctrl_info = NULL;
+	int ret = 0;
+
+	pr_debug("%s: enter\n", __func__);
+	if (!card) {
+		pr_err("%s: failed to get snd card!", __func__);
+		return -EINVAL;
+	}
+
+	pdata = snd_soc_card_get_drvdata(card);
+	if (!pdata) {
+		pr_err("%s: no pdata\n", __func__);
+		return -EINVAL;
+	}
+	if (!pdata->mclk_used) {
+		pr_info("%s: mclk is not used\n", __func__);
+		return 0;
+	}
+
+	mutex_lock(&pdata->mclk_conf[index].lock);
+	if (pdata->mclk_conf[index].mclk_status == MCLK_DISABLED) {
+		ret = audio_prm_set_lpass_clk_cfg(&internal_mclk[index], 1);
+		if (ret < 0) {
+			pr_err("%s: audio_prm_set_lpass_clk_cfg failed to enable mclk[%d], err:%d\n",
+				__func__, index, ret);
+		} else {
+			pdata->mclk_conf[index].mclk_status = MCLK_ENABLED;
+		}
+	} else {
+		pr_info("%s: mclk[%d] already enabled\n", __func__, index);
+	}
+
+	pinctrl_info = &pdata->mclk_pinctrl_info[index];
+	if (pinctrl_info && pinctrl_info->pinctrl) {
+		ret = msm_set_pinctrl(pinctrl_info, STATE_ACTIVE);
+		if (ret != 0) {
+			pr_err("%s: set pin state to active for mclk[%d], failed with %d\n",
+				__func__, index, ret);
+		}
+		pinctrl_info->curr_state = STATE_ACTIVE;
+	}
+	mutex_unlock(&pdata->mclk_conf[index].lock);
+	return ret;
+}
+
 static int tdm_snd_startup(struct snd_pcm_substream *substream)
 {
 	int ret = 0;
@@ -305,7 +480,7 @@ static int tdm_snd_startup(struct snd_pcm_substream *substream)
 	struct tdm_conf *intf_conf = NULL;
 	struct msm_pinctrl_info *pinctrl_info = NULL;
 	int ret_pinctrl = 0;
-	int index;
+	int index, mclk_index;
 
 	index = msm_tdm_get_intf_idx(dai_link->id);
 	if (index < 0) {
@@ -315,6 +490,11 @@ static int tdm_snd_startup(struct snd_pcm_substream *substream)
 		goto err;
 	}
 
+	if (pdata->mclk_used) {
+		mclk_index = msm_get_mclk_index(index);
+		if (mclk_index != MCLK_NONE)
+			msm_mclk_enable(card, mclk_index);
+	}
         /*
          * Mutex protection in case the same TDM
          * interface using for both TX and RX so
@@ -347,7 +527,7 @@ static void tdm_snd_shutdown(struct snd_pcm_substream *substream)
 	struct msm_pinctrl_info *pinctrl_info = NULL;
 	struct tdm_conf *intf_conf = NULL;
 	int ret_pinctrl = 0;
-	int index;
+	int index, mclk_index;
 
 	pr_debug("%s: substream = %s, stream = %d\n", __func__,
                  substream->name, substream->stream);
@@ -357,6 +537,12 @@ static void tdm_snd_shutdown(struct snd_pcm_substream *substream)
 		pr_err("%s: DAI link id (%d) out of range\n",
                         __func__, dai_link->id);
 		return;
+	}
+
+	if (pdata->mclk_used) {
+		mclk_index = msm_get_mclk_index(index);
+		if (mclk_index != MCLK_NONE)
+			msm_mclk_disable(card, mclk_index);
 	}
 
 	intf_conf = &pdata->tdm_intf_conf[index];
@@ -508,8 +694,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SENARY_TDM_RX_0,
 	SND_SOC_DAILINK_REG(sen_tdm_rx_0),
 },
 {
@@ -518,8 +706,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SENARY_TDM_TX_0,
 	SND_SOC_DAILINK_REG(sen_tdm_tx_0),
 },
 {
@@ -528,8 +718,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SEPTENARY_TDM_RX_0,
 	SND_SOC_DAILINK_REG(sep_tdm_rx_0),
 },
 {
@@ -538,8 +730,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_SEPTENARY_TDM_TX_0,
 	SND_SOC_DAILINK_REG(sep_tdm_tx_0),
 },
 {
@@ -548,8 +742,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_OCTONARY_TDM_RX_0,
 	SND_SOC_DAILINK_REG(oct_tdm_rx_0),
 },
 {
@@ -558,8 +754,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_OCTONARY_TDM_TX_0,
 	SND_SOC_DAILINK_REG(oct_tdm_tx_0),
 },
 {
@@ -688,8 +886,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUATERNARY_TDM_RX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quat_tdm_rx_0_dummy),
 },
 {
@@ -698,8 +898,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUATERNARY_TDM_TX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quat_tdm_tx_0_dummy),
 },
 {
@@ -708,8 +910,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_playback = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUINARY_TDM_RX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quin_tdm_rx_0_dummy),
 },
 {
@@ -718,8 +922,10 @@ static struct snd_soc_dai_link msm_common_dai_links[] = {
 	.dpcm_capture = 1,
 	.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 				SND_SOC_DPCM_TRIGGER_POST},
+	.ops = &tdm_be_ops,
 	.ignore_suspend = 1,
 	.ignore_pmdown_time = 1,
+	.id = IDX_QUINARY_TDM_TX_DUMMY_0,
 	SND_SOC_DAILINK_REG(quin_tdm_tx_0_dummy),
 },
 };
@@ -919,6 +1125,24 @@ static void msm_release_pinctrl(struct platform_device *pdev)
 	}
 }
 
+static void msm_release_mclk_pinctrl(struct platform_device *pdev)
+{
+	struct snd_soc_card *card = platform_get_drvdata(pdev);
+	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+	struct msm_pinctrl_info *pinctrl_info = NULL;
+	int i;
+
+	for (i = 0; i < MCLK_MAX; i++) {
+		pinctrl_info = &pdata->mclk_pinctrl_info[i];
+		if (pinctrl_info == NULL)
+			continue;
+		if (pinctrl_info->pinctrl) {
+			devm_pinctrl_put(pinctrl_info->pinctrl);
+			pinctrl_info->pinctrl = NULL;
+		}
+	}
+}
+
 static int msm_get_pinctrl(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
@@ -999,20 +1223,18 @@ err:
 	return -EINVAL;
 }
 
-static int msm_pinctrl_mclk_enable(struct platform_device *pdev)
+static int msm_get_mclk_pinctrl(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
 	struct msm_pinctrl_info *pinctrl_info = NULL;
 	struct pinctrl *pinctrl = NULL;
-	int pinctrl_num;
 	int i, j;
 	struct device_node *np = NULL;
 	struct platform_device *pdev_np = NULL;
 	int ret = 0;
 
-	pinctrl_num = MCLK_MAX;
-	for (i = 0; i < pinctrl_num; i++) {
+	for (i = 0; i < MCLK_MAX; i++) {
 
 		np = of_parse_phandle(pdev->dev.of_node, mclk_gpio_phandle[i], 0);
 		if (!np) {
@@ -1039,33 +1261,28 @@ static int msm_pinctrl_mclk_enable(struct platform_device *pdev)
 		pinctrl_info->pinctrl = pinctrl;
 		/* get all the states handles from Device Tree */
 		pinctrl_info->sleep = pinctrl_lookup_state(pinctrl,
-			"sleep");
+			"default");
 		if (IS_ERR(pinctrl_info->sleep)) {
 			pr_err("%s: could not get sleep pin state\n", __func__);
 			goto err;
 		}
 		pinctrl_info->active = pinctrl_lookup_state(pinctrl,
-			"default");
+			"active");
 		if (IS_ERR(pinctrl_info->active)) {
 			pr_err("%s: could not get active pin state\n", __func__);
 			goto err;
 		}
 
-		/* Reset the mclk pins to a active state */
-		ret = audio_prm_set_lpass_clk_cfg(&internal_mclk[i], 1);
-		if (ret < 0) {
-			pr_err("%s: audio_prm_set_lpass_clk_cfg failed to enable clock, err:%d\n",
-				__func__, ret);
-		}
-
-		ret = pinctrl_select_state(pinctrl_info->pinctrl, pinctrl_info->active);
+		/* Reset the mclk pins to a sleep state */
+		ret = pinctrl_select_state(pinctrl_info->pinctrl,
+						pinctrl_info->sleep);
 		if (ret != 0) {
-			pr_err("%s: set pin state to active failed with %d\n",
+			pr_err("%s: set pin state to sleep failed with %d\n",
 				__func__, ret);
 			ret = -EIO;
 			goto err;
 		}
-		pinctrl_info->curr_state = STATE_ACTIVE;
+		pinctrl_info->curr_state = STATE_SLEEP;
 	}
 	return 0;
 
@@ -1081,7 +1298,6 @@ err:
 	}
 	return -EINVAL;
 }
-
 
 static int msm_asoc_machine_probe(struct platform_device *pdev)
 {
@@ -1137,8 +1353,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 
 	if (ret == -EPROBE_DEFER) {
-		if (codec_reg_done)
-			ret = -EINVAL;
 		goto err;
 	} else if (ret) {
 		dev_err(&pdev->dev, "snd_soc_register_card failed (%d)\n",
@@ -1161,17 +1375,13 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		ret = 0;
 	}
 
-	/* enable mclk pinctrl info from devicetree */
-    match = of_match_node(asoc_machine_of_match, pdev->dev.of_node);
-	if (!match) {
-		dev_err(&pdev->dev, "%s: No DT match found for sound card\n", __func__);
-		return -EINVAL;
-	}
+	pdata->mclk_used = false;
 	if (strstr(match->compatible, "sa8295") || strstr(match->compatible, "sa8255")) {
-		/* enable mclk pinctrl info from devicetree */
-		ret = msm_pinctrl_mclk_enable(pdev);
+		/* get mclk pinctrl info from devicetree */
+		ret = msm_get_mclk_pinctrl(pdev);
 		if (!ret) {
 			pr_debug("%s: pinctrl mclk parsing successful\n", __func__);
+			pdata->mclk_used = true;
 		} else {
 			dev_err(&pdev->dev,
 				"%s: pinctrl mclk parsing failed with %d\n",
@@ -1184,12 +1394,15 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	pr_err("Sound card %s registered\n", card->name);
 	spdev = pdev;
 
-	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
-	ret = audio_notifier_register("auto_spf", AUDIO_NOTIFIER_ADSP_DOMAIN,
-				      &service_nb);
+	ret = msm_audio_ssr_register(&pdev->dev);
+	if (ret)
+		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
+			__func__, ret);
 
+	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
 	return 0;
 err:
+	msm_release_mclk_pinctrl(pdev);
 	msm_release_pinctrl(pdev);
 	devm_kfree(&pdev->dev, pdata);
 	return ret;
@@ -1197,7 +1410,9 @@ err:
 
 static int msm_asoc_machine_remove(struct platform_device *pdev)
 {
+	msm_release_mclk_pinctrl(pdev);
 	msm_release_pinctrl(pdev);
+	snd_event_master_deregister(&pdev->dev);
 	return 0;
 }
 
