@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -120,6 +120,7 @@ static void msm_audio_ion_add_allocation(
 	mutex_unlock(&(msm_audio_ion_data->list_mutex));
 }
 
+/* This function is called with ion_data list mutex lock */
 static int msm_audio_ion_map_kernel(struct dma_buf *dma_buf,
 	struct msm_audio_ion_private *ion_data, struct dma_buf_map *dma_vmap)
 {
@@ -157,6 +158,7 @@ exit:
 	return rc;
 }
 
+/* This function is called with ion_data list mutex lock */
 static int msm_audio_dma_buf_map(struct dma_buf *dma_buf,
 				 dma_addr_t *addr, size_t *len, bool is_iova,
 				 struct msm_audio_ion_private *ion_data)
@@ -249,7 +251,6 @@ static int msm_audio_dma_buf_unmap(struct dma_buf *dma_buf, struct msm_audio_ion
 	 * should be explicitly acquired to avoid race condition
 	 * on adding elements to the list.
 	 */
-	mutex_lock(&(ion_data->list_mutex));
 	list_for_each_safe(ptr, next,
 			    &(ion_data->alloc_list)) {
 
@@ -274,7 +275,6 @@ static int msm_audio_dma_buf_unmap(struct dma_buf *dma_buf, struct msm_audio_ion
 			break;
 		}
 	}
-	mutex_unlock(&(ion_data->list_mutex));
 
 	if (!found) {
 		dev_err(cb_dev,
@@ -321,7 +321,6 @@ static int msm_audio_ion_unmap_kernel(struct dma_buf *dma_buf, struct msm_audio_
 	 * TBD: remove the below section once new API
 	 * for unmapping kernel virtual address is available.
 	 */
-	mutex_lock(&(ion_data->list_mutex));
 	list_for_each_entry(alloc_data, &(ion_data->alloc_list),
 			    list) {
 		if (alloc_data->dma_buf == dma_buf) {
@@ -329,7 +328,6 @@ static int msm_audio_ion_unmap_kernel(struct dma_buf *dma_buf, struct msm_audio_
 			break;
 		}
 	}
-	mutex_unlock(&(ion_data->list_mutex));
 
 	if (!dma_vmap) {
 		dev_err(cb_dev,
@@ -352,7 +350,8 @@ err:
 	return rc;
 }
 
-static int msm_audio_ion_map_buf(struct dma_buf *dma_buf, u64 *paddr,
+/* This function is called with ion_data list mutex lock */
+static int msm_audio_ion_buf_map(struct dma_buf *dma_buf, dma_addr_t *paddr,
 				 size_t *plen, struct dma_buf_map *dma_vmap,
 				 struct msm_audio_ion_private *ion_data)
 {
@@ -377,7 +376,9 @@ static int msm_audio_ion_map_buf(struct dma_buf *dma_buf, u64 *paddr,
 		pr_err("%s: ION memory mapping for AUDIO failed, err:%d\n",
 			__func__, rc);
 		rc = -ENOMEM;
+		mutex_lock(&(ion_data->list_mutex));
 		msm_audio_dma_buf_unmap(dma_buf, ion_data);
+		mutex_unlock(&(ion_data->list_mutex));
 		goto err;
 	}
 
@@ -603,7 +604,7 @@ static int msm_audio_ion_import(struct dma_buf **dma_buf, int fd,
 		}
 	}
 	if (ion_data->smmu_enabled) {
-		rc = msm_audio_ion_map_buf(*dma_buf, paddr, plen, dma_vmap, ion_data);
+		rc = msm_audio_ion_buf_map(*dma_buf, paddr, plen, dma_vmap, ion_data);
 		if (rc) {
 			pr_err("%s: failed to map ION buf, rc = %d\n", __func__, rc);
 			goto err;
@@ -631,6 +632,7 @@ err:
  *
  * Returns 0 on success or error on failure
  */
+/* This funtion is called with ion_data list mutex lock */
 static int msm_audio_ion_free(struct dma_buf *dma_buf, struct msm_audio_ion_private *ion_data)
 {
 	int ret = 0;
@@ -649,12 +651,15 @@ static int msm_audio_ion_free(struct dma_buf *dma_buf, struct msm_audio_ion_priv
 
 	if (ion_data->smmu_enabled) {
 		ret = msm_audio_ion_unmap_kernel(dma_buf, ion_data);
-		if (ret)
+		if (ret) {
+			mutex_unlock(&(ion_data->list_mutex));
 			return ret;
+		}
 	}
 
 	msm_audio_dma_buf_unmap(dma_buf, ion_data);
 
+	mutex_unlock(&(ion_data->list_mutex));
 	return 0;
 }
 
