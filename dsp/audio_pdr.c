@@ -18,11 +18,6 @@ static struct audio_pdr_service audio_pdr_services[AUDIO_PDR_DOMAIN_MAX] = {
 	{	/* AUDIO_PDR_DOMAIN_ADSP */
 		.service_name = "avs/audio",
 		.service_path = "msm/adsp/audio_pd",
-	},
-	{
-		/* AUDIO_PDR_DOMAIN_MODEM_ROOT */
-		.service_name = "avs/audio",
-		.service_path = "msm/modem/root_pd",
 	}
 };
 
