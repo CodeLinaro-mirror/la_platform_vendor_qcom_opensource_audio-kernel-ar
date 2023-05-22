@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2019, 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/regmap.h>
@@ -63,12 +63,12 @@ static struct reg_default wcd939x_defaults[] = {
 	{WCD939X_MICB2_TEST_CTL_1,               0x1a},
 	{WCD939X_MICB2_TEST_CTL_2,               0x00},
 	{WCD939X_MICB2_TEST_CTL_3,               0x24},
-	{WCD939X_MICB3_TEST_CTL_1,               0x1a},
-	{WCD939X_MICB3_TEST_CTL_2,               0x00},
-	{WCD939X_MICB3_TEST_CTL_3,               0xa4},
+	{WCD939X_MICB3_TEST_CTL_1,               0x9a},
+	{WCD939X_MICB3_TEST_CTL_2,               0x80},
+	{WCD939X_MICB3_TEST_CTL_3,               0x24},
 	{WCD939X_MICB4_TEST_CTL_1,               0x1a},
-	{WCD939X_MICB4_TEST_CTL_2,               0x00},
-	{WCD939X_MICB4_TEST_CTL_3,               0xa4},
+	{WCD939X_MICB4_TEST_CTL_2,               0x80},
+	{WCD939X_MICB4_TEST_CTL_3,               0x24},
 	{WCD939X_ADC_VCM,                        0x39},
 	{WCD939X_BIAS_ATEST,                     0xe0},
 	{WCD939X_SPARE1,                         0x00},
@@ -185,6 +185,9 @@ static struct reg_default wcd939x_defaults[] = {
 	{WCD939X_EAR_TEST_CTL,                   0x00},
 	{WCD939X_STATUS_REG_1,                   0x00},
 	{WCD939X_STATUS_REG_2,                   0x08},
+	{WCD939X_FLYBACK_NEW_CTRL_2,             0x00},
+	{WCD939X_FLYBACK_NEW_CTRL_3,             0x00},
+	{WCD939X_FLYBACK_NEW_CTRL_4,             0x44},
 	{WCD939X_ANA_NEW_PAGE,                   0x00},
 	{WCD939X_ANA_HPH2,                       0x00},
 	{WCD939X_ANA_HPH3,                       0x00},
@@ -569,14 +572,6 @@ static struct reg_default wcd939x_defaults[] = {
 	{WCD939X_DSD_HPHR_CFG5,                  0x00},
 };
 
-static bool wcd939x_readable_register(struct device *dev, unsigned int reg)
-{
-	if (reg <= WCD939X_BASE + 1)
-		return 0;
-
-	return wcd939x_reg_access[WCD939X_REG(reg)] & RD_REG;
-}
-
 static bool wcd939x_writeable_register(struct device *dev, unsigned int reg)
 {
 	if (reg <= WCD939X_BASE + 1)
@@ -602,7 +597,6 @@ struct regmap_config wcd939x_regmap_config = {
 	.num_reg_defaults = ARRAY_SIZE(wcd939x_defaults),
 	.max_register = WCD939X_MAX_REGISTER,
 	.volatile_reg = wcd939x_volatile_register,
-	.readable_reg = wcd939x_readable_register,
 	.writeable_reg = wcd939x_writeable_register,
 	.reg_format_endian = REGMAP_ENDIAN_NATIVE,
 	.val_format_endian = REGMAP_ENDIAN_NATIVE,

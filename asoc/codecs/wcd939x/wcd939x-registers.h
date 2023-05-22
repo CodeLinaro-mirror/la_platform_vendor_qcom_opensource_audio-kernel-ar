@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef WCD939X_REGISTERS_H
@@ -17,6 +17,11 @@ enum {
        RD_WR_REG
 };
 
+enum {
+    WCD939X_VERSION_1_0,
+    WCD939X_VERSION_1_1,
+    WCD939X_VERSION_2_0,
+};
 
 #define WCD939X_ANA_BASE                       (WCD939X_BASE+0x01)
 #define WCD939X_ANA_PAGE                       (WCD939X_ANA_BASE+0x00)
@@ -227,6 +232,11 @@ enum {
 #define WCD939X_EAR_TEST_CTL                   (WCD939X_EAR_BASE+0x05)
 #define WCD939X_STATUS_REG_1                   (WCD939X_EAR_BASE+0x06)
 #define WCD939X_STATUS_REG_2                   (WCD939X_EAR_BASE+0x07)
+
+#define WCD939X_FLYBACK_NEW_BASE               (WCD939X_BASE+0xf7)
+#define WCD939X_FLYBACK_NEW_CTRL_2             (WCD939X_FLYBACK_NEW_BASE+0x00)
+#define WCD939X_FLYBACK_NEW_CTRL_3             (WCD939X_FLYBACK_NEW_BASE+0x01)
+#define WCD939X_FLYBACK_NEW_CTRL_4             (WCD939X_FLYBACK_NEW_BASE+0x02)
 
 #define WCD939X_ANA_NEW_BASE                   (WCD939X_BASE+0x101)
 #define WCD939X_ANA_NEW_PAGE                   (WCD939X_ANA_NEW_BASE+0x00)
@@ -649,7 +659,7 @@ enum {
 #define WCD939X_DSD_HPHR_CFG4                  (WCD939X_DSD_HPHR_BASE+0x05)
 #define WCD939X_DSD_HPHR_CFG5                  (WCD939X_DSD_HPHR_BASE+0x06)
 
-#define WCD939X_NUM_REGISTERS                  (WCD939X_DSD_HPHR_CFG5+1)
-#define WCD939X_MAX_REGISTER                   (WCD939X_NUM_REGISTERS-1)
+#define WCD939X_MAX_REGISTER                   (WCD939X_DSD_HPHR_CFG5)
+#define WCD939X_NUM_REGISTERS                  (WCD939X_REG(WCD939X_MAX_REGISTER+1))
 
 #endif /* WCD939X_REGISTERS_H */
