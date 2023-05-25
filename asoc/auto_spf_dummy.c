@@ -1346,7 +1346,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	pr_err("Sound card %s registered\n", card->name);
 	spdev = pdev;
 
-	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
+	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
 	ret = audio_notifier_register("auto_spf", AUDIO_NOTIFIER_ADSP_DOMAIN,
 				      &service_nb);
 
