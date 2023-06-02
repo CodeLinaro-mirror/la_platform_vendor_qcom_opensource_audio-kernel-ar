@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -615,8 +615,12 @@ static int lpass_cdc_tx_macro_tx_mixer_put(struct snd_kcontrol *kcontrol,
 		set_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
 		tx_priv->active_ch_cnt[dai_id]++;
 	} else {
-		tx_priv->active_ch_cnt[dai_id]--;
-		clear_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
+		if (tx_priv->active_ch_cnt[dai_id] > 0) {
+			tx_priv->active_ch_cnt[dai_id]--;
+			clear_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
+		} else {
+			pr_debug("%s: already set to 0\n", __func__);
+		}
 	}
 	snd_soc_dapm_mixer_update_power(widget->dapm, kcontrol, enable, update);
 
