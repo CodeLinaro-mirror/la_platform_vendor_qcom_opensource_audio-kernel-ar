@@ -41,6 +41,7 @@
 #define __CHIPSET__ "SA8xx5 "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
 
+#ifdef CONFIG_MSM_COUPLED_SSR
 enum subsys_state {
 	SUBSYS_DOWN = 0,
 	SUBSYS_UP = 1
@@ -56,6 +57,7 @@ static struct dsps_state_t {
 	struct mutex lock;
 	enum subsys_state states[SUBSYS_DOMAIN_MAX];
 } dsps_state;
+#endif
 
 
 enum pinctrl_pin_state {
@@ -254,6 +256,7 @@ static int msm_tdm_get_intf_idx(u16 id)
 	}
 }
 
+#ifdef CONFIG_MSM_COUPLED_SSR
 static void set_subsys_state_l(enum subsys_doamin subsys,
 				enum subsys_state state) {
 	dsps_state.states[subsys] = state;
@@ -276,7 +279,6 @@ static enum subsys_state get_combined_dsps_state_l(void) {
 	return SUBSYS_UP;
 }
 
-#ifdef CONFIG_MSM_COUPLED_SSR
 static int modem_notifier_service_cb(struct notifier_block *this,
 			   unsigned long opcode, void *data)
 {
