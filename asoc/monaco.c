@@ -95,7 +95,6 @@ struct msm_asoc_mach_data {
 	struct msm_common_pdata *common_pdata;
 	struct device_node *dmic01_gpio_p; /* used by pinctrl API */
 	struct device_node *dmic23_gpio_p; /* used by pinctrl API */
-	bool visense_enable;
 	struct srcu_notifier_head *slatecom_notifier_chain;
 	struct notifier_block notifier_cc_dsp_nb;
 	struct card_status cs;
@@ -437,9 +436,7 @@ static int msm_int_audrx_init(struct snd_soc_pcm_runtime *rtd)
 		besbev_info_create_codec_entry(pdata->codec_root, component);
 		bolero_set_port_map(bolero_component,
 			ARRAY_SIZE(sm_port_map_besbev), sm_port_map_besbev);
-
-		if (!pdata->visense_enable)
-			besbev_amic_init(component);
+		besbev_amic_init(component);
 	} else if (!strncmp(component->driver->name, "wsa-codec.1",
 						strlen("wsa-codec.1"))) {
 		bolero_set_port_map(bolero_component,
@@ -1272,7 +1269,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	struct snd_soc_card *card = NULL;
 	struct msm_asoc_mach_data *pdata = NULL;
 	const char *codec_name = NULL;
-	int ret = 0, val = 0;
+	int ret = 0;
 
 	if (!pdev->dev.of_node) {
 		dev_err(&pdev->dev, "%s: No platform supplied from device tree\n",
@@ -1343,13 +1340,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	pdata->dmic23_gpio_p = of_parse_phandle(pdev->dev.of_node,
 					      "qcom,cdc-dmic23-gpios",
 					       0);
-
-	ret = of_property_read_u32(pdev->dev.of_node, "qcom,visense-enable", &val);
-	if (ret)
-		pdata->visense_enable = 1;
-	else
-		pdata->visense_enable = val;
-
 	mutex_init(&pdata->cs.lock);
 	/**
 	 * By default state is OFFLINE, once ADSP is up post registration
