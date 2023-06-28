@@ -287,7 +287,7 @@ static int msm_audio_dma_buf_unmap(struct dma_buf *dma_buf, struct msm_audio_ion
 }
 
 static int msm_audio_ion_get_phys(struct dma_buf *dma_buf,
-				  u64 *addr, size_t *len, bool is_iova,
+				  dma_addr_t *addr, size_t *len, bool is_iova,
 				  struct msm_audio_ion_private *ion_data)
 {
 	int rc = 0;
@@ -570,7 +570,7 @@ void msm_audio_get_handle(int fd, void **handle)
  */
 static int msm_audio_ion_import(struct dma_buf **dma_buf, int fd,
 			unsigned long *ionflag, size_t bufsz,
-			u64 *paddr, size_t *plen, struct dma_buf_map *dma_vmap,
+			dma_addr_t *paddr, size_t *plen, struct dma_buf_map *dma_vmap,
 			struct msm_audio_ion_private *ion_data)
 {
 	int rc = 0;
@@ -708,8 +708,17 @@ void msm_audio_ion_crash_handler(void)
 			handle = msm_audio_fd_data->handle;
 			ion_data = dev_get_drvdata(msm_audio_fd_data->dev);
 			/*  clean if CMA was used*/
-			if (msm_audio_fd_data->hyp_assign)
+			/*
+			 * TODO: assigned memory to adsp, mdsp & sdsp cannot be reclaimed,
+			 * caused  by a known issue from TZ.
+			 * After TZ fixes the issue, the memory can have the common handling
+			 */
+			if (msm_audio_fd_data->hyp_assign) {
+				if (msm_audio_fd_data->ss_masks == (0x1|0x2|0x8)) {
+					continue;
+				}
 				msm_audio_hyp_unassign(msm_audio_fd_data);
+			}
 			if (handle)
 				msm_audio_ion_free(handle, ion_data);
 		}
@@ -759,7 +768,7 @@ static int msm_audio_hyp_assign_for_subsystems(int fd, u64 ss_masks)
 {
 	int i = 0 , count = 0;
 	int ret = 0;
-	u64 paddr;
+	dma_addr_t paddr;
 	size_t pa_len = 0;
 	int vmids[GPR_DOMAIN_MAX] = {0};
 	int perms[GPR_DOMAIN_MAX] = {0};
@@ -796,7 +805,7 @@ static int msm_audio_hyp_unassign_for_subsystems(int fd, u64 ss_masks)
 {
 	int i = 0 , count = 0;
 	int ret = 0;
-	u64 paddr;
+	dma_addr_t paddr;
 	size_t pa_len = 0;
 	int vmids[GPR_DOMAIN_MAX] = {0};
 	int mdf_reclaim_vm_map[1] = {VMID_HLOS};
@@ -842,7 +851,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 				unsigned long __user ioctl_param)
 {
 	void *mem_handle;
-	u64 paddr;
+	dma_addr_t paddr;
 	size_t pa_len = 0;
 	struct dma_buf_map *dma_vmap = NULL;
 	int ret = 0;
@@ -1124,7 +1133,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	enum apr_subsys_state q6_state;
 #endif
 
-	dev_err(dev, "%s: msm_audio_ion_probe\n", __func__);
+	dev_info(dev, "%s: msm_audio_ion_probe\n", __func__);
 	if (dev->of_node == NULL) {
 		dev_err(dev,
 			"%s: device tree is not found\n",

@@ -127,6 +127,6 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
         $(KERNEL_MODULES_OUT)/snd_event_dlkm.ko \
         $(KERNEL_MODULES_OUT)/stub_dlkm.ko \
         $(KERNEL_MODULES_OUT)/machine_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/pinctrl_lpi_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko
+        $(KERNEL_MODULES_OUT)/pinctrl_lpi_dlkm.ko \
+        $(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko
 endif   #gen4
