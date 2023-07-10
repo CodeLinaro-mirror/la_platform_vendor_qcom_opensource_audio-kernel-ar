@@ -1663,8 +1663,7 @@ static int wcd9xxx_slim_device_up(struct slim_device *sldev)
 
 	return ret;
 }
-#endif
-#ifndef CONFIG_WCD934X_I2S
+
 static int wcd9xxx_slim_device_down(struct slim_device *sldev)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
