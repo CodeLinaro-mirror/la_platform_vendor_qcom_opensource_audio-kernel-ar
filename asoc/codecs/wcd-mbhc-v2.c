@@ -963,6 +963,21 @@ static bool wcd_mbhc_moisture_detect(struct wcd_mbhc *mbhc, bool detection_type)
 	return ret;
 }
 
+static void wcd_mbhc_set_hsj_connect(struct snd_soc_component *component, bool connect)
+{
+#if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
+	if (connect) {
+		if (of_find_property(component->card->dev->of_node,
+					"qcom,usbss-hsj-connect-enabled", NULL))
+			wcd_usbss_switch_update(WCD_USBSS_HSJ_CONNECT, WCD_USBSS_CABLE_CONNECT);
+	} else {
+		if (of_find_property(component->card->dev->of_node,
+					"qcom,usbss-hsj-connect-enabled", NULL))
+			wcd_usbss_switch_update(WCD_USBSS_HSJ_CONNECT, WCD_USBSS_CABLE_DISCONNECT);
+	}
+#endif
+}
+
 static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 {
 	bool detection_type = 0;
@@ -1004,6 +1019,7 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 	if ((mbhc->current_plug == MBHC_PLUG_TYPE_NONE) &&
 	    detection_type) {
 
+		wcd_mbhc_set_hsj_connect(component, 1);
 		/* If moisture is present, then enable polling, disable
 		 * moisture detection and wait for interrupt
 		 */
@@ -1119,6 +1135,7 @@ static void wcd_mbhc_swch_irq_handler(struct wcd_mbhc *mbhc)
 				mbhc->mbhc_cb->mbhc_moisture_detect_en(mbhc,
 									false);
 		}
+		wcd_mbhc_set_hsj_connect(component, 0);
 
 	} else if (!detection_type) {
 		/* Disable external voltage source to micbias if present */
@@ -1716,7 +1733,7 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 			mbhc->mbhc_cb->lock_sleep(mbhc, false);
 		}
 #endif
-	} else {
+	} else if (mode < TYPEC_MAX_ACCESSORY) {
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 		WCD_MBHC_REG_READ(WCD_MBHC_L_DET_EN, l_det_en);
 		WCD_MBHC_REG_READ(WCD_MBHC_MECH_DETECTION_TYPE, detection_type);
@@ -1731,6 +1748,9 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 			dev_dbg(mbhc->component->dev, "leave, %s: mode = %lu\n", __func__, mode);
 		}
 #endif
+	} else if (mode == TYPEC_MAX_ACCESSORY) {
+		if (mbhc->mbhc_cb->surge_reset_routine)
+			mbhc->mbhc_cb->surge_reset_routine(mbhc);
 	}
 	return 0;
 }
