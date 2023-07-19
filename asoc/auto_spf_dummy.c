@@ -41,6 +41,7 @@
 #define __CHIPSET__ "SA8xx5 "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
 
+#ifdef CONFIG_MSM_COUPLED_SSR
 enum subsys_state {
 	SUBSYS_DOWN = 0,
 	SUBSYS_UP = 1
@@ -56,6 +57,7 @@ static struct dsps_state_t {
 	struct mutex lock;
 	enum subsys_state states[SUBSYS_DOMAIN_MAX];
 } dsps_state;
+#endif
 
 
 enum pinctrl_pin_state {
@@ -471,7 +473,7 @@ err:
 static int msm_mclk_disable(struct snd_soc_card *card,
 		enum msm_mclk_index index)
 {
-	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
+	struct msm_asoc_mach_data *pdata = NULL;
 	struct msm_pinctrl_info *pinctrl_info = NULL;
 	int ret = 0;
 
@@ -1504,7 +1506,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
 			__func__, ret);
 
-	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
+	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
 	return 0;
 err:
 	msm_release_mclk_pinctrl(pdev);
