@@ -83,6 +83,7 @@ static bool msm_audio_ion_fd_list_init = false;
 
 struct msm_audio_fd_data {
 	int fd;
+	struct dma_buf *dma_buf;
 	size_t plen;
 	void *handle;
 	dma_addr_t paddr;
@@ -512,6 +513,30 @@ void msm_audio_get_handle(int fd, void **handle)
 	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
 }
 
+int msm_audio_get_handle_from_phy_addr(int *fd, dma_addr_t paddr, size_t pa_len)
+{
+	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
+	int status = -EINVAL;
+
+	pr_debug("%s paddr %llu\n", __func__, paddr);
+	mutex_lock(&(msm_audio_ion_fd_list.list_mutex));
+	list_for_each_entry(msm_audio_fd_data,
+			&msm_audio_ion_fd_list.fd_list, list) {
+		if ((msm_audio_fd_data->paddr == paddr) &&
+			(msm_audio_fd_data->plen == pa_len)) {
+			//TODO: need to map to new fd if client running on different process.
+			*fd = msm_audio_fd_data->fd;
+			status = 0;
+			pr_debug("%s fd %d\n", __func__, *fd);
+			mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
+			return status;
+		}
+	}
+	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
+	return status;
+}
+EXPORT_SYMBOL(msm_audio_get_handle_from_phy_addr);
+
 /**
  * msm_audio_ion_import-
  *        Import ION buffer with given file descriptor
@@ -743,6 +768,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 			return ret;
 		}
 		msm_audio_fd_data->fd = (int)ioctl_param;
+		msm_audio_fd_data->dma_buf = (struct dma_buf *)mem_handle;
 		msm_audio_fd_data->handle = mem_handle;
 		msm_audio_fd_data->paddr = paddr;
 		msm_audio_fd_data->plen = pa_len;

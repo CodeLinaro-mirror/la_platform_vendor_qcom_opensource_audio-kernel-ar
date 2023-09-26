@@ -38,8 +38,10 @@ static void *audio_pkt_ilctxt;
 static int audio_pkt_debug_mask;
 module_param_named(debug_mask, audio_pkt_debug_mask, int, 0664);
 
-#define APM_CMD_SHARED_MEM_MAP_REGIONS		0x0100100C
+#define APM_CMD_SHARED_MEM_MAP_REGIONS	0x0100100C
+#define APM_CMD_SHARED_SATELLITE_MEM_MAP_REGIONS	0x01001026
 #define APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE	0x00000004UL
+
 enum {
 	AUDIO_PKT_INFO = 1U << 0,
 };
@@ -118,7 +120,6 @@ struct audio_pkt_apm_cmd_shared_mem_map_regions_t {
 	uint16_t mem_pool_id;
 	uint16_t num_regions;
 	uint32_t property_flag;
-
 };
 
 struct audio_pkt_apm_shared_map_region_payload_t {
@@ -135,6 +136,24 @@ struct audio_pkt_apm_mem_map {
 struct audio_gpr_pkt {
 	struct gpr_hdr audpkt_hdr;
 	struct audio_pkt_apm_mem_map audpkt_mem_map;
+};
+
+struct audio_pkt_apm_cmd_shared_satellite_mem_map_regions_t {
+	uint32_t master_mem_handle;
+	uint32_t satellite_proc_domain_id;
+	uint16_t mem_pool_id;
+	uint16_t num_regions;
+	uint32_t property_flag;
+};
+
+struct audio_pkt_apm_satellite_mem_map {
+	struct audio_pkt_apm_cmd_shared_satellite_mem_map_regions_t mmap_header;
+	struct audio_pkt_apm_shared_map_region_payload_t mmap_payload;
+};
+
+struct audio_satellite_gpr_pkt {
+	struct gpr_hdr audpkt_hdr;
+	struct audio_pkt_apm_satellite_mem_map audpkt_mem_map;
 };
 
 typedef void (*audio_pkt_clnt_cb_fn)(void *buf, int len, void *priv);
@@ -229,6 +248,31 @@ static int audio_pkt_internal_release(struct platform_device *adev)
 }
 
 /**
+ * audpkt_update_handle - Update from physical address to file handler
+ * audpkt_hdr:	Pointer to the file structure.
+ */
+int audpkt_chk_and_update_handle(struct audio_gpr_pkt *gpr_pkt)
+{
+	int ret = 0, fd = 0;
+	size_t pa_len = 0;
+	dma_addr_t paddr;
+
+	paddr = gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw;
+	paddr |= (unsigned long long)gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw << 32;
+	pa_len = gpr_pkt->audpkt_mem_map.mmap_payload.mem_size_bytes;
+
+	ret = msm_audio_get_handle_from_phy_addr(&fd, paddr, pa_len);
+	if (ret < 0) {
+		AUDIO_PKT_ERR("%s Get ion mem handle failed, ret %d\n",
+				__func__, ret);
+		return ret;
+	}
+	gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = fd;
+	gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw = 0;
+	return ret;
+}
+
+/**
  * audio_pkt_read() - read() syscall for the audio_pkt device
  * file:	Pointer to the file structure.
  * buf:		Pointer to the userspace buffer.
@@ -248,7 +292,8 @@ ssize_t audio_pkt_read(struct file *file, char __user *buf,
 	unsigned long flags;
 	struct sk_buff *skb;
 	int use;
-	uint32_t *temp;
+	struct gpr_hdr *audpkt_hdr = NULL;
+	int ret;
 
 	if (!audpkt_dev) {
 		AUDIO_PKT_ERR("invalid device handle\n");
@@ -282,15 +327,47 @@ ssize_t audio_pkt_read(struct file *file, char __user *buf,
 
 	skb = skb_dequeue(&audpkt_dev->queue);
 	spin_unlock_irqrestore(&audpkt_dev->queue_lock, flags);
-	if (!skb)
+	if (!skb) {
+		AUDIO_PKT_ERR("Invalid skb\n");
 		return -EFAULT;
+	}
 
 	use = min_t(size_t, count, skb->len);
-	if (copy_to_user(buf, skb->data, use))
+	audpkt_hdr = (struct gpr_hdr *) skb->data;
+	if (!audpkt_hdr) {
+		AUDIO_PKT_ERR("Invalid audpkt_hdr\n");
 		use = -EFAULT;
-	temp = (uint32_t *) skb->data;
-	kfree_skb(skb);
+		goto free_kbuf;
+	}
 
+	/* validate packet size */
+	if ((use > MAX_PACKET_SIZE) || (use < GPR_PKT_GET_PACKET_BYTE_SIZE(audpkt_hdr->header))) {
+		AUDIO_PKT_ERR("Invalid count %d\n", use);
+		use = -EINVAL;
+		goto free_kbuf;
+	}
+
+	if (audpkt_hdr->opcode == APM_CMD_SHARED_MEM_MAP_REGIONS) {
+		if (use < sizeof(struct audio_gpr_pkt)) {
+			AUDIO_PKT_ERR("Invalid count %d\n", use);
+			use = -EINVAL;
+			goto free_kbuf;
+		}
+		// convert from physical address to handle
+		ret = audpkt_chk_and_update_handle((struct audio_gpr_pkt *) audpkt_hdr);
+		if (ret < 0) {
+			AUDIO_PKT_ERR("Update from physical address to file handle failed -%d\n", ret);
+			use = -EINVAL;
+			goto free_kbuf;
+		}
+	}
+
+	if (copy_to_user(buf, skb->data, use)) {
+		use = -EFAULT;
+	}
+
+free_kbuf:
+	kfree_skb(skb);
 	return use;
 }
 
@@ -302,6 +379,34 @@ int audpkt_chk_and_update_physical_addr(struct audio_gpr_pkt *gpr_pkt)
 {
 	int ret = 0;
         size_t pa_len = 0;
+	dma_addr_t paddr;
+
+	if (gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
+				APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE) {
+		ret = msm_audio_get_phy_addr(
+			(int) gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw,
+			&paddr, &pa_len);
+		if (ret < 0) {
+			AUDIO_PKT_ERR("%s Get phy. address failed, ret %d\n",
+					__func__, ret);
+			return ret;
+		}
+		AUDIO_PKT_INFO("%s physical address %pK", __func__,
+				(void *) paddr);
+		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (uint32_t) paddr;
+		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw = (uint64_t) paddr >> 32;
+	}
+	return ret;
+}
+
+/**
+ * audpkt_update_satellite_physical_addr - Update physical address for satellite domain
+ * audpkt_hdr:	Pointer to the file structure.
+ */
+int audpkt_chk_and_update_satellite_physical_addr(struct audio_satellite_gpr_pkt *gpr_pkt)
+{
+	int ret = 0;
+	size_t pa_len = 0;
 	dma_addr_t paddr;
 
 	if (gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
@@ -387,6 +492,18 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 			goto free_kbuf;
 		}
 		ret = audpkt_chk_and_update_physical_addr((struct audio_gpr_pkt *) audpkt_hdr);
+		if (ret < 0) {
+			AUDIO_PKT_ERR("Update Physical Address Failed -%d\n", ret);
+			goto free_kbuf;
+		}
+	} else if (audpkt_hdr->opcode == APM_CMD_SHARED_SATELLITE_MEM_MAP_REGIONS) {
+		if (count < sizeof(struct audio_satellite_gpr_pkt)) {
+			AUDIO_PKT_ERR("Invalid count %zu\n", count);
+			ret = -EINVAL;
+			goto free_kbuf;
+		}
+		ret = audpkt_chk_and_update_satellite_physical_addr(
+				(struct audio_satellite_gpr_pkt *) audpkt_hdr);
 		if (ret < 0) {
 			AUDIO_PKT_ERR("Update Physical Address Failed -%d\n", ret);
 			goto free_kbuf;
