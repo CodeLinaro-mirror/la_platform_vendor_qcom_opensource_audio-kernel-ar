@@ -1,6 +1,8 @@
 # Android makefile for audio kernel modules
 
 ifeq ($(AUDIO_DLKM_ENABLE), true)
+BOARD_OPENSOURCE_DIR ?= vendor/qcom/opensource
+BOARD_COMMON_DIR ?= device/qcom/common
 
 LOCAL_PATH := $(call my-dir)
 
@@ -40,11 +42,11 @@ ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi bla
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 
 ifneq ($(findstring opensource,$(LOCAL_PATH)),)
-	AUDIO_BLD_DIR := $(abspath .)/vendor/qcom/opensource/audio-kernel
+	AUDIO_BLD_DIR := $(abspath .)/$(BOARD_OPENSOURCE_DIR)/audio-kernel
 endif # opensource
 
 include $(AUDIO_BLD_DIR)/EnableBazel.mk
-DLKM_DIR := $(TOP)/device/qcom/common/dlkm
+DLKM_DIR := $(TOP)/$(BOARD_COMMON_DIR)/dlkm
 
 
 ###########################################################
