@@ -1,9 +1,10 @@
 load(":audio_modules.bzl", "audio_modules")
-load(":module_mgr.bzl", "define_consolidate_gki_modules")
+load(":module_mgr.bzl", "define_target_modules")
 
 def define_pineapple():
-    define_consolidate_gki_modules(
+    define_target_modules(
         target = "pineapple",
+        variants = ["consolidate", "gki"],
         registry = audio_modules,
         modules = [
             "q6_dlkm",
@@ -35,6 +36,8 @@ def define_pineapple():
             "lpass_cdc_tx_macro_dlkm",
             "wsa883x_dlkm",
             "wsa884x_dlkm",
+            "wcd937x_dlkm",
+            "wcd937x_slave_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
             "wcd939x_dlkm",
