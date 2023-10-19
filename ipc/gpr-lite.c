@@ -1,6 +1,6 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -551,6 +551,10 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 	gpr_priv->wsource = wakeup_source_register(gpr_priv->dev, "audio-gpr");
 	dev_info(dev, "%s: gpr-lite probe success\n",
 		__func__);
+
+#ifndef CONFIG_MSM_QDSP6_PDR
+	gpr_set_q6_state(GPR_SUBSYS_LOADED);
+#endif
 
 	return 0;
 }
