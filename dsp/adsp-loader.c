@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2014, 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -20,6 +20,7 @@
 #include <linux/remoteproc.h>
 #include <linux/remoteproc/qcom_rproc.h>
 
+#include <soc/qcom/boot_stats.h>
 
 #define Q6_PIL_GET_DELAY_MS 100
 #define BOOT_CMD 1
@@ -139,6 +140,7 @@ load_adsp:
 	{
 		adsp_state = spf_core_is_apm_ready();
 		if (adsp_state == SPF_SUBSYS_DOWN) {
+			place_marker("M - Start ADSP");
 			rc = rproc_boot(priv->pil_h);
 			if (rc) {
 				dev_err(&pdev->dev, "%s: pil get failed,\n",
