@@ -10714,6 +10714,11 @@ static int tavil_suspend(struct device *dev)
 
 	wcd9xxx   = tavil->wcd9xxx;
 	component = tavil->component;
+	if (!wcd9xxx || !component || !component->dev || !component->dev->parent) {
+		dev_err(dev, "%s: wcd9xxx or component, dev or parent is NULL\n", __func__);
+		return -EINVAL;
+	}
+
 	pdata     = dev_get_platdata(component->dev->parent);
 	if (!pdata) {
 		dev_err(dev, "%s: pdata is NULL\n", __func__);
@@ -10757,6 +10762,11 @@ static int tavil_resume(struct device *dev)
 
 	wcd9xxx   = tavil->wcd9xxx;
 	component = tavil->component;
+	if (!wcd9xxx || !component || !component->dev || !component->dev->parent) {
+		dev_err(dev, "%s: wcd9xxx or component, dev or parent could be NULL\n", __func__);
+		return -EINVAL;
+        }
+
 	pdata     = dev_get_platdata(component->dev->parent);
 	if (!pdata) {
 		dev_err(dev, "%s: pdata is NULL\n", __func__);
