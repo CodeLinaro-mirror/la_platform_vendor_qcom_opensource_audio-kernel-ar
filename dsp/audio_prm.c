@@ -22,6 +22,7 @@
 #define TIMEOUT_MS 500
 #define MAX_RETRY_COUNT 3
 #define APM_READY_WAIT_DURATION 2
+#define GPR_SEND_PKT_APM_TIMEOUT_MS 0
 
 struct audio_prm {
 	struct gpr_device *adev;
@@ -104,7 +105,8 @@ static int prm_gpr_send_pkt(struct gpr_pkt *pkt, wait_queue_head_t *wait)
 			(gpr_get_q6_state() == GPR_SUBSYS_LOADED)) {
 		pr_info("%s: apm ready check not done\n", __func__);
 		retry = 0;
-		while (!spf_core_is_apm_ready() && retry < MAX_RETRY_COUNT) {
+		while (!spf_core_is_apm_ready(GPR_SEND_PKT_APM_TIMEOUT_MS) &&
+							retry < MAX_RETRY_COUNT) {
 			msleep(APM_READY_WAIT_DURATION);
 			++retry;
 		}
@@ -523,13 +525,16 @@ static int audio_prm_probe(struct gpr_device *adev)
 {
 	int ret = 0;
 
-	struct device *dev = &adev->dev;
-
 	if (!audio_notifier_probe_status()) {
 		pr_err("%s: Audio notify probe not completed, defer audio prm probe\n",
 				__func__);
 		return -EPROBE_DEFER;
 	}
+
+	ret = of_property_read_u32(adev->dev.of_node,
+		"qcom,sleep-api-supported", &g_prm.prm_sleep_api_supported);
+	if (ret < 0)
+		pr_debug("%s: sleep API not supported\n", __func__);
 
 	ret = audio_notifier_register("audio_prm", AUDIO_NOTIFIER_ADSP_DOMAIN,
 				      &service_nb);
@@ -541,11 +546,6 @@ static int audio_prm_probe(struct gpr_device *adev)
 	}
 
 	dev_set_drvdata(&adev->dev, &g_prm);
-
-	ret = of_property_read_u32(dev->of_node,
-		"qcom,sleep-api-supported", &g_prm.prm_sleep_api_supported);
-	if (ret < 0)
-		pr_debug("%s: sleep API not supported\n", __func__);
 
 	g_prm.adev = adev;
 
