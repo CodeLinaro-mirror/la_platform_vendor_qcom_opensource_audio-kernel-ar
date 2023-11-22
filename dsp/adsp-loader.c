@@ -26,6 +26,7 @@
 #define SSR_RESET_CMD 1
 #define IMAGE_UNLOAD_CMD 0
 #define MAX_FW_IMAGES 4
+#define ADSP_LOADER_APM_TIMEOUT_MS 10000
 
 enum spf_subsys_state {
 	SPF_SUBSYS_DOWN,
@@ -137,7 +138,7 @@ static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 
 load_adsp:
 	{
-		adsp_state = spf_core_is_apm_ready();
+		adsp_state = spf_core_is_apm_ready(ADSP_LOADER_APM_TIMEOUT_MS);
 		if (adsp_state == SPF_SUBSYS_DOWN) {
 			if (!priv->adsp_fw_name) {
 				dev_info(&pdev->dev, "%s: Load default ADSP\n",
@@ -160,7 +161,7 @@ load_adsp:
 				dev_info(&pdev->dev, "%s: Load ADSP DTB with fw name %s\n",
 					__func__, priv->adsp_dtb_name);
 				rc = qcom_rproc_set_dtb_firmware(priv->pil_h,
-					priv->adsp_fw_name);
+					priv->adsp_dtb_name);
 				if (rc) {
 					dev_err(&pdev->dev, "%s: rproc set dtb firmware failed,\n",
 						__func__);
