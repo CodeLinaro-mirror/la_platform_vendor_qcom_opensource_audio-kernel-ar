@@ -1,6 +1,6 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -24,6 +24,7 @@
 #include <linux/of.h>
 
 #include <soc/snd_event.h>
+#include <soc/qcom/boot_stats.h>
 #include <dsp/audio_notifier.h>
 
 #define APM_EVENT_MODULE_TO_CLIENT	0x03001000
@@ -200,6 +201,7 @@ static void gpr_adsp_down(unsigned long opcode)
 static void gpr_adsp_up(void)
 {
 	dev_info_ratelimited(gpr_priv->dev, "%s: Q6 is Up\n", __func__);
+	place_marker("M - ADSP Ready");
 	gpr_set_q6_state(GPR_SUBSYS_LOADED);
 	snd_event_notify(gpr_priv->dev, SND_EVENT_UP);
 }
