@@ -506,7 +506,6 @@ int lpi_pinctrl_suspend(struct device *dev)
 {
 	int ret = 0;
 
-	trace_printk("%s: system suspend\n",  __func__);
 	dev_dbg(dev, "%s: system suspend\n", __func__);
 
 	if ((!pm_runtime_enabled(dev) || !pm_runtime_suspended(dev))) {
@@ -543,7 +542,6 @@ static struct notifier_block service_nb = {
 
 static void lpi_pinctrl_ssr_disable(struct device *dev, void *data)
 {
-	trace_printk("%s: enter\n", __func__);
 	lpi_dev_up = false;
 	lpi_pinctrl_suspend(dev);
 }
@@ -554,7 +552,6 @@ static int lpi_pinctrl_ssr_enable(struct device *dev, void *data)
 	dev_dbg(dev, "%s: enter\n", __func__);
 
 	if (!initial_boot) {
-		trace_printk("%s: enter\n", __func__);
 		if (!lpi_dev_up) {
 			msleep(100);
 			if (state->lpass_core_hw_vote)
@@ -901,7 +898,6 @@ int lpi_pinctrl_runtime_resume(struct device *dev)
 	int ret = 0;
 	struct clk *hw_vote = state->lpass_core_hw_vote;
 
-	trace_printk("%s: enter\n", __func__);
 	if (state->lpass_core_hw_vote == NULL) {
 		dev_dbg(dev, "%s: Invalid core hw node\n", __func__);
 		if (state->lpass_audio_hw_vote == NULL) {
@@ -927,7 +923,6 @@ int lpi_pinctrl_runtime_resume(struct device *dev)
 
 exit:
 	mutex_unlock(&state->core_hw_vote_lock);
-	trace_printk("%s: exit\n", __func__);
 	return 0;
 }
 
@@ -936,7 +931,6 @@ int lpi_pinctrl_runtime_suspend(struct device *dev)
 	struct lpi_gpio_state *state = dev_get_drvdata(dev);
 	struct clk *hw_vote = state->lpass_core_hw_vote;
 
-	trace_printk("%s: enter\n", __func__);
 	if (state->lpass_core_hw_vote == NULL) {
 		dev_dbg(dev, "%s: Invalid core hw node\n", __func__);
 		if (state->lpass_audio_hw_vote == NULL) {
@@ -952,7 +946,6 @@ int lpi_pinctrl_runtime_suspend(struct device *dev)
 		state->core_hw_vote_status = false;
 	}
 	mutex_unlock(&state->core_hw_vote_lock);
-	trace_printk("%s: exit\n", __func__);
 	return 0;
 }
 
