@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/irq.h>
@@ -3266,7 +3266,9 @@ static int swrm_runtime_resume(struct device *dev)
 			swrm_clk_req_err = true;
 			goto exit;
 		}
-		if (!swrm->clk_stop_mode0_supp || swrm->state == SWR_MSTR_SSR) {
+		if (!swrm->clk_stop_mode0_supp ||
+			swrm->state == SWR_MSTR_SSR ||
+			swrm->state == SWR_MSTR_DOWN) {
 			list_for_each_entry(swr_dev, &mstr->devices, dev_list) {
 				ret = swr_device_up(swr_dev);
 				if (ret == -ENODEV) {
@@ -3392,7 +3394,9 @@ static int swrm_runtime_suspend(struct device *dev)
 			ret = -EBUSY;
 			goto exit;
 		}
-		if (!swrm->clk_stop_mode0_supp || swrm->state == SWR_MSTR_SSR) {
+		if (!swrm->clk_stop_mode0_supp ||
+			swrm->state == SWR_MSTR_SSR ||
+			current_state == SWR_MSTR_UP) {
 			dev_err_ratelimited(dev, "%s: clk stop mode not supported or SSR entry\n",
 				__func__);
 			mutex_unlock(&swrm->reslock);
