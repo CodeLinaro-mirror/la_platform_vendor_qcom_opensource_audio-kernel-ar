@@ -6,7 +6,6 @@ LOCAL_MODULE_KO_DIRS += dsp/spf_core_dlkm.ko
 LOCAL_MODULE_KO_DIRS += dsp/audpkt_ion_dlkm.ko
 LOCAL_MODULE_KO_DIRS += ipc/gpr_dlkm.ko
 LOCAL_MODULE_KO_DIRS += ipc/audio_pkt_dlkm.ko
-LOCAL_MODULE_KO_DIRS += ipc/audio_cc_ipc_dlkm.ko
 LOCAL_MODULE_KO_DIRS += dsp/adsp_loader_dlkm.ko
 LOCAL_MODULE_KO_DIRS += dsp/audio_prm_dlkm.ko
 LOCAL_MODULE_KO_DIRS += dsp/q6_pdr_dlkm.ko
