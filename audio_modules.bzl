@@ -160,6 +160,9 @@ audio_modules.register(
         "CONFIG_SND_SOC_PINEAPPLE": [
             "pineapple.c"
         ],
+        "CONFIG_SND_SOC_NIOBE": [
+            "pineapple.c"
+        ],
         "CONFIG_SND_SOC_HOLI": [
             "holi.c"
         ],
@@ -393,7 +396,7 @@ audio_modules.register(
         "wcd937x-regmap.c",
         "wcd937x-tables.c",
         "wcd937x-mbhc.c",
-    ],
+    ]
 )
 audio_modules.register(
     name = "wcd937x_slave_dlkm",
