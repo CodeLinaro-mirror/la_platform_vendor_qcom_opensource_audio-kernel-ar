@@ -33,7 +33,7 @@
 #include <soc/snd_event.h>
 #include "msm_dailink.h"
 #include "msm_common.h"
-
+#include <soc/qcom/boot_stats.h>
 
 #define DRV_NAME "spf-asoc-snd"
 #define DRV_PINCTRL_NAME "audio-pcm-pinctrl"
@@ -41,6 +41,7 @@
 #define __CHIPSET__ "SA8xx5 "
 #define MSM_DAILINK_NAME(name) (__CHIPSET__#name)
 
+#ifdef CONFIG_MSM_COUPLED_SSR
 enum subsys_state {
 	SUBSYS_DOWN = 0,
 	SUBSYS_UP = 1
@@ -56,6 +57,7 @@ static struct dsps_state_t {
 	struct mutex lock;
 	enum subsys_state states[SUBSYS_DOMAIN_MAX];
 } dsps_state;
+#endif
 
 
 enum pinctrl_pin_state {
@@ -1403,6 +1405,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
 	dev_err(&pdev->dev, "%s: audio_reach\n", __func__);
 
+        place_marker("M - DRIVER Audio Init");
 	match = of_match_node(asoc_machine_of_match, pdev->dev.of_node);
 	if (!match) {
 		dev_err(&pdev->dev, "%s: No DT match found for sound card\n", __func__);
@@ -1487,6 +1490,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
 	dev_info(&pdev->dev, "Sound card %s registered\n", card->name);
 	pr_err("Sound card %s registered\n", card->name);
+        place_marker("M - DRIVER Audio Ready");
 	spdev = pdev;
 
 #ifdef CONFIG_MSM_COUPLED_SSR
@@ -1504,7 +1508,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
 			__func__, ret);
 
-	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
+	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
 	return 0;
 err:
 	msm_release_mclk_pinctrl(pdev);
