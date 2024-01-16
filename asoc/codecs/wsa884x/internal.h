@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef WSA884X_INTERNAL_H
@@ -336,6 +336,11 @@ static const int pbr_vth15_data[G_MAX_DB][CONFIG_MAX][WSA_MAX_OHMS] = {
 	{ {0, 0, 0, 0}, {2000, 0, 0, 0}, {2000, 0, 0, 0}, {1600, 0, 0, 0} }, /* G_18_DB   */
 };
 
+enum {
+	WSA884X_DEV_DOWN,
+	WSA884X_DEV_UP,
+	WSA884X_DEV_READY,
+};
 
 /*
  * Private data Structure for wsa884x. All parameters related to
@@ -365,6 +370,7 @@ struct wsa884x_priv {
 	int curr_temp;
 	int variant;
 	int version;
+	int state;
 	u8 pa_gain;
 	u32 bat_cfg;
 	u32 rload;

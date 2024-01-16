@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -485,8 +485,11 @@ static const struct file_operations codec_debug_dump_ops = {
 static void wsa884x_regcache_sync(struct wsa884x_priv *wsa884x)
 {
 	mutex_lock(&wsa884x->res_lock);
-	regcache_mark_dirty(wsa884x->regmap);
-	regcache_sync(wsa884x->regmap);
+	if (wsa884x->state != WSA884X_DEV_READY) {
+		regcache_mark_dirty(wsa884x->regmap);
+		regcache_sync(wsa884x->regmap);
+		wsa884x->state = WSA884X_DEV_READY;
+	}
 	mutex_unlock(&wsa884x->res_lock);
 }
 
@@ -1748,35 +1751,73 @@ static int wsa884x_gpio_ctrl(struct wsa884x_priv *wsa884x, bool enable)
 	return ret;
 }
 
-static int wsa884x_swr_up(struct wsa884x_priv *wsa884x)
+static int wsa884x_swr_up(struct swr_device *pdev)
 {
 	int ret;
+	struct wsa884x_priv *wsa884x;
+
+	wsa884x = swr_get_dev_data(pdev);
+	if (!wsa884x) {
+		dev_err(&pdev->dev, "%s: wsa884x is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (wsa884x->state == WSA884X_DEV_UP) {
+		dev_dbg(&pdev->dev, "%s: device already up\n", __func__);
+		return 0;
+	}
 
 	ret = wsa884x_gpio_ctrl(wsa884x, true);
 	if (ret)
 		dev_err_ratelimited(wsa884x->dev, "%s: Failed to enable gpio\n", __func__);
+	else
+		wsa884x->state = WSA884X_DEV_UP;
 
 	return ret;
 }
 
-static int wsa884x_swr_down(struct wsa884x_priv *wsa884x)
+static int wsa884x_swr_down(struct swr_device *pdev)
 {
 	int ret;
+	struct wsa884x_priv *wsa884x;
+
+	wsa884x = swr_get_dev_data(pdev);
+	if (!wsa884x) {
+		dev_err(&pdev->dev, "%s: wsa884x is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (wsa884x->state == WSA884X_DEV_DOWN) {
+		dev_dbg(&pdev->dev, "%s: device already down\n", __func__);
+		return 0;
+	}
 
 	ret = wsa884x_gpio_ctrl(wsa884x, false);
 	if (ret)
 		dev_err_ratelimited(wsa884x->dev, "%s: Failed to disable gpio\n", __func__);
+	else
+		wsa884x->state = WSA884X_DEV_DOWN;
 
 	return ret;
 }
 
-static int wsa884x_swr_reset(struct wsa884x_priv *wsa884x)
+static int wsa884x_swr_reset(struct swr_device *pdev)
 {
 	u8 retry = WSA884X_NUM_RETRY;
 	u8 devnum = 0;
-	struct swr_device *pdev;
+	struct wsa884x_priv *wsa884x;
 
-	pdev = wsa884x->swr_slave;
+	wsa884x = swr_get_dev_data(pdev);
+	if (!wsa884x) {
+		dev_err(&pdev->dev, "%s: wsa884x is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (wsa884x->state == WSA884X_DEV_READY) {
+		dev_dbg(&pdev->dev, "%s: device already active\n", __func__);
+		return 0;
+	}
+
 	while (swr_get_logical_dev_num(pdev, pdev->addr, &devnum) && retry--) {
 		/* Retry after 1 msec delay */
 		usleep_range(1000, 1100);
@@ -1802,14 +1843,14 @@ static int wsa884x_event_notify(struct notifier_block *nb,
 		if (test_bit(SPKR_STATUS, &wsa884x->status_mask))
 			snd_soc_component_update_bits(wsa884x->component,
 				REG_FIELD_VALUE(PA_FSM_EN, GLOBAL_PA_EN, 0x00));
-		wsa884x_swr_down(wsa884x);
+		wsa884x_swr_down(wsa884x->swr_slave);
 		break;
 
 	case BOLERO_SLV_EVT_SSR_UP:
-		wsa884x_swr_up(wsa884x);
+		wsa884x_swr_up(wsa884x->swr_slave);
 		/* Add delay to allow enumerate */
 		usleep_range(20000, 20010);
-		wsa884x_swr_reset(wsa884x);
+		wsa884x_swr_reset(wsa884x->swr_slave);
 		dev_err(wsa884x->dev, "%s: BOLERO_SLV_EVT_SSR_UP Called", __func__);
 		swr_init_port_params(wsa884x->swr_slave, WSA884X_MAX_SWR_PORTS,
 			wsa884x->swr_wsa_port_params);
@@ -1987,6 +2028,8 @@ static int wsa884x_swr_probe(struct swr_device *pdev)
 	wsa884x->dev = &pdev->dev;
 	pin_state_current = msm_cdc_pinctrl_get_state(wsa884x->wsa_rst_np);
 	wsa884x_gpio_ctrl(wsa884x, true);
+	wsa884x->state = WSA884X_DEV_UP;
+
 	/*
 	 * Add 5msec delay to provide sufficient time for
 	 * soundwire auto enumeration of slave devices as
@@ -2464,6 +2507,9 @@ static struct swr_driver wsa884x_swr_driver = {
 	.probe = wsa884x_swr_probe,
 	.remove = wsa884x_swr_remove,
 	.id_table = wsa884x_swr_id,
+	.device_up = wsa884x_swr_up,
+	.device_down = wsa884x_swr_down,
+	.reset_device = wsa884x_swr_reset,
 };
 
 static int __init wsa884x_swr_init(void)
