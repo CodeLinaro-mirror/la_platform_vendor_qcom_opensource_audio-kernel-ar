@@ -29,6 +29,11 @@ ifeq ($(CONFIG_SND_SOC_AUTO), y)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/gvmautoconf.h
 	endif
+	ifdef CONFIG_SND_SOC_SA7255
+		include $(AUDIO_ROOT)/config/sa7255auto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sa7255autoconf.h
+	endif
 
 else
 ifeq ($(KERNEL_BUILD), 0)
@@ -76,8 +81,8 @@ ifeq ($(KERNEL_BUILD), 0)
 		INCS    +=  -include $(AUDIO_ROOT)/config/pineappleautoconf.h
 	endif
 	ifeq ($(CONFIG_ARCH_PITTI), y)
-		include $(AUDIO_ROOT)/config/pineappleauto.conf
-		INCS    +=  -include $(AUDIO_ROOT)/config/pineappleautoconf.h
+		include $(AUDIO_ROOT)/config/pittiauto.conf
+		INCS    +=  -include $(AUDIO_ROOT)/config/pittiautoconf.h
 	endif
 	ifeq ($(CONFIG_ARCH_LITO), y)
 		include $(AUDIO_ROOT)/config/litoauto.conf
@@ -201,6 +206,11 @@ ifdef CONFIG_SND_SOC_PINEAPPLE
 	MACHINE_OBJS += pineapple.o
 endif
 
+# for PITTI sound card driver
+ifdef CONFIG_SND_SOC_PITTI
+	MACHINE_OBJS += pineapple.o
+endif
+
 # for HOLI sound card driver
 ifdef CONFIG_SND_SOC_HOLI
 	MACHINE_OBJS += holi.o
@@ -218,6 +228,12 @@ endif
 # for sa8155 sound card driver
 ifdef CONFIG_SND_SOC_SA8155
 	MACHINE_OBJS += sa8155.o
+endif
+
+# for sa7255 sound card driver
+ifdef CONFIG_SND_SOC_SA7255_AUTO_SPF
+    SPF_MACHINE_OBJS += msm_common.o
+    SPF_MACHINE_OBJS += auto_spf_dummy.o
 endif
 
 ifdef CONFIG_SND_SOC_QDSP6V2
@@ -298,6 +314,9 @@ machine_dlkm-y := $(MACHINE_OBJS)
 obj-$(CONFIG_SND_SOC_PINEAPPLE) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
+obj-$(CONFIG_SND_SOC_PITTI) += machine_dlkm.o
+machine_dlkm-y := $(MACHINE_OBJS)
+
 obj-$(CONFIG_SND_SOC_HOLI) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
@@ -316,6 +335,8 @@ machine_dlkm-y := $(MACHINE_OBJS)
 obj-$(CONFIG_SND_SOC_GVM_AUTO_SPF) += spf_machine_dlkm.o
 spf_machine_dlkm-y := $(SPF_MACHINE_OBJS)
 
+obj-$(CONFIG_SND_SOC_SA7255_AUTO_SPF) += spf_machine_dlkm.o
+spf_machine_dlkm-y := $(SPF_MACHINE_OBJS)
 
 # inject some build related information
 DEFINES += -DBUILD_TIMESTAMP=\"$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')\"
