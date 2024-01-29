@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023. Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2021-2024. Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -1375,6 +1375,8 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 	int rc = 0;
 	u32 val = 0;
 	const struct of_device_id *match;
+	struct device_node *disp_node;
+	const char *disp_status = NULL;
 
 	match = of_match_node(kalama_asoc_machine_of_match, dev->of_node);
 	if (!match) {
@@ -1447,8 +1449,20 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 			total_links += ARRAY_SIZE(msm_tdm_dai_links);
 		}
 
-		rc = of_property_read_u32(dev->of_node,
-					   "qcom,ext-disp-audio-rx", &val);
+		val = 0;
+		disp_node = of_find_node_by_name(NULL, "qcom,msm-ext-disp");
+		if (!disp_node) {
+			dev_dbg(dev, "can not find qcom,msm-ext-disp\n");
+		} else {
+			if (of_property_read_string(disp_node, "status", &disp_status)) {
+				dev_dbg(dev, "can not get status for qcom,msm-ext-disp\n");
+			}
+			if (disp_status != NULL && strcmp(disp_status, "no") == 0)
+				dev_dbg(dev, "non-Display, not load ext_disp dai-link\n");
+			else
+				rc = of_property_read_u32(dev->of_node,
+					"qcom,ext-disp-audio-rx", &val);
+		}
 		if (!rc && val) {
 			dev_dbg(dev, "%s(): ext disp audio support present\n",
 				__func__);
