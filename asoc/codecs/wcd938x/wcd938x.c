@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1993,6 +1993,8 @@ int wcd938x_micbias_control(struct snd_soc_component *component,
 {
 
 	struct wcd938x_priv *wcd938x = snd_soc_component_get_drvdata(component);
+	struct device *dev = wcd938x->dev;
+	struct wcd938x_pdata *pdata = (struct wcd938x_pdata *) dev->platform_data;
 	int micb_index = micb_num - 1;
 	u16 micb_reg;
 	int pre_off_event = 0, post_off_event = 0;
@@ -2073,6 +2075,25 @@ int wcd938x_micbias_control(struct snd_soc_component *component,
 			ret = -ENODEV;
 			goto done;
 		}
+		if (pdata->mic_buffer_regulator) {
+			pdata->mic_buffer_users++;
+			if (pdata->mic_buffer_users == 1) {
+				dev_dbg(component->dev, "%s: enabling regulator\n",
+					__func__);
+				ret = regulator_set_voltage(pdata->mic_buffer_regulator,
+							  pdata->mic_buffer_voltage,
+							  pdata->mic_buffer_voltage);
+				if (ret) {
+					dev_dbg(component->dev, "%s: Setting voltage failed , err = %d\n",
+						__func__, ret);
+				}
+				ret = regulator_enable(pdata->mic_buffer_regulator);
+				if (ret) {
+					dev_dbg(component->dev, "%s: Regulator enable failed , err = %d\n",
+						__func__, ret);
+				}
+			}
+		}
 		wcd938x->micb_ref[micb_index]++;
 		if (wcd938x->micb_ref[micb_index] == 1) {
 			snd_soc_component_update_bits(component,
@@ -2129,6 +2150,28 @@ int wcd938x_micbias_control(struct snd_soc_component *component,
 						&wcd938x->mbhc->notifier,
 						post_off_event,
 						&wcd938x->mbhc->wcd_mbhc);
+		}
+		if (pdata->mic_buffer_regulator) {
+			pdata->mic_buffer_users--;
+			if (pdata->mic_buffer_users == 0) {
+				dev_dbg(component->dev, "%s: disabling regulator\n",
+					__func__);
+				ret = regulator_disable(pdata->mic_buffer_regulator);
+				if (ret) {
+					dev_dbg(component->dev, "%s: Regulator disable failed , err = %d\n",
+						__func__, ret);
+				}
+				ret = regulator_set_voltage(pdata->mic_buffer_regulator,
+							  0, pdata->mic_buffer_voltage);
+				if (ret) {
+					dev_dbg(component->dev, "%s: Setting voltage failed , err = %d\n",
+						__func__, ret);
+				}
+			} else if (pdata->mic_buffer_users < 0) {
+				dev_dbg(component->dev, "%s: Regulator already disabled\n",
+					__func__);
+				pdata->mic_buffer_users = 0;
+			}
 		}
 		if (is_dapm && post_dapm_off && wcd938x->mbhc)
 			blocking_notifier_call_chain(&wcd938x->mbhc->notifier,
@@ -4303,6 +4346,7 @@ static int wcd938x_reset_low(struct device *dev)
 struct wcd938x_pdata *wcd938x_populate_dt_data(struct device *dev)
 {
 	struct wcd938x_pdata *pdata = NULL;
+	int ret = 0;
 
 	pdata = devm_kzalloc(dev, sizeof(struct wcd938x_pdata),
 				GFP_KERNEL);
@@ -4326,6 +4370,27 @@ struct wcd938x_pdata *wcd938x_populate_dt_data(struct device *dev)
 		dev_err_ratelimited(dev, "%s: no power supplies defined for codec\n",
 			__func__);
 		return NULL;
+	}
+
+	/* Parse Mic buffer power supply info */
+	if (of_parse_phandle(dev->of_node, "mic-buffer-supply", 0)) {
+		pdata->mic_buffer_regulator = devm_regulator_get(dev,"mic-buffer");
+		if (IS_ERR(pdata->mic_buffer_regulator)) {
+			ret = PTR_ERR(pdata->mic_buffer_regulator);
+			dev_err_ratelimited(dev,
+				"%s:Failed to get mic buffer supply for WCD mic%d\n",
+				__func__, ret);
+			return NULL;
+		}
+		ret = of_property_read_u32(dev->of_node,
+					"qcom,mic-buffer-voltage",
+					&pdata->mic_buffer_voltage);
+		if (ret) {
+			dev_err_ratelimited(dev, "%s: error reading qcom,mic-buffer-voltage in dt\n",
+				__func__);
+			return NULL;
+		}
+		pdata->mic_buffer_users = 0;
 	}
 
 	pdata->rx_slave = of_parse_phandle(dev->of_node, "qcom,rx-slave", 0);
