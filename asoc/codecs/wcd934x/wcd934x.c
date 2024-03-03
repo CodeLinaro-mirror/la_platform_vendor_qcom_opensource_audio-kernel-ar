@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -189,6 +189,7 @@ enum {
 	ANC_MIC_AMIC4,
 	CLK_INTERNAL,
 	CLK_MODE,
+	WCD_SUPPLIES_LPM_MODE,
 };
 
 enum {
@@ -641,6 +642,12 @@ struct tavil_priv {
 	struct regulator *micb_load;
 	int micb_load_low;
 	int micb_load_high;
+	int datahub_i2s1_enable_count;
+	int datahub_i2s2_enable_count;
+	int datahub_i2s3_enable_count;
+	int datahub_i2s1_config_count;
+	int datahub_i2s2_config_count;
+	int datahub_i2s3_config_count;
 };
 
 static const struct tavil_reg_mask_val tavil_spkr_default[] = {
@@ -1759,19 +1766,23 @@ static int tavil_codec_enable_rx_i2c(struct snd_soc_dapm_widget *w,
 	struct tavil_priv *tavil_p = snd_soc_component_get_drvdata(component);
 	int ret = -EINVAL;
 	u32 i2s_reg;
+	int *datahub_i2s_config_count;
 
 	switch (tavil_p->rx_port_value[w->shift]) {
 	case AIF1_PB:
 	case AIF1_CAP:
+		datahub_i2s_config_count = &(tavil_p->datahub_i2s1_config_count);
 		i2s_reg = WCD934X_DATA_HUB_I2S_0_CTL;
 		break;
 	case AIF2_PB:
 	case AIF2_CAP:
 		i2s_reg = WCD934X_DATA_HUB_I2S_1_CTL;
+		datahub_i2s_config_count = &(tavil_p->datahub_i2s2_config_count);
 		break;
 	case AIF3_PB:
 	case AIF3_CAP:
 		i2s_reg = WCD934X_DATA_HUB_I2S_2_CTL;
+		datahub_i2s_config_count = &(tavil_p->datahub_i2s3_config_count);
 		break;
 	default:
 		dev_err(component->dev, "%s Invalid i2s Id received", __func__);
@@ -1781,9 +1792,12 @@ static int tavil_codec_enable_rx_i2c(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
 		ret = tavil_codec_set_i2s_rx_ch(w, i2s_reg, true);
+		*datahub_i2s_config_count = (*datahub_i2s_config_count) + 1;
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		ret = tavil_codec_set_i2s_rx_ch(w, i2s_reg, false);
+		*datahub_i2s_config_count = (*datahub_i2s_config_count) - 1;
+		if (*datahub_i2s_config_count == 0)
+			ret = tavil_codec_set_i2s_rx_ch(w, i2s_reg, false);
 		break;
 	}
 
@@ -1858,19 +1872,23 @@ static int tavil_codec_enable_tx_i2c(struct snd_soc_dapm_widget *w,
 	struct tavil_priv *tavil_p = snd_soc_component_get_drvdata(component);
 	int ret = -EINVAL;
 	u32 i2s_reg;
+	int *datahub_i2s_config_count;
 
 	switch (tavil_p->rx_port_value[w->shift]) {
 	case AIF1_PB:
 	case AIF1_CAP:
+		datahub_i2s_config_count = &(tavil_p->datahub_i2s1_config_count);
 		i2s_reg = WCD934X_DATA_HUB_I2S_0_CTL;
 		break;
 	case AIF2_PB:
 	case AIF2_CAP:
 		i2s_reg = WCD934X_DATA_HUB_I2S_1_CTL;
+		datahub_i2s_config_count = &(tavil_p->datahub_i2s2_config_count);
 		break;
 	case AIF3_PB:
 	case AIF3_CAP:
 		i2s_reg = WCD934X_DATA_HUB_I2S_2_CTL;
+		datahub_i2s_config_count = &(tavil_p->datahub_i2s3_config_count);
 		break;
 	default:
 		dev_err(component->dev, "%s Invalid i2s Id received", __func__);
@@ -1880,9 +1898,12 @@ static int tavil_codec_enable_tx_i2c(struct snd_soc_dapm_widget *w,
 	switch (event) {
 	case SND_SOC_DAPM_POST_PMU:
 		ret = tavil_codec_set_i2s_tx_ch(w, i2s_reg, true);
+		*datahub_i2s_config_count = *datahub_i2s_config_count + 1;
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		ret = tavil_codec_set_i2s_tx_ch(w, i2s_reg, false);
+		*datahub_i2s_config_count = *datahub_i2s_config_count - 1;
+		if (*datahub_i2s_config_count == 0)
+			ret = tavil_codec_set_i2s_tx_ch(w, i2s_reg, false);
 		break;
 	}
 
@@ -2738,19 +2759,23 @@ static int tavil_codec_enable_i2s_path(struct snd_soc_dapm_widget *w,
 	struct snd_soc_component *component =
 			snd_soc_dapm_to_component(w->dapm);
 	struct tavil_priv *tavil_p = snd_soc_component_get_drvdata(component);
+	int *datahub_i2s_enable_count;
 
 	switch (tavil_p->rx_port_value[w->shift]) {
 	case AIF1_PB:
 	case AIF1_CAP:
 		i2s_reg = WCD934X_DATA_HUB_I2S_0_CTL;
+		datahub_i2s_enable_count = &(tavil_p->datahub_i2s1_enable_count);
 		break;
 	case AIF2_PB:
 	case AIF2_CAP:
 		i2s_reg = WCD934X_DATA_HUB_I2S_1_CTL;
+		datahub_i2s_enable_count = &(tavil_p->datahub_i2s2_enable_count);
 		break;
 	case AIF3_PB:
 	case AIF3_CAP:
 		i2s_reg = WCD934X_DATA_HUB_I2S_2_CTL;
+		datahub_i2s_enable_count = &(tavil_p->datahub_i2s3_enable_count);
 		break;
 	default:
 		dev_err(component->dev, "%s Invalid i2s Id received", __func__);
@@ -2761,10 +2786,13 @@ static int tavil_codec_enable_i2s_path(struct snd_soc_dapm_widget *w,
 	case SND_SOC_DAPM_PRE_PMU:
 		ret = snd_soc_component_update_bits(component, i2s_reg,
 					0x01, 0x01);
+		*datahub_i2s_enable_count = *datahub_i2s_enable_count + 1;
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		ret = snd_soc_component_update_bits(component, i2s_reg,
-					0x01, 0x00);
+		*datahub_i2s_enable_count = *datahub_i2s_enable_count - 1;
+		if (*datahub_i2s_enable_count == 0)
+			ret = snd_soc_component_update_bits(component, i2s_reg,
+						0x01, 0x00);
 		break;
 	}
 
@@ -10596,6 +10624,13 @@ static int tavil_soc_codec_probe(struct snd_soc_component *component)
 				  tavil_tx_mute_update_callback);
 	}
 
+	tavil->datahub_i2s1_enable_count = 0;
+	tavil->datahub_i2s2_enable_count = 0;
+	tavil->datahub_i2s3_enable_count = 0;
+	tavil->datahub_i2s1_config_count = 0;
+	tavil->datahub_i2s2_config_count = 0;
+	tavil->datahub_i2s3_config_count = 0;
+
 	tavil->spk_anc_dwork.tavil = tavil;
 	INIT_DELAYED_WORK(&tavil->spk_anc_dwork.dwork,
 			  tavil_spk_anc_update_callback);
@@ -10695,29 +10730,92 @@ static const struct snd_soc_component_driver soc_codec_dev_tavil = {
 static int tavil_suspend(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct tavil_priv *tavil = platform_get_drvdata(pdev);
+	struct tavil_priv *tavil = NULL;
+	struct wcd9xxx *wcd9xxx = NULL;
+	struct wcd9xxx_pdata *pdata = NULL;
+	struct snd_soc_component *component = NULL;
 
+	if (!pdev) {
+		dev_err(dev, "%s: Platform device null\n", __func__);
+		return -EINVAL;
+	}
+
+	tavil = platform_get_drvdata(pdev);
 	if (!tavil) {
 		dev_err(dev, "%s: tavil private data is NULL\n", __func__);
 		return -EINVAL;
 	}
+
+	wcd9xxx   = tavil->wcd9xxx;
+	component = tavil->component;
+	if (!wcd9xxx || !component || !component->dev || !component->dev->parent) {
+		dev_err(dev, "%s: wcd9xxx or component, dev or parent is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	pdata     = dev_get_platdata(component->dev->parent);
+	if (!pdata) {
+		dev_err(dev, "%s: pdata is NULL\n", __func__);
+		return -EINVAL;
+	}
+
 	dev_dbg(dev, "%s: system suspend\n", __func__);
 	if (delayed_work_pending(&tavil->power_gate_work) &&
 	    cancel_delayed_work_sync(&tavil->power_gate_work))
 		tavil_codec_power_gate_digital_core(tavil);
+
+	msm_cdc_set_supplies_lpm_mode(wcd9xxx->dev,
+			wcd9xxx->supplies,
+			pdata->regulator,
+			pdata->num_supplies,
+			true);
+	set_bit(WCD_SUPPLIES_LPM_MODE, &tavil->status_mask);
+
 	return 0;
 }
 
 static int tavil_resume(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct tavil_priv *tavil = platform_get_drvdata(pdev);
+	struct tavil_priv *tavil = NULL;
+	struct wcd9xxx *wcd9xxx = NULL;
+	struct wcd9xxx_pdata *pdata = NULL;
+	struct snd_soc_component *component = NULL;
 
+	if (!pdev) {
+		dev_err(dev, "%s: Platform device null\n", __func__);
+		return -EINVAL;
+	}
+
+	tavil = platform_get_drvdata(pdev);
 	if (!tavil) {
 		dev_err(dev, "%s: tavil private data is NULL\n", __func__);
 		return -EINVAL;
 	}
 	dev_dbg(dev, "%s: system resume\n", __func__);
+
+	wcd9xxx   = tavil->wcd9xxx;
+	component = tavil->component;
+	if (!wcd9xxx || !component || !component->dev || !component->dev->parent) {
+		dev_err(dev, "%s: wcd9xxx or component, dev or parent could be NULL\n", __func__);
+		return -EINVAL;
+        }
+
+	pdata     = dev_get_platdata(component->dev->parent);
+	if (!pdata) {
+		dev_err(dev, "%s: pdata is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	if (test_bit(WCD_SUPPLIES_LPM_MODE, &tavil->status_mask)) {
+		msm_cdc_set_supplies_lpm_mode(wcd9xxx->dev,
+				wcd9xxx->supplies,
+				pdata->regulator,
+				pdata->num_supplies,
+				false);
+		clear_bit(WCD_SUPPLIES_LPM_MODE, &tavil->status_mask);
+	}
+
 	return 0;
 }
 
