@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _WCD938X_INTERNAL_H
@@ -133,6 +134,10 @@ struct wcd938x_pdata {
 	struct wcd938x_micbias_setting micbias;
 
 	struct cdc_regulator *regulator;
+	struct regulator *mic_buffer_regulator;
+	u32 mic_buffer_voltage;
+	u32 mic_buffer_current;
+	int mic_buffer_users;
 	int num_supplies;
 };
 
