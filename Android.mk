@@ -26,6 +26,10 @@ ifeq ($(call is-board-platform-in-list,pitti),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_PITTI=m
 endif
 
+ifeq ($(call is-board-platform-in-list,niobe),true)
+AUDIO_SELECT  := CONFIG_SND_SOC_NIOBE=m
+endif
+
 ifeq ($(ENABLE_AUDIO_LEGACY_TECHPACK),true)
 include $(call all-subdir-makefiles)
 LOCAL_PATH := vendor/qcom/opensource/audio-kernel
