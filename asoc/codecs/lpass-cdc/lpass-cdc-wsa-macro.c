@@ -745,6 +745,7 @@ static int lpass_cdc_wsa_macro_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_STREAM_CAPTURE:
 		if (dai->id == LPASS_CDC_WSA_MACRO_AIF_VI)
 			wsa_priv->pcm_rate_vi = params_rate(params);
+		break;
 	default:
 		break;
 	}
@@ -3059,7 +3060,7 @@ static int lpass_cdc_wsa_macro_set_cur_state(
 		wsa_priv->thermal_cur_state = state;
 	} else {
 		dev_err(wsa_priv->dev,
-			"%s: incorrect requested state:%d\n",
+			"%s: incorrect requested state:%lu\n",
 			__func__, state);
 		return -EINVAL;
 	}

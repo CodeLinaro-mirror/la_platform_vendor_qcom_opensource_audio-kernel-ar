@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/gpio.h>
@@ -601,7 +601,7 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 	}
 }
 
-static void msm_audio_add_qos_request()
+static void msm_audio_add_qos_request(void)
 {
 	int num_req = 0;
 	int cpu = 0;
@@ -642,7 +642,7 @@ static void msm_audio_add_qos_request()
 	}
 }
 
-static void msm_audio_remove_qos_request()
+static void msm_audio_remove_qos_request(void)
 {
 	int cpu = 0;
 	int ret = 0;
@@ -839,7 +839,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 			ch_cnt = tx_ch_cnt;
 		}
 		if (ch_cnt > 2) {
-			pr_err("%s: Incorrect channel count: %d\n", ch_cnt);
+			pr_err("%s: Incorrect channel count: %d\n", __func__, ch_cnt);
 			return -EINVAL;
 		}
 		len = sizeof(uint32_t) * (ch_cnt + 1);
@@ -888,9 +888,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		/* reset return value from the loop above */
 		ret = 0;
 		if (rx_ch_cnt == 0 && tx_ch_cnt == 0) {
-			pr_debug("%s: got incorrect channel map for backend_id:%d, ",
-				"RX Channel Count:%d,"
-				"TX Channel Count:%d\n",
+			pr_debug("%s: got incorrect channel map for backend_id:%d, RX Channel Count:%d, TX Channel Count:%d\n",
 				__func__, backend_id, rx_ch_cnt, tx_ch_cnt);
 			return ret;
 		}
@@ -1095,8 +1093,8 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 			pdata->id = SLIM;
 		} else {
 			pdata->id = CODEC_DMA;
-			if (rtd->num_codecs <= MAX_CODEC_DAI) {
-				pdata->num_codec_dai = rtd->num_codecs;
+			if (rtd->dai_link->num_codecs <= MAX_CODEC_DAI) {
+				pdata->num_codec_dai = rtd->dai_link->num_codecs;
 				for_each_rtd_codec_dais(rtd, index, codec_dai) {
 					pdata->dai[index] = codec_dai;
 				}

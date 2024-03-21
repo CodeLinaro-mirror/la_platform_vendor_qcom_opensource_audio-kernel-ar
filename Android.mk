@@ -2,7 +2,7 @@
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(call is-board-platform, taro parrot),true)
+ifeq ($(call is-board-platform-in-list, taro parrot),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_WAIPIO=m
 endif
 
@@ -17,6 +17,9 @@ ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 ifneq ($(findstring opensource,$(LOCAL_PATH)),)
 	AUDIO_BLD_DIR := $(abspath .)/vendor/qcom/opensource/audio-kernel
 endif # opensource
+
+include $(AUDIO_BLD_DIR)/EnableBazel.mk
+LOCAL_MODULE_DDK_BUILD := true
 
 DLKM_DIR := $(TOP)/device/qcom/common/dlkm
 
@@ -33,6 +36,10 @@ KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
 
+#ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4),true)
+KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
+#endif
+
 AUDIO_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*) \
 	$(wildcard $(LOCAL_PATH)/*/*) \
@@ -40,7 +47,6 @@ AUDIO_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*/*/*/*)
 
 ########################### dsp ################################
-
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := q6_notifier_dlkm.ko
@@ -338,6 +344,16 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
 ###########################################################
+#include $(CLEAR_VARS)
+#LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+#LOCAL_MODULE              := hdmi_dlkm.ko
+#LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/hdmi_dlkm.ko
+#LOCAL_MODULE_TAGS         := optional
+#LOCAL_MODULE_DEBUG_ENABLE := true
+#LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+#include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
+#ifeq ($(AUDIO_DLKM_ENABLE), true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := hdmi_dlkm.ko
@@ -345,8 +361,10 @@ LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/hdmi_dlkm.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+LOCAL_REQUIRED_MODULES    := msm-ext-disp-module-symvers
+LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-###########################################################
+#endif
 
 endif # DLKM check
 endif # supported target check

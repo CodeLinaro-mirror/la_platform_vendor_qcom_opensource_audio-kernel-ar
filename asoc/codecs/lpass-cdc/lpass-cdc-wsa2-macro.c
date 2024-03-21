@@ -233,6 +233,7 @@ enum {
 	LPASS_CDC_WSA2_MACRO_AIF_MIX1_PB,
 	LPASS_CDC_WSA2_MACRO_AIF_VI,
 	LPASS_CDC_WSA2_MACRO_AIF_ECHO,
+	LPASS_CDC_WSA2_MACRO_AIF_CPS,
 	LPASS_CDC_WSA2_MACRO_MAX_DAIS,
 };
 
@@ -743,6 +744,7 @@ static int lpass_cdc_wsa2_macro_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_STREAM_CAPTURE:
 		if (dai->id == LPASS_CDC_WSA2_MACRO_AIF_VI)
 			wsa2_priv->pcm_rate_vi = params_rate(params);
+		break;
 	default:
 		break;
 	}
@@ -3059,7 +3061,7 @@ static int lpass_cdc_wsa2_macro_set_cur_state(
 		wsa2_priv->thermal_cur_state = state;
 	} else {
 		dev_err(wsa2_priv->dev,
-			"%s: incorrect requested state:%d\n",
+			"%s: incorrect requested state:%lu\n",
 			__func__, state);
 		return -EINVAL;
 	}
