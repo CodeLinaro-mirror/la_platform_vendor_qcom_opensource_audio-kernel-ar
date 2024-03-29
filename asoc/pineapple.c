@@ -1482,10 +1482,6 @@ static const struct of_device_id pineapple_asoc_machine_of_match[]  = {
 	  .data = "codec"},
 	{ .compatible = "qcom,pineapple-asoc-snd-stub",
 	  .data = "stub_codec"},
-	{ .compatible = "qcom,pitti-asoc-snd",
-	  .data = "codec"},
-	{ .compatible = "qcom,pitti-asoc-snd-stub",
-	  .data = "stub_codec"},
 	{},
 };
 
