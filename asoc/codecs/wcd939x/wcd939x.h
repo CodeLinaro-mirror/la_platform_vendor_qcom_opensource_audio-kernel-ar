@@ -24,12 +24,12 @@ enum {
 	WCD939X_EVT_SSR_UP,
 };
 
-struct swr_slave_ch_map {
+struct swr_slave_ch_map_939x {
 	u8 ch_type;
 	u8 index;
 };
 
-static const struct swr_slave_ch_map swr_slv_tx_ch_idx[] = {
+static const struct swr_slave_ch_map_939x swr_slv_tx_ch_idx_939x[] = {
 	{ADC1, 0},
 	{ADC2, 1},
 	{ADC3, 2},
@@ -45,7 +45,7 @@ static const struct swr_slave_ch_map swr_slv_tx_ch_idx[] = {
 	{DMIC7, 11},
 };
 
-static int swr_master_ch_map[] = {
+static int swr_master_ch_map_939x[] = {
 	ZERO,
 	SWRM_TX_PCM_OUT,
 	SWRM_TX1_CH1,
@@ -80,14 +80,14 @@ static inline int wcd939x_slave_get_master_ch_val(int ch)
 	int i;
 
 	for (i = 0; i < WCD939X_MAX_SLAVE_CH_TYPES; i++)
-		if (ch == swr_master_ch_map[i])
+		if (ch == swr_master_ch_map_939x[i])
 			return i;
 	return 0;
 }
 
 static inline int wcd939x_slave_get_master_ch(int idx)
 {
-	return swr_master_ch_map[idx];
+	return swr_master_ch_map_939x[idx];
 }
 
 static inline int wcd939x_slave_get_slave_ch_val(int ch)
@@ -95,8 +95,8 @@ static inline int wcd939x_slave_get_slave_ch_val(int ch)
 	int i;
 
 	for (i = 0; i < WCD939X_MAX_SLAVE_CH_TYPES; i++)
-		if (ch == swr_slv_tx_ch_idx[i].ch_type)
-			return swr_slv_tx_ch_idx[i].index;
+		if (ch == swr_slv_tx_ch_idx_939x[i].ch_type)
+			return swr_slv_tx_ch_idx_939x[i].index;
 
 	return -EINVAL;
 }

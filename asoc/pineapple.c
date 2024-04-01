@@ -42,6 +42,8 @@
 #include "codecs/wcd937x/wcd937x.h"
 #include "codecs/wcd9378/wcd9378.h"
 #include "codecs/wcd939x/wcd939x.h"
+#include "codecs/wcd938x/wcd938x.h"
+#include "codecs/wcd938x/wcd938x-mbhc.h"
 #include "codecs/lpass-cdc/lpass-cdc.h"
 #include <bindings/audio-codec-port-types.h>
 #include "codecs/lpass-cdc/lpass-cdc-wsa-macro.h"
@@ -71,6 +73,7 @@
 
 enum {
 	WCD937X_DEV_INDEX,
+	WCD938X_DEV_INDEX,
 	WCD939X_DEV_INDEX,
 	WCD9378_DEV_INDEX,
 };
@@ -1514,7 +1517,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	else if (pdata->wcd_used == WCD9378_DEV_INDEX)
 		strscpy(wcd_name, WCD9378_DRV_NAME, sizeof(WCD9378_DRV_NAME));
 	else
-		strscpy(wcd_name, WCD939X_DRV_NAME, sizeof(WCD939X_DRV_NAME));
+		strscpy(wcd_name, WCD938X_DRV_NAME, sizeof(WCD938X_DRV_NAME));
 
 	component = snd_soc_rtdcom_lookup(rtd, wcd_name);
 	if (!component) {
@@ -1540,8 +1543,8 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	case WCD9378_DEV_INDEX:
 		ret = wcd9378_mbhc_hs_detect(component, &wcd_mbhc_cfg);
 		break;
-	case WCD939X_DEV_INDEX:
-		ret = wcd939x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+	case WCD938X_DEV_INDEX:
+		ret = wcd938x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
 		break;
 	default:
 		return -EINVAL;
@@ -2068,23 +2071,13 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	if (pdata->wcd_disabled)
 		goto done;
 
-	component = snd_soc_rtdcom_lookup(rtd, WCD939X_DRV_NAME);
+	component = snd_soc_rtdcom_lookup(rtd, "wcd938x_codec");
 	if (!component) {
-		component = snd_soc_rtdcom_lookup(rtd, WCD937X_DRV_NAME);
-		if (!component) {
-			component = snd_soc_rtdcom_lookup(rtd, WCD9378_DRV_NAME);
-			if (!component) {
-				pr_err("%s component is NULL\n", __func__);
-				ret = -EINVAL;
-				goto exit;
-			} else {
-				pdata->wcd_used = WCD9378_DEV_INDEX;
-			}
-		} else {
-			pdata->wcd_used = WCD937X_DEV_INDEX;
-		}
+		pr_err("%s component is NULL\n", __func__);
+		ret = -EINVAL;
+        goto exit;
 	} else {
-		pdata->wcd_used = WCD939X_DEV_INDEX;
+		pdata->wcd_used = WCD938X_DEV_INDEX;
 	}
 
 	dapm = snd_soc_component_get_dapm(component);
@@ -2118,7 +2111,18 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
 	} else if (pdata->wcd_used == WCD9378_DEV_INDEX) {
 		wcd9378_info_create_codec_entry(pdata->codec_root, component);
-	} else {
+	} else if (pdata->wcd_used == WCD938X_DEV_INDEX) {
+		wcd938x_info_create_codec_entry(pdata->codec_root, component);
+		//codec_variant = wcd938x_get_codec_variant(component);
+		//dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
+		/* check if the variant is wcd9385 and set RX HIFI filter capability */
+#ifdef CONFIG_BOLERO_VER_2P6
+		if (codec_variant == WCD9385)
+			ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, true);
+		else
+			ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, false);
+#endif
+    } else {
 		wcd939x_info_create_codec_entry(pdata->codec_root, component);
 		codec_variant = wcd939x_get_codec_variant(component);
 		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);

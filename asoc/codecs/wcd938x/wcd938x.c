@@ -3782,9 +3782,6 @@ static const struct snd_soc_dapm_route wcd938x_audio_map[] = {
 	{"WCD_TX_OUTPUT", NULL, "DMIC7_MIXER"},
 	{"DMIC7_MIXER", "Switch", "DMIC7"},
 
-	{"WCD_TX_OUTPUT", NULL, "DMIC8_MIXER"},
-	{"DMIC8_MIXER", "Switch", "DMIC8"},
-
 	{"IN1_HPHL", NULL, "WCD_RX_DUMMY"},
 	{"IN1_HPHL", NULL, "VDD_BUCK"},
 	{"IN1_HPHL", NULL, "CLS_H_PORT"},
