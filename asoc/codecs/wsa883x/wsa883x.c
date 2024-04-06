@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1628,6 +1628,15 @@ static int wsa883x_event_notify(struct notifier_block *nb,
 				/* Added delay as per HW sequence */
 				usleep_range(5000, 5050);
 			}
+			snd_soc_component_update_bits(wsa883x->component,
+					WSA883X_PA_FSM_BYP,
+					0x01, 0x00);
+			snd_soc_component_update_bits(wsa883x->component,
+					WSA883X_DRE_IDLE_DET_CTL,
+					0xFF, 0x20);
+			snd_soc_component_update_bits(wsa883x->component,
+					WSA883X_DRE_CTL_1,
+					0xFF, 0x0F);
 		}
 		break;
 	case BOLERO_SLV_EVT_PA_ON_POST_FSCLK_ADIE_LB:
