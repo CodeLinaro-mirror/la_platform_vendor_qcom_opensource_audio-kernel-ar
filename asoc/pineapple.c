@@ -2113,8 +2113,8 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 		wcd9378_info_create_codec_entry(pdata->codec_root, component);
 	} else if (pdata->wcd_used == WCD938X_DEV_INDEX) {
 		wcd938x_info_create_codec_entry(pdata->codec_root, component);
-		//codec_variant = wcd938x_get_codec_variant(component);
-		//dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
+		codec_variant = wcd938x_get_codec_variant(component);
+		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
 		/* check if the variant is wcd9385 and set RX HIFI filter capability */
 #ifdef CONFIG_BOLERO_VER_2P6
 		if (codec_variant == WCD9385)

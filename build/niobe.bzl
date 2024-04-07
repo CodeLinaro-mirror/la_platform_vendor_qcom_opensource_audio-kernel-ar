@@ -44,6 +44,7 @@ def define_niobe():
             "CONFIG_DIGITAL_CDC_RSC_MGR",
             "CONFIG_SOUNDWIRE_MSTR_CTRL",
             "CONFIG_SWRM_VER_1P7",
+            "CONFIG_BOLERO_VER_2P6",
             "CONFIG_WCD9XXX_CODEC_CORE_V2",
             "CONFIG_MSM_CDC_PINCTRL",
             "CONFIG_SND_SOC_WCD_IRQ",
