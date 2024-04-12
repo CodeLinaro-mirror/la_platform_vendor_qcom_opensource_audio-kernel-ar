@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2016, 2019, 2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/regmap.h>
@@ -382,6 +383,10 @@ static bool wsa883x_volatile_register(struct device *dev, unsigned int reg)
 {
 	if (reg <= WSA883X_BASE)
 		return 0;
+
+	if (reg == WSA883X_PA_FSM_BYP || reg == WSA883X_DRE_IDLE_DET_CTL
+					|| reg == WSA883X_DRE_CTL_1)
+		return 1;
 
 	return ((wsa883x_reg_access[WSA883X_REG(reg)] & RD_REG) &&
 		!(wsa883x_reg_access[WSA883X_REG(reg)] & WR_REG));
