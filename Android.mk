@@ -22,6 +22,10 @@ ifeq ($(call is-board-platform-in-list,pineapple cliffs volcano),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_PINEAPPLE=m
 endif
 
+ifeq ($(call is-board-platform-in-list,anorak61),true)
+AUDIO_SELECT  := CONFIG_SND_SOC_ANORAK=m
+endif
+
 ifeq ($(call is-board-platform-in-list,pitti),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_PITTI=m
 endif
@@ -36,7 +40,7 @@ LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple cliffs pitti holi blair gen4 msmnile niobe volcano), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple cliffs pitti holi blair gen4 msmnile niobe volcano anorak61), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -61,7 +65,7 @@ KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
 
-ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4 anorak61),true)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 endif
 
@@ -342,7 +346,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
-ifneq ($(call is-board-platform-in-list, niobe),true)
+ifneq ($(call is-board-platform-in-list, niobe anorak61),true)
 ########################### WSA884x CODEC  ###########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -364,7 +368,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
-ifneq ($(call is-board-platform-in-list, niobe),true)
+ifneq ($(call is-board-platform-in-list, niobe anorak61),true)
 ########################### WCD937x CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -405,7 +409,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ########################### WCD939x CODEC  ################################
 
-ifneq ($(call is-board-platform-in-list, niobe pitti),true)
+ifneq ($(call is-board-platform-in-list, niobe pitti anorak61),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := wcd939x_dlkm.ko
@@ -453,6 +457,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
+ifneq ($(call is-board-platform-in-list, anorak61),true)
 ###########################################################
 ifeq ($(AUDIO_DLKM_ENABLE), true)
 include $(CLEAR_VARS)
@@ -465,6 +470,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 LOCAL_REQUIRED_MODULES    := msm-ext-disp-module-symvers
 LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 endif
 endif
 

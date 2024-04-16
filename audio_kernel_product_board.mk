@@ -17,7 +17,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/machine_dlkm.ko
-ifneq ($(call is-board-platform-in-list,bengal holi blair niobe), true)
+ifneq ($(call is-board-platform-in-list,bengal holi blair niobe anorak61), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/swr_haptics_dlkm.ko
 endif
 ifneq ($(call is-board-platform-in-list,bengal holi blair), true)
@@ -28,7 +28,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/hdmi_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/lpass_cdc_rx_macro_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/lpass_cdc_tx_macro_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/lpass_cdc_dlkm.ko
-ifneq ($(call is-board-platform-in-list,bengal holi blair pitti niobe), true)
+ifneq ($(call is-board-platform-in-list,bengal holi blair pitti niobe anorak61), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wsa884x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wsa883x_dlkm.ko \
@@ -37,7 +37,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif
-ifneq ($(call is-board-platform-in-list,niobe pitti), true)
+ifneq ($(call is-board-platform-in-list,niobe pitti anorak61), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd939x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd939x_slave_dlkm.ko
 endif
@@ -56,12 +56,12 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list, holi blair niobe), true)
+ifeq ($(call is-board-platform-in-list, holi blair niobe anorak61), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif
 
-ifeq ($(call is-board-platform-in-list, niobe), true)
+ifeq ($(call is-board-platform-in-list, niobe anorak61), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)//wsa883x_dlkm.ko
 endif
