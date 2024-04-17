@@ -19,6 +19,7 @@
 #include <linux/soc/qcom/wcd939x-i2c.h>
 #endif
 #include <linux/pm_qos.h>
+#include <linux/nvmem-consumer.h>
 #include <sound/control.h>
 #include <sound/core.h>
 #include <sound/soc.h>
@@ -63,6 +64,7 @@
 #define WCN_CDC_SLIM_RX_CH_MAX 2
 #define WCN_CDC_SLIM_TX_CH_MAX 2
 #define WCN_CDC_SLIM_TX_CH_MAX_LITO 3
+#define WCN_CDC_SLIM_TX_CH_MAX_FM 3
 
 /* Number of WSAs */
 #define MONO_SPEAKER    1
@@ -454,6 +456,23 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 	msm_common_dai_link_init(rtd);
     return ret;
 }
+
+static int msm_wcn_init_btfm(struct snd_soc_pcm_runtime *rtd)
+{
+	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
+	unsigned int tx_ch[WCN_CDC_SLIM_TX_CH_MAX_FM]  = {159, 160, 161};
+	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	int ret = 0;
+
+	ret = snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
+					   tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
+	if (ret)
+		return ret;
+
+	msm_common_dai_link_init(rtd);
+	return ret;
+}
+
 #endif
 
 static struct snd_info_entry *msm_snd_info_create_subdir(struct module *mod,
@@ -638,7 +657,7 @@ static struct snd_soc_dai_link msm_wcn_btfm_be_dai_links[] = {
 		.playback_only = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST},
-		.init = &msm_wcn_init,
+		.init = &msm_wcn_init_btfm,
 		.ops = &msm_common_be_ops,
 		/* dai link has playback support */
 		.ignore_pmdown_time = 1,
@@ -661,6 +680,7 @@ static struct snd_soc_dai_link msm_wcn_btfm_be_dai_links[] = {
 		.capture_only = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST},
+		.init = &msm_wcn_init,
 		.ops = &msm_common_be_ops,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(slimbus_8_tx),
@@ -1328,7 +1348,10 @@ static struct snd_soc_dai_link msm_pineapple_dai_links[
 			ARRAY_SIZE(msm_va_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(ext_disp_be_dai_link) +
 			ARRAY_SIZE(msm_common_be_dai_links) +
+#ifndef CONFIG_AUDIO_BTFM_PROXY
 			ARRAY_SIZE(msm_wcn_btfm_be_dai_links) +
+#endif
+			ARRAY_SIZE(msm_wcn_be_dai_links) +
 			ARRAY_SIZE(msm_mi2s_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links)];
 
@@ -1672,6 +1695,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 			       msm_wcn_be_dai_links,
 			       sizeof(msm_wcn_be_dai_links));
 			total_links += ARRAY_SIZE(msm_wcn_be_dai_links);
+#ifndef CONFIG_AUDIO_BTFM_PROXY
 		} else {
 			rc = of_property_read_u32(dev->of_node, "qcom,wcn-btfm", &val);
 			if (!rc && val) {
@@ -1682,6 +1706,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 				       sizeof(msm_wcn_btfm_be_dai_links));
 				total_links += ARRAY_SIZE(msm_wcn_btfm_be_dai_links);
 			}
+#endif
 		}
 
 		dailink = msm_pineapple_dai_links;
@@ -1725,15 +1750,25 @@ static int msm_int_wsa883x_init(struct snd_soc_pcm_runtime *rtd)
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
 		if (!component) {
 			pr_err("%s: wsa-codec.1 component is NULL\n", __func__);
-			return -EINVAL;
+			component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.2");
+			if (!component) {
+				pr_err("%s: wsa-codec.2 component is NULL\n", __func__);
+				return -EINVAL;
+			}
+			wsa883x_set_channel_map(component, &spkright_ports[0],
+					WSA883X_MAX_SWR_PORTS, &ch_mask[0],
+					&ch_rate[0], &spkright_port_types[0]);
+
+			wsa883x_codec_info_create_codec_entry(pdata->codec_root,
+					component);
+		} else {
+			wsa883x_set_channel_map(component, &spkleft_ports[0],
+					WSA883X_MAX_SWR_PORTS, &ch_mask[0],
+					&ch_rate[0], &spkleft_port_types[0]);
+
+			wsa883x_codec_info_create_codec_entry(pdata->codec_root,
+					component);
 		}
-
-		wsa883x_set_channel_map(component, &spkleft_ports[0],
-				WSA883X_MAX_SWR_PORTS, &ch_mask[0],
-				&ch_rate[0], &spkleft_port_types[0]);
-
-		wsa883x_codec_info_create_codec_entry(pdata->codec_root,
-				component);
 	}
 
 	/* If current platform has more than one WSA */
@@ -1810,15 +1845,25 @@ static int msm_int_wsa884x_init(struct snd_soc_pcm_runtime *rtd)
 		component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
 		if (!component) {
 			pr_err("%s: wsa-codec.1 component is NULL\n", __func__);
-			return -EINVAL;
+			component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.2");
+			if (!component) {
+				pr_err("%s: wsa-codec.2 component is NULL\n", __func__);
+				return -EINVAL;
+			}
+			wsa884x_set_channel_map(component, &spkright_ports[0],
+					WSA884X_MAX_SWR_PORTS, &ch_mask[0],
+					&ch_rate[0], &spkright_port_types[0]);
+
+			wsa884x_codec_info_create_codec_entry(pdata->codec_root,
+					component);
+		} else {
+			wsa884x_set_channel_map(component, &spkleft_ports[0],
+				WSA884X_MAX_SWR_PORTS, &ch_mask[0],
+				&ch_rate[0], &spkleft_port_types[0]);
+
+			wsa884x_codec_info_create_codec_entry(pdata->codec_root,
+					component);
 		}
-
-		wsa884x_set_channel_map(component, &spkleft_ports[0],
-			WSA884X_MAX_SWR_PORTS, &ch_mask[0],
-			&ch_rate[0], &spkleft_port_types[0]);
-
-		wsa884x_codec_info_create_codec_entry(pdata->codec_root,
-				component);
 	}
 
 	/* If current platform has more than one WSA */
@@ -2291,6 +2336,50 @@ void msm_common_set_pdata(struct snd_soc_card *card,
 	pdata->common_pdata = common_pdata;
 }
 
+static int msm_asoc_parse_soundcard_name(struct platform_device *pdev,
+				struct snd_soc_card *card)
+{
+	struct nvmem_cell *cell = NULL;
+	size_t len = 0;
+	u32 *buf = NULL;
+	u32 adsp_var_idx = 0;
+	int ret = 0;
+
+	/* get adsp variant idx */
+	cell = nvmem_cell_get(&pdev->dev, "adsp_variant");
+	if (IS_ERR_OR_NULL(cell)) {
+		dev_dbg(&pdev->dev, "%s: FAILED to get nvmem cell\n", __func__);
+		goto parse;
+	}
+	buf = nvmem_cell_read(cell, &len);
+	nvmem_cell_put(cell);
+	if (IS_ERR_OR_NULL(buf)) {
+		dev_dbg(&pdev->dev, "%s: FAILED to read nvmem cell\n", __func__);
+		goto parse;
+	}
+	if (len <= 0 || len > sizeof(u32)) {
+		dev_dbg(&pdev->dev, "%s: nvmem cell length out of range: %d\n",
+			__func__, len);
+		kfree(buf);
+		goto parse;
+	}
+
+	memcpy(&adsp_var_idx, buf, len);
+	kfree(buf);
+
+parse:
+	if (adsp_var_idx)
+		ret = snd_soc_of_parse_card_name(card, "qcom,sku-model");
+	else
+		ret = snd_soc_of_parse_card_name(card, "qcom,model");
+
+	if (ret)
+		dev_err(&pdev->dev, "%s: parse card name failed, err:%d\n",
+			__func__, ret);
+
+	return ret;
+}
+
 static int msm_asoc_machine_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = NULL;
@@ -2345,9 +2434,9 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, pdata);
 
-	ret = snd_soc_of_parse_card_name(card, "qcom,model");
+	ret = msm_asoc_parse_soundcard_name(pdev, card);
 	if (ret) {
-		dev_err(&pdev->dev, "%s: parse card name failed, err:%d\n",
+		dev_err(&pdev->dev, "%s: parse soundcard name failed, err:%d\n",
 			__func__, ret);
 		goto err;
 	}

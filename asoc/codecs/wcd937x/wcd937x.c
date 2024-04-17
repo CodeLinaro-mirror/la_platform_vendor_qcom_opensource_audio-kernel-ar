@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1832,6 +1832,11 @@ static int wcd937x_event_notify(struct notifier_block *block,
 		}
 		wcd937x->mbhc->wcd_mbhc.deinit_in_progress = false;
 		break;
+	case BOLERO_SLV_EVT_CLK_NOTIFY:
+		snd_soc_component_update_bits(component,
+			WCD937X_DIGITAL_TOP_CLK_CFG, 0x06,
+				((val >> 0x10) << 0x01));
+		break;
 	default:
 		dev_err(component->dev, "%s: invalid event %d\n", __func__,
 			event);
@@ -3170,7 +3175,7 @@ static int wcd937x_reset(struct device *dev)
 	if (rc) {
 		dev_err(dev, "%s: wcd sleep state request fail!\n",
 				__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 	/* 20ms sleep required after pulling the reset gpio to LOW */
 	usleep_range(20, 30);
@@ -3179,7 +3184,7 @@ static int wcd937x_reset(struct device *dev)
 	if (rc) {
 		dev_err(dev, "%s: wcd active state request fail!\n",
 				__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 	/* 20ms sleep required after pulling the reset gpio to HIGH */
 	usleep_range(20, 30);
@@ -3353,7 +3358,8 @@ static int wcd937x_bind(struct device *dev)
 	pdata = wcd937x_populate_dt_data(dev);
 	if (!pdata) {
 		dev_err(dev, "%s: Fail to obtain platform data\n", __func__);
-		return -EINVAL;
+		ret = -EINVAL;
+		goto err_pdata;
 	}
 	wcd937x->dev = dev;
 	wcd937x->dev->platform_data = pdata;
@@ -3403,7 +3409,11 @@ static int wcd937x_bind(struct device *dev)
 		goto err_bind_all;
 	}
 
-	wcd937x_reset(dev);
+	ret = wcd937x_reset(dev);
+	if (ret == -EPROBE_DEFER) {
+		dev_err(dev, "%s: wcd reset failed!\n", __func__);
+		goto err_bind_all;
+	}
 	/*
 	 * Add 5msec delay to provide sufficient time for
 	 * soundwire auto enumeration of slave devices as
@@ -3515,8 +3525,9 @@ err_irq:
 err:
 	component_unbind_all(dev, wcd937x);
 err_bind_all:
-	dev_set_drvdata(dev, NULL);
 	kfree(pdata);
+err_pdata:
+	dev_set_drvdata(dev, NULL);
 	kfree(wcd937x);
 	return ret;
 }
