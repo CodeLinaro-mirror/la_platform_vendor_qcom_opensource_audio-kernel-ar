@@ -585,35 +585,6 @@ static struct snd_soc_dai_link msm_rx_tx_cdc_dma_be_dai_links[] = {
 	},
 };
 
-
-static struct snd_soc_dai_link msm_rx_tx_cdc_dma_be_pinn_dai_links[] = {
-	/* WSA CDC DMA Backend DAI Links */
-	{
-		.name = LPASS_BE_PRI_MI2S_RX,
-		.stream_name = LPASS_BE_PRI_MI2S_RX,
-		.playback_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_pmdown_time = 1,
-		.ignore_suspend = 1,
-		.ops = &sdx_mi2s_be_ops,
-		SND_SOC_DAILINK_REG(tavil_i2s_rx_wt_wsa),
-		.init = &msm_aux_codec_init,
-	},
-	{
-		.name = LPASS_BE_PRI_MI2S_TX,
-		.stream_name = LPASS_BE_PRI_MI2S_TX,
-		.capture_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_pmdown_time = 1,
-		.ignore_suspend = 1,
-		.ops = &sdx_mi2s_be_ops,
-		SND_SOC_DAILINK_REG(tavil_i2s_rx_wt_wsa),
-	},
-};
-
-
 static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 	{
 		.name = LPASS_BE_PRI_TDM_RX_0,
@@ -638,15 +609,11 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 	},
 };
 
-static struct snd_soc_dai_link msm_sdx_mtp_dai_links[
-			ARRAY_SIZE(msm_rx_tx_cdc_dma_be_pinn_dai_links)+
-			ARRAY_SIZE(msm_common_be_dai_links) +
-			ARRAY_SIZE(msm_tdm_dai_links)];
-
 static struct snd_soc_dai_link msm_sdx_dai_links[
 			ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_common_be_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links)];
+
 
 static int msm_populate_dai_link_component_of_node(
 					struct snd_soc_card *card)
@@ -657,60 +624,48 @@ static int msm_populate_dai_link_component_of_node(
 	struct device_node *np = NULL;
 
 	if (!cdev) {
-		dev_info(cdev, "%s: Sound card device memory NULL\n", __func__);
+		dev_err(cdev, "%s: Sound card device memory NULL\n", __func__);
 		return -ENODEV;
 	}
-	dev_info(cdev, "%s: Enter\n", __func__);
 
 	for (i = 0; i < card->num_links; i++) {
 		if (dai_link[i].init == NULL)
 			dai_link[i].init = &msm_common_dai_link_init;
 
 		/* populate codec_of_node for snd card dai links */
-		dev_info(cdev, "%s: dai_link[%d].name:%s\n", __func__, i, dai_link[i].name);
-		
 		if (dai_link[i].num_codecs > 0) {
 			for (j = 0; j < dai_link[i].num_codecs; j++) {
-				dev_info(cdev, "%s: dai_link[%d].codecs[%d].name:%s\n", __func__, i, j, dai_link[i].codecs[j].name);
-				dev_info(cdev, "%s: dai_link[%d].codecs[%d].dainame:%s\n", __func__, i, j, dai_link[i].codecs[j].dai_name);
 				if (dai_link[i].codecs[j].of_node ||
-						!dai_link[i].codecs[j].name){
-					dev_info(cdev, "%s: %d\n", __func__, __LINE__);
+						!dai_link[i].codecs[j].name)
 					continue;
-			}
 
 				index = of_property_match_string(cdev->of_node,
 						"asoc-codec-names",
 						dai_link[i].codecs[j].name);
-				if (index < 0){
-					dev_info(cdev, "%s: %d\n", __func__, __LINE__);
+				if (index < 0)
 					continue;
-				}
 				np = of_parse_phandle(cdev->of_node,
 						      "asoc-codec",
 						      index);
 				if (!np) {
-					dev_info(cdev, "%s: retrieving phandle for codec %s failed\n",
+					dev_err(cdev, "%s: retrieving phandle for codec %s failed\n",
 						__func__,
 						dai_link[i].codecs[j].name);
 					ret = -ENODEV;
 					goto err;
 				}
-				dev_info(cdev, "%s: %d\n", __func__, __LINE__);
 				dai_link[i].codecs[j].of_node = np;
 				dai_link[i].codecs[j].name = NULL;
-				dev_info(cdev, "%s: %d\n", __func__, __LINE__);
 			}
 		}
 	}
 
 err:
-	dev_info(cdev, "%s: %d\n", __func__, __LINE__);
 	return ret;
 }
 
 static int msm_audrx_stub_init(struct snd_soc_pcm_runtime *rtd)
-{pr_err("%s: Enter\n", __func__);
+{
 	return 0;
 }
 
@@ -756,8 +711,6 @@ static struct snd_soc_dai_link msm_stub_dai_links[
 static const struct of_device_id sdx_asoc_machine_of_match[]  = {
 	{ .compatible = "qcom,sdx-asoc-snd-tavil",
 	  .data = "codec"},
-	{ .compatible = "qcom,sdx-asoc-snd-tavil-mtp",
-	  .data = "mtp-codec"},
 	{},
 };
 
@@ -768,10 +721,10 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	struct snd_soc_pcm_runtime *rtd;
 	int ret = 0;
 	void *mbhc_calibration;
-	dev_info(card->dev, "%s: Enter\n", __func__);
+
 	rtd = snd_soc_get_pcm_runtime(card, &card->dai_link[0]);
 	if (!rtd) {
-		dev_info(card->dev,
+		dev_err(card->dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
 			__func__, be_dl_name);
 		return -EINVAL;
@@ -808,92 +761,40 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 	int rc = 0;
 	u32 val = 0;
 	const struct of_device_id *match;
-	pr_err("%s: Enter\n", __func__);
+
 	match = of_match_node(sdx_asoc_machine_of_match, dev->of_node);
 	if (!match) {
-		pr_err("%s: %d\n", __func__, __LINE__);
-		dev_info(dev, "%s: No DT match found for sound card\n",
+		dev_err(dev, "%s: No DT match found for sound card\n",
 			__func__);
 		return NULL;
 	}
-	pr_err("%s: %d\n", __func__, __LINE__);
-    
+
 	if (!strcmp(match->data, "codec")) {
-		pr_err("%s: match->data :codec\n", __func__);
 		card = &snd_soc_card_sdx_msm;
 
 		memcpy(msm_sdx_dai_links + total_links,
 		       msm_rx_tx_cdc_dma_be_dai_links,
 		       sizeof(msm_rx_tx_cdc_dma_be_dai_links));
-		pr_err("%s: %d\n", __func__, __LINE__);
 		total_links +=
 			ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links);
-			pr_err("%s: %d\n", __func__, __LINE__);
-        pr_err("%s: %d\n", __func__, __LINE__);
 
-        pr_err("%s: %d\n", __func__, __LINE__);
 		memcpy(msm_sdx_dai_links + total_links,
 		       msm_common_be_dai_links,
 		       sizeof(msm_common_be_dai_links));
-		pr_err("%s: %d\n", __func__, __LINE__);
 		total_links +=
 			ARRAY_SIZE(msm_common_be_dai_links);
-		pr_err("%s: %d\n", __func__, __LINE__);
 
 		rc = of_property_read_u32(dev->of_node,
 				"qcom,tdm-audio-intf", &val);
-		pr_err("%s: %d\n", __func__, __LINE__);
 		if (!rc && val) {
-			pr_err("%s: %d\n", __func__, __LINE__);
 			memcpy(msm_sdx_dai_links + total_links,
 					msm_tdm_dai_links,
 					sizeof(msm_tdm_dai_links));
-			pr_err("%s: %d\n", __func__, __LINE__);
 			total_links += ARRAY_SIZE(msm_tdm_dai_links);
 		}
-
-		pr_err("%s: %d\n", __func__, __LINE__);
 
 		dailink = msm_sdx_dai_links;
-		pr_err("%s: %d\n", __func__, __LINE__);
-	} else if (!strcmp(match->data, "mtp-codec")) {
-		pr_err("%s: match->data :mtp-codec\n", __func__);
-		card = &snd_soc_card_sdx_msm;
-
-		memcpy(msm_sdx_mtp_dai_links+ total_links,
-		       msm_rx_tx_cdc_dma_be_pinn_dai_links,
-		       sizeof(msm_rx_tx_cdc_dma_be_pinn_dai_links));
-		pr_err("%s: %d\n", __func__, __LINE__);
-		total_links +=
-			ARRAY_SIZE(msm_rx_tx_cdc_dma_be_pinn_dai_links);
-			
-        pr_err("%s: %d\n", __func__, __LINE__);
-		memcpy(msm_sdx_mtp_dai_links + total_links,
-		       msm_common_be_dai_links,
-		       sizeof(msm_common_be_dai_links));
-		pr_err("%s: %d\n", __func__, __LINE__);
-		total_links +=
-			ARRAY_SIZE(msm_common_be_dai_links);
-		pr_err("%s: %d\n", __func__, __LINE__);
-
-		rc = of_property_read_u32(dev->of_node,
-				"qcom,tdm-audio-intf", &val);
-		pr_err("%s: %d\n", __func__, __LINE__);
-		if (!rc && val) {
-			pr_err("%s: %d\n", __func__, __LINE__);
-			memcpy(msm_sdx_mtp_dai_links + total_links,
-					msm_tdm_dai_links,
-					sizeof(msm_tdm_dai_links));
-			pr_err("%s: %d\n", __func__, __LINE__);
-			total_links += ARRAY_SIZE(msm_tdm_dai_links);
-		}
-
-		pr_err("%s: %d\n", __func__, __LINE__);
-
-		dailink = msm_sdx_mtp_dai_links;
-		pr_err("%s: %d\n", __func__, __LINE__);
-	}	else if(!strcmp(match->data, "stub_codec")) {
-		pr_err("%s: %d\n", __func__, __LINE__);
+	} else if(!strcmp(match->data, "stub_codec")) {
 		card = &snd_soc_card_stub_msm;
 
 		memcpy(msm_stub_dai_links,
