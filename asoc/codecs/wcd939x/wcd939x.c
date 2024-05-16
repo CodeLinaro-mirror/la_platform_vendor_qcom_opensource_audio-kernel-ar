@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -3738,6 +3738,10 @@ static const struct snd_kcontrol_new va_amic5_switch[] = {
 	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
 };
 
+static const struct snd_kcontrol_new dmic0_switch[] = {
+	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
+};
+
 static const struct snd_kcontrol_new dmic1_switch[] = {
 	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
 };
@@ -3763,10 +3767,6 @@ static const struct snd_kcontrol_new dmic6_switch[] = {
 };
 
 static const struct snd_kcontrol_new dmic7_switch[] = {
-	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
-};
-
-static const struct snd_kcontrol_new dmic8_switch[] = {
 	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
 };
 
@@ -3902,28 +3902,28 @@ static const struct snd_soc_dapm_widget wcd939x_dapm_widgets[] = {
 	SND_SOC_DAPM_ADC_E("ADC4", NULL, SND_SOC_NOPM, 3, 0,
 				wcd939x_codec_enable_adc,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC1", NULL, SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_ADC_E("DMIC0", NULL, SND_SOC_NOPM, 0, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC2", NULL, SND_SOC_NOPM, 1, 0,
+	SND_SOC_DAPM_ADC_E("DMIC1", NULL, SND_SOC_NOPM, 1, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC3", NULL, SND_SOC_NOPM, 2, 0,
+	SND_SOC_DAPM_ADC_E("DMIC2", NULL, SND_SOC_NOPM, 2, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC4", NULL, SND_SOC_NOPM, 3, 0,
+	SND_SOC_DAPM_ADC_E("DMIC3", NULL, SND_SOC_NOPM, 3, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC5", NULL, SND_SOC_NOPM, 4, 0,
+	SND_SOC_DAPM_ADC_E("DMIC4", NULL, SND_SOC_NOPM, 4, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC6", NULL, SND_SOC_NOPM, 5, 0,
+	SND_SOC_DAPM_ADC_E("DMIC5", NULL, SND_SOC_NOPM, 5, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC7", NULL, SND_SOC_NOPM, 6, 0,
+	SND_SOC_DAPM_ADC_E("DMIC6", NULL, SND_SOC_NOPM, 6, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_ADC_E("DMIC8", NULL, SND_SOC_NOPM, 7, 0,
+	SND_SOC_DAPM_ADC_E("DMIC7", NULL, SND_SOC_NOPM, 7, 0,
 				wcd939x_codec_enable_dmic,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
@@ -3993,6 +3993,10 @@ static const struct snd_soc_dapm_widget wcd939x_dapm_widgets[] = {
 	SND_SOC_DAPM_MIXER_E("ADC4_MIXER", SND_SOC_NOPM, ADC4, 0, adc4_switch,
 				ARRAY_SIZE(adc4_switch), wcd939x_tx_swr_ctrl,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_MIXER_E("DMIC0_MIXER", SND_SOC_NOPM, DMIC0,
+				0, dmic0_switch, ARRAY_SIZE(dmic0_switch),
+				wcd939x_tx_swr_ctrl, SND_SOC_DAPM_PRE_PMU |
+				SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_MIXER_E("DMIC1_MIXER", SND_SOC_NOPM, DMIC1,
 				0, dmic1_switch, ARRAY_SIZE(dmic1_switch),
 				wcd939x_tx_swr_ctrl, SND_SOC_DAPM_PRE_PMU |
@@ -4019,10 +4023,6 @@ static const struct snd_soc_dapm_widget wcd939x_dapm_widgets[] = {
 				SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_MIXER_E("DMIC7_MIXER", SND_SOC_NOPM, DMIC7,
 				0, dmic7_switch, ARRAY_SIZE(dmic7_switch),
-				wcd939x_tx_swr_ctrl, SND_SOC_DAPM_PRE_PMU |
-				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_MIXER_E("DMIC8_MIXER", SND_SOC_NOPM, DMIC8,
-				0, dmic8_switch, ARRAY_SIZE(dmic8_switch),
 				wcd939x_tx_swr_ctrl, SND_SOC_DAPM_PRE_PMU |
 				SND_SOC_DAPM_POST_PMD),
 	/* micbias widgets*/
@@ -4218,6 +4218,9 @@ static const struct snd_soc_dapm_route wcd939x_audio_map[] = {
 	{"ADC4 MUX", "CH4_AMIC4", "AMIC4_MIXER"},
 	{"ADC4 MUX", "CH4_AMIC5", "AMIC5_MIXER"},
 
+	{"WCD_TX_OUTPUT", NULL, "DMIC0_MIXER"},
+	{"DMIC0_MIXER", "Switch", "DMIC0"},
+
 	{"WCD_TX_OUTPUT", NULL, "DMIC1_MIXER"},
 	{"DMIC1_MIXER", "Switch", "DMIC1"},
 
@@ -4238,9 +4241,6 @@ static const struct snd_soc_dapm_route wcd939x_audio_map[] = {
 
 	{"WCD_TX_OUTPUT", NULL, "DMIC7_MIXER"},
 	{"DMIC7_MIXER", "Switch", "DMIC7"},
-
-	{"WCD_TX_OUTPUT", NULL, "DMIC8_MIXER"},
-	{"DMIC8_MIXER", "Switch", "DMIC8"},
 
 	{"IN1_HPHL", NULL, "WCD_RX_DUMMY"},
 	{"IN1_HPHL", NULL, "VDD_BUCK"},
@@ -4706,19 +4706,19 @@ static int wcd939x_reset(struct device *dev)
 	if (rc) {
 		dev_err_ratelimited(dev, "%s: wcd sleep state request fail!\n",
 				__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 	/* 20us sleep required after pulling the reset gpio to LOW */
-	usleep_range(20, 30);
+	usleep_range(80, 85);
 
 	rc = msm_cdc_pinctrl_select_active_state(wcd939x->rst_np);
 	if (rc) {
 		dev_err_ratelimited(dev, "%s: wcd active state request fail!\n",
 				__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 	/* 20us sleep required after pulling the reset gpio to HIGH */
-	usleep_range(20, 30);
+	usleep_range(80, 85);
 
 	/* Set OVP threshold to 4.2V after reset */
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
@@ -5497,7 +5497,11 @@ static int wcd939x_probe(struct platform_device *pdev)
 	if (ret)
 		goto err_lock_init;
 
-	wcd939x_reset(dev);
+	ret = wcd939x_reset(dev);
+	if (ret == -EPROBE_DEFER) {
+		dev_err(dev, "%s: wcd reset failed!\n", __func__);
+		goto err_lock_init;
+	}
 
 	wcd939x->wakeup = wcd939x_wakeup;
 
