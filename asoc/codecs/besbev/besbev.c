@@ -1232,10 +1232,17 @@ static int besbev_spkr_event(struct snd_soc_dapm_widget *w,
 			}
 			set_bit(BESBEV_SPKR_BOOST_ENABLE, &besbev->status_mask);
 		}
+		if (besbev->update_wcd_event)
+			besbev->update_wcd_event(besbev->handle,
+						SLV_BOLERO_EVT_TX_DEC_MUTE,
+						0x10);
+		msleep(1);
+
 		swr_slvdev_datapath_control(besbev->swr_dev,
 					    besbev->swr_dev->dev_num,
 					    true);
 		besbev_global_mbias_enable(component);
+		msleep(1);
 		/* Set Gain from SWR */
 		if (besbev->comp_support)
 			snd_soc_component_update_bits(component,
@@ -1254,6 +1261,12 @@ static int besbev_spkr_event(struct snd_soc_dapm_widget *w,
 
 		snd_soc_component_update_bits(component,
 				BESBEV_PA_FSM_CTL, 0x01, 0x01);
+		msleep(1);
+
+		if (besbev->update_wcd_event)
+			besbev->update_wcd_event(besbev->handle,
+						SLV_BOLERO_EVT_TX_DEC_MUTE,
+						0x00);
 		if (besbev->update_wcd_event)
 			besbev->update_wcd_event(besbev->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
