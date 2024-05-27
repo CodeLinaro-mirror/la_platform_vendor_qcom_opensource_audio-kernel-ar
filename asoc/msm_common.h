@@ -8,12 +8,18 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
+ *
+ * SPDX-License-Identifier: GPL-2.0-only
+ *
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
+
 #ifndef _MSM_COMMON_H_
 #define _MSM_COMMON_H_
 
 #include <sound/soc.h>
 #include <sound/pcm.h>
+#include <linux/cpu.h>
 
 enum {
 	MI2S = 0,

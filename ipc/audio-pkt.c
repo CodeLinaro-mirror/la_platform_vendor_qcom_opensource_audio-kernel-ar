@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -621,8 +621,7 @@ static int audio_pkt_platform_driver_probe(struct platform_device *pdev)
 		goto err_chrdev;
 	}
 
-	audpkt_dev->audio_pkt_class = class_create(THIS_MODULE,
-						   AUDPKT_DRIVER_NAME);
+	audpkt_dev->audio_pkt_class = class_create(AUDPKT_DRIVER_NAME);
 	if (IS_ERR(audpkt_dev->audio_pkt_class)) {
 		ret = PTR_ERR(audpkt_dev->audio_pkt_class);
 		AUDIO_PKT_ERR("class_create failed ret:%ld\n",

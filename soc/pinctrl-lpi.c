@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/gpio.h>
@@ -22,6 +22,7 @@
 #include <dsp/digital-cdc-rsc-mgr.h>
 #include <linux/pm_runtime.h>
 #include <dsp/audio_notifier.h>
+#include <linux/gpio/driver.h>
 
 #include "core.h"
 #include "pinctrl-utils.h"
@@ -729,7 +730,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 		}
 	} else {
 		slew_base = NULL;
-		dev_dbg(dev, "error in reading lpi slew register: %d\n",
+		dev_dbg(dev, "%s: error in reading lpi slew register: %d\n",
 			__func__, ret);
 	}
 

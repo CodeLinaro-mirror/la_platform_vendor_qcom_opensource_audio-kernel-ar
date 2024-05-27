@@ -14,7 +14,9 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/of_device.h>
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 #include <linux/soc/qcom/fsa4480-i2c.h>
+#endif
 #include <linux/pm_qos.h>
 #include <linux/nvmem-consumer.h>
 #include <sound/control.h>
@@ -134,6 +136,7 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.moisture_duty_cycle_en = true,
 };
 
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool active)
 {
 	struct snd_soc_card *card = component->card;
@@ -145,6 +148,12 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 
 	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
 }
+#else
+static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool active)
+{
+	return false;
+}
+#endif
 
 static void msm_parse_upd_configuration(struct platform_device *pdev,
 					struct msm_asoc_mach_data *pdata)
@@ -1409,7 +1418,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	if (!rtd) {
 		dev_err(card->dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[0]);
+			__func__, card->dai_link[0].name);
 		return -EINVAL;
 	}
 
@@ -2023,7 +2032,7 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 	if (!rtd_wcd) {
 		dev_dbg(dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[0]);
+			__func__, card->dai_link[0].name);
 	}
 
 	if (pdata->wsa_max_devs > 0) {
@@ -2032,11 +2041,11 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 				&card->dai_link[ARRAY_SIZE(msm_tx_cdc_dma_be_dai_links)]);
 		else
 			rtd_wsa = snd_soc_get_pcm_runtime(card,
-				&card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)]);
+				&card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links) - 1]);            
 		if (!rtd_wsa) {
 			dev_dbg(dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)]);
+			__func__, card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links) - 1].name);
 		}
 	}
 	/* set UPD configuration */
@@ -2168,7 +2177,7 @@ static int msm_asoc_parse_soundcard_name(struct platform_device *pdev,
 		goto parse;
 	}
 	if (len <= 0 || len > sizeof(u32)) {
-		dev_dbg(&pdev->dev, "%s: nvmem cell length out of range: %d\n",
+		dev_dbg(&pdev->dev, "%s: nvmem cell length out of range: %zu\n",
 			__func__, len);
 		kfree(buf);
 		goto parse;
@@ -2335,7 +2344,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	is_initial_boot = true;
 
 	/* change card status to ONLINE */
-	dev_dbg(&pdev->dev, "%s: setting snd_card to ONLINE\n", __func__);
+	dev_info(&pdev->dev, "%s: setting snd_card to ONLINE\n", __func__);
 	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
 
 	return 0;

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -17,7 +18,9 @@
 #include <linux/input.h>
 #include <linux/firmware.h>
 #include <linux/completion.h>
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 #include <linux/soc/qcom/fsa4480-i2c.h>
+#endif
 #include <linux/usb/typec.h>
 #include <sound/soc.h>
 #include <sound/jack.h>
@@ -1678,12 +1681,6 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 	}
 	return 0;
 }
-#else
-static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
-					   unsigned long mode, void *ptr)
-{
-	return 0;
-}
 #endif
 
 int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
@@ -1754,12 +1751,13 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 			pr_err("%s: Skipping to read mbhc fw, 0x%pK %pK\n",
 				 __func__, mbhc->mbhc_fw, mbhc->mbhc_cal);
 	}
-
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 	if (mbhc_cfg->enable_usbc_analog) {
 		mbhc->fsa_nb.notifier_call = wcd_mbhc_usbc_ana_event_handler;
 		mbhc->fsa_nb.priority = 0;
 		rc = fsa4480_reg_notifier(&mbhc->fsa_nb, mbhc->fsa_np);
 	}
+#endif
 
 	return rc;
 err:
@@ -1794,8 +1792,10 @@ void wcd_mbhc_stop(struct wcd_mbhc *mbhc)
 		mbhc->mbhc_cal = NULL;
 	}
 
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 	if (mbhc->mbhc_cfg->enable_usbc_analog)
 		fsa4480_unreg_notifier(&mbhc->fsa_nb, mbhc->fsa_np);
+#endif
 
 	pr_debug("%s: leave\n", __func__);
 }
@@ -1909,7 +1909,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 	if (mbhc->headset_jack.jack == NULL) {
 		ret = snd_soc_card_jack_new(component->card,
 					    "Headset Jack", WCD_MBHC_JACK_MASK,
-					    &mbhc->headset_jack, NULL, 0);
+					    &mbhc->headset_jack);
 		if (ret) {
 			pr_err("%s: Failed to create new jack\n", __func__);
 			return ret;
@@ -1918,7 +1918,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 		ret = snd_soc_card_jack_new(component->card,
 					    "Button Jack",
 					    WCD_MBHC_JACK_BUTTON_MASK,
-					    &mbhc->button_jack, NULL, 0);
+					    &mbhc->button_jack);
 		if (ret) {
 			pr_err("Failed to create new jack\n");
 			return ret;

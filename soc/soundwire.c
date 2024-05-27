@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -126,7 +127,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	list_add_tail(&swr->dev_list, &master->devices);
 	mutex_unlock(&master->mlock);
 
-	dev_set_name(&swr->dev, "%s.%lx", swr->name, swr->addr);
+	dev_set_name(&swr->dev, "%s.%llx", swr->name, swr->addr);
 	result = device_register(&swr->dev);
 	if (result) {
 		dev_err(&master->dev, "device [%s] register failed err %d\n",
@@ -138,7 +139,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	return swr;
 
 err_out:
-	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%lx %d\n",
+	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%llx %d\n",
 		swr->name, swr->addr, result);
 	swr_master_put(master);
 	list_del_init(&swr->dev_list);	
@@ -169,7 +170,7 @@ int of_register_swr_devices(struct swr_master *master)
 
 		dev_dbg(&master->dev, "of_swr:register %s\n", node->full_name);
 
-		if (of_modalias_node(node, info.name, sizeof(info.name)) < 0) {
+		if (of_alias_from_compatible(node, info.name, sizeof(info.name)) < 0) {
 			dev_err(&master->dev, "of_swr:modalias failure %s\n",
 				node->full_name);
 			continue;
@@ -968,10 +969,10 @@ int swr_register_master(struct swr_master *master)
 
 	master->bus_num = id;
 	/* Can't register until driver model init */
-	if (WARN_ON(!soundwire_type.p)) {
+	/*if (WARN_ON(!soundwire_type.p)) {
 		status = -EAGAIN;
 		goto done;
-	}
+	}*/
 
 	dev_set_name(&master->dev, "swr%u", master->bus_num);
 	master->dev.bus = &soundwire_type;

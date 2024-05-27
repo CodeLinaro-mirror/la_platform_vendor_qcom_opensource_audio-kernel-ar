@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -186,7 +186,6 @@ static struct regmap_irq_chip wsa883x_regmap_irq_chip = {
 	.num_regs = 2,
 	.status_base = WSA883X_INTR_STATUS0,
 	.mask_base = WSA883X_INTR_MASK0,
-	.type_base = WSA883X_INTR_LEVEL0,
 	.ack_base = WSA883X_INTR_CLEAR0,
 	.use_ack = 1,
 	.runtime_pm = false,
@@ -1730,7 +1729,7 @@ static int wsa883x_swr_probe(struct swr_device *pdev)
 	ret = swr_get_logical_dev_num(pdev, pdev->addr, &devnum);
 	if (ret) {
 		dev_dbg(&pdev->dev,
-			"%s get devnum %d for dev addr %lx failed\n",
+			"%s get devnum %d for dev addr %llx failed\n",
 			__func__, devnum, pdev->addr);
 		ret = -EPROBE_DEFER;
 		goto err_supply;
