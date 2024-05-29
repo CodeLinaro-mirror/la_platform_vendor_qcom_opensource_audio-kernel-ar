@@ -193,18 +193,12 @@ static int wcd9378_mbhc_free_irq(struct snd_soc_component *component,
 static void wcd9378_mbhc_clk_setup(struct snd_soc_component *component,
 				 bool enable)
 {
-	if (enable) {
+	if (enable)
 		snd_soc_component_update_bits(component, WCD9378_MBHC_NEW_CTL_1,
 				    0x80, 0x80);
-		snd_soc_component_update_bits(component, WCD9378_CDC_ANA_TX_CLK_CTL,
-				    0x01, 0x01);
-	} else {
+	else
 		snd_soc_component_update_bits(component, WCD9378_MBHC_NEW_CTL_1,
 				    0x80, 0x00);
-		snd_soc_component_update_bits(component, WCD9378_CDC_ANA_TX_CLK_CTL,
-				    0x01, 0x00);
-
-	}
 }
 
 static int wcd9378_mbhc_btn_to_num(struct snd_soc_component *component)
@@ -1042,6 +1036,8 @@ int wcd9378_mbhc_post_ssr_init(struct wcd9378_mbhc *mbhc,
 {
 	int ret = 0;
 	struct wcd_mbhc *wcd_mbhc = NULL;
+	struct wcd9378_priv *wcd9378 =
+			dev_get_drvdata(component->dev);
 
 	if (!mbhc || !component)
 		return -EINVAL;
@@ -1063,6 +1059,15 @@ int wcd9378_mbhc_post_ssr_init(struct wcd9378_mbhc *mbhc,
 		goto done;
 	}
 
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_MBHC_ELECT_INS_REM_DET);
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_MBHC_ELECT_INS_REM_LEG_DET);
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_EAR_SCD_INT);
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_AUX_SCD_INT);
+
 done:
 	return ret;
 }
@@ -1083,6 +1088,8 @@ int wcd9378_mbhc_init(struct wcd9378_mbhc **mbhc,
 	struct wcd_mbhc *wcd_mbhc = NULL;
 	int ret = 0;
 	struct wcd9378_pdata *pdata;
+	struct wcd9378_priv *wcd9378 =
+			dev_get_drvdata(component->dev);
 
 	if (!component) {
 		pr_err("%s: component is NULL\n", __func__);
@@ -1122,6 +1129,15 @@ int wcd9378_mbhc_init(struct wcd9378_mbhc **mbhc,
 			__func__);
 		goto err;
 	}
+
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_MBHC_ELECT_INS_REM_DET);
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_MBHC_ELECT_INS_REM_LEG_DET);
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_EAR_SCD_INT);
+	wcd_disable_irq(&wcd9378->irq_info,
+				WCD9378_IRQ_AUX_SCD_INT);
 
 	(*mbhc) = wcd9378_mbhc;
 	snd_soc_add_component_controls(component, impedance_detect_controls,

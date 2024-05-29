@@ -175,8 +175,6 @@ enum {
 	ADC_MODE_LP,
 };
 
-static const SNDRV_CTL_TLVD_DECLARE_DB_MINMAX(ear_pa_gain, 600, -1800);
-static const SNDRV_CTL_TLVD_DECLARE_DB_MINMAX(aux_pa_gain, 600, -600);
 static const SNDRV_CTL_TLVD_DECLARE_DB_MINMAX(analog_gain, 0, 3000);
 
 static int wcd9378_reset(struct device *dev);
@@ -228,6 +226,7 @@ static const struct regmap_irq wcd9378_regmap_irqs[WCD9378_NUM_IRQS] = {
 	REGMAP_IRQ_REG(WCD9378_IRQ_MBHC_MOISTURE_INT, 2, 0x02),
 	REGMAP_IRQ_REG(WCD9378_IRQ_HPHL_SURGE_DET_INT, 2, 0x04),
 	REGMAP_IRQ_REG(WCD9378_IRQ_HPHR_SURGE_DET_INT, 2, 0x08),
+	REGMAP_IRQ_REG(WCD9378_IRQ_SAPU_PROT_MODE_CHG, 2, 0x40),
 };
 
 static int wcd9378_handle_post_irq(void *data)
@@ -321,6 +320,9 @@ static int wcd9378_init_reg(struct snd_soc_component *component)
 			WCD9378_ANA_BIAS_PRECHRG_EN_MASK, 0x00);
 	/*End Analog Master Bias enable*/
 
+	/*ANA_TXSCBIAS_CLK_EN ENABLE*/
+	snd_soc_component_update_bits(component, WCD9378_CDC_ANA_TX_CLK_CTL,
+			WCD9378_CDC_ANA_TX_CLK_CTL_ANA_TXSCBIAS_CLK_EN_MASK, 0x01);
 	/*SEQ_BYPASS ENABLE*/
 	snd_soc_component_update_bits(component, WCD9378_TX_COM_TXFE_DIV_CTL,
 			WCD9378_TX_COM_TXFE_DIV_CTL_SEQ_BYPASS_MASK, 0x80);
@@ -333,6 +335,9 @@ static int wcd9378_init_reg(struct snd_soc_component *component)
 	/*IBIAS_LDO_DRIVER 5e-06*/
 	snd_soc_component_update_bits(component, WCD9378_MICB1_TEST_CTL_2,
 			WCD9378_MICB1_TEST_CTL_2_IBIAS_LDO_DRIVER_MASK, 0x01);
+	/*IBIAS_LDO_DRIVER 5e-06*/
+	snd_soc_component_update_bits(component, WCD9378_MICB2_TEST_CTL_2,
+			WCD9378_MICB2_TEST_CTL_2_IBIAS_LDO_DRIVER_MASK, 0x01);
 	/*IBIAS_LDO_DRIVER 5e-06*/
 	snd_soc_component_update_bits(component, WCD9378_MICB3_TEST_CTL_2,
 			WCD9378_MICB3_TEST_CTL_2_IBIAS_LDO_DRIVER_MASK, 0x01);
@@ -1057,11 +1062,11 @@ static int wcd9378_sys_usage_bit_get(
 		case ADC3:
 			if ((snd_soc_component_read(component,
 					WCD9378_TX_NEW_TX_CH34_MUX) &
-					WCD9378_TX_NEW_TX_CH34_MUX_CH3_SEL_SHIFT) == 0x01) {
+					WCD9378_TX_NEW_TX_CH34_MUX_CH3_SEL_MASK) == 0x01) {
 				*sys_usage_bit = TX2_AMIC1_EN;
 			} else if ((snd_soc_component_read(component,
 					WCD9378_TX_NEW_TX_CH34_MUX) &
-					WCD9378_TX_NEW_TX_CH34_MUX_CH3_SEL_SHIFT) == 0x03) {
+					WCD9378_TX_NEW_TX_CH34_MUX_CH3_SEL_MASK) == 0x03) {
 				*sys_usage_bit = TX2_AMIC4_EN;
 			} else {
 				dev_err(component->dev, "%s: unsupport usecase, pls check\n",
@@ -1498,11 +1503,6 @@ static int wcd9378_codec_hphl_dac_event(struct snd_soc_dapm_widget *w,
 				WCD9378_CDC_COMP_CTL_0_HPHL_COMP_EN_MASK, 0x02);
 			wcd9378_rx_connect_port(component, COMP_L, true);
 		}
-
-		if (wcd9378->update_wcd_event)
-			wcd9378->update_wcd_event(wcd9378->handle,
-						SLV_BOLERO_EVT_RX_MUTE,
-						(WCD_RX1 << 0x10));
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/*OCP FSM DISABLE*/
@@ -1519,7 +1519,7 @@ static int wcd9378_codec_hphl_dac_event(struct snd_soc_dapm_widget *w,
 		if (wcd9378->comp1_enable) {
 			snd_soc_component_update_bits(component, WCD9378_CDC_COMP_CTL_0,
 				WCD9378_CDC_COMP_CTL_0_HPHL_COMP_EN_MASK, 0x00);
-			wcd9378_rx_connect_port(component, COMP_R, false);
+			wcd9378_rx_connect_port(component, COMP_L, false);
 		}
 		break;
 	default:
@@ -1617,6 +1617,8 @@ static int wcd9378_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 			wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10));
+		wcd_enable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_HPHL_PDM_WD_INT);
 
 		act_ps = snd_soc_component_read(component, WCD9378_PDE47_ACT_PS);
 		if (act_ps)
@@ -1631,6 +1633,8 @@ static int wcd9378_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 			wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10 | 0x1));
+		wcd_disable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_HPHL_PDM_WD_INT);
 
 		if (wcd9378->update_wcd_event && wcd9378->comp1_enable)
 			wcd9378->update_wcd_event(wcd9378->handle,
@@ -1671,6 +1675,8 @@ static int wcd9378_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 			wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX2 << 0x10));
+		wcd_enable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_HPHR_PDM_WD_INT);
 
 		act_ps = snd_soc_component_read(component, WCD9378_PDE47_ACT_PS);
 		if (act_ps)
@@ -1685,6 +1691,8 @@ static int wcd9378_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 			wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX2 << 0x10 | 0x1));
+		wcd_disable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_HPHR_PDM_WD_INT);
 
 		if (wcd9378->update_wcd_event && wcd9378->comp2_enable)
 			wcd9378->update_wcd_event(wcd9378->handle,
@@ -1735,12 +1743,15 @@ static int wcd9378_codec_enable_aux_pa(struct snd_soc_dapm_widget *w,
 				wcd9378->update_wcd_event(wcd9378->handle,
 							SLV_BOLERO_EVT_RX_MUTE,
 							(WCD_RX2 << 0x10));
-
+			wcd_enable_irq(&wcd9378->irq_info,
+						WCD9378_IRQ_HPHR_PDM_WD_INT);
 		} else {
 			if (wcd9378->update_wcd_event)
 				wcd9378->update_wcd_event(wcd9378->handle,
 							SLV_BOLERO_EVT_RX_MUTE,
 							(WCD_RX3 << 0x10));
+			wcd_enable_irq(&wcd9378->irq_info,
+						WCD9378_IRQ_AUX_PDM_WD_INT);
 		}
 
 		act_ps = snd_soc_component_read(component, WCD9378_PDE23_ACT_PS);
@@ -1757,11 +1768,15 @@ static int wcd9378_codec_enable_aux_pa(struct snd_soc_dapm_widget *w,
 				wcd9378->update_wcd_event(wcd9378->handle,
 							SLV_BOLERO_EVT_RX_MUTE,
 							(WCD_RX2 << 0x10 | 0x1));
+			wcd_disable_irq(&wcd9378->irq_info,
+						WCD9378_IRQ_HPHR_PDM_WD_INT);
 		} else {
 			if (wcd9378->update_wcd_event)
 				wcd9378->update_wcd_event(wcd9378->handle,
 							SLV_BOLERO_EVT_RX_MUTE,
 							(WCD_RX3 << 0x10 | 0x1));
+			wcd_disable_irq(&wcd9378->irq_info,
+						WCD9378_IRQ_AUX_PDM_WD_INT);
 		}
 		break;
 	};
@@ -1799,11 +1814,16 @@ static int wcd9378_codec_enable_ear_pa(struct snd_soc_dapm_widget *w,
 				wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10));
+			wcd_enable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_HPHL_PDM_WD_INT);
+
 		} else {
 			if (wcd9378->update_wcd_event)
 				wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX3 << 0x10));
+			wcd_enable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_AUX_PDM_WD_INT);
 		}
 
 		act_ps = snd_soc_component_read(component, WCD9378_PDE23_ACT_PS);
@@ -1821,11 +1841,15 @@ static int wcd9378_codec_enable_ear_pa(struct snd_soc_dapm_widget *w,
 				wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX1 << 0x10 | 0x1));
+			wcd_disable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_HPHL_PDM_WD_INT);
 		} else {
 			if (wcd9378->update_wcd_event)
 				wcd9378->update_wcd_event(wcd9378->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
 						(WCD_RX3 << 0x10 | 0x1));
+			wcd_disable_irq(&wcd9378->irq_info,
+					WCD9378_IRQ_AUX_PDM_WD_INT);
 		}
 		break;
 	};
@@ -2824,6 +2848,96 @@ static int wcd9378_hph_get_gain(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int wcd9378_ear_pa_gain_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	int ear_gain = 0;
+
+	if (component == NULL)
+		return -EINVAL;
+
+	ear_gain =
+		snd_soc_component_read(component, WCD9378_ANA_EAR_COMPANDER_CTL) &
+				WCD9378_ANA_EAR_COMPANDER_CTL_EAR_GAIN_MASK;
+
+	ucontrol->value.enumerated.item[0] = ear_gain;
+	dev_dbg(component->dev, "%s: get ear_gain val: 0x%x\n",
+			__func__, ear_gain);
+	return 0;
+}
+
+static int wcd9378_ear_pa_gain_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	int ear_gain = 0;
+
+	if (component == NULL)
+		return -EINVAL;
+
+	if (ucontrol->value.integer.value[0] < 0 ||
+		ucontrol->value.integer.value[0] > 0x10) {
+		dev_err(component->dev, "%s: Unsupported gain val %ld\n",
+			 __func__, ucontrol->value.integer.value[0]);
+		return -EINVAL;
+	}
+
+	ear_gain = ucontrol->value.integer.value[0];
+	snd_soc_component_update_bits(component, WCD9378_ANA_EAR_COMPANDER_CTL,
+				WCD9378_ANA_EAR_COMPANDER_CTL_EAR_GAIN_MASK,
+				ear_gain);
+	dev_dbg(component->dev, "%s: set ear_gain val: 0x%x\n",
+			__func__, ear_gain);
+	return 0;
+}
+
+static int wcd9378_aux_pa_gain_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	int aux_gain = 0;
+
+	if (component == NULL)
+		return -EINVAL;
+
+	aux_gain = snd_soc_component_read(component, WCD9378_AUX_INT_MISC) &
+			WCD9378_AUX_INT_MISC_PA_GAIN_MASK;
+
+	ucontrol->value.enumerated.item[0] = aux_gain;
+	dev_dbg(component->dev, "%s: get aux_gain val: 0x%x\n",
+			__func__, aux_gain);
+	return 0;
+}
+
+static int wcd9378_aux_pa_gain_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	int aux_gain = 0;
+
+	if (component == NULL)
+		return -EINVAL;
+
+	if (ucontrol->value.integer.value[0] < 0 ||
+		ucontrol->value.integer.value[0] > 0x8) {
+		dev_err(component->dev, "%s: Unsupported gain val %ld\n",
+			__func__, ucontrol->value.integer.value[0]);
+		return -EINVAL;
+	}
+
+	aux_gain = ucontrol->value.integer.value[0];
+	snd_soc_component_update_bits(component, WCD9378_AUX_INT_MISC,
+				WCD9378_AUX_INT_MISC_PA_GAIN_MASK,
+				aux_gain);
+	dev_dbg(component->dev, "%s: set aux_gain val: 0x%x\n",
+			 __func__, aux_gain);
+	return 0;
+}
 
 static int wcd9378_rx2_mode_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
@@ -2886,46 +3000,6 @@ int wcd9378_codec_get_dev_num(struct snd_soc_component *component)
 	return wcd9378->rx_swr_dev->dev_num;
 }
 EXPORT_SYMBOL_GPL(wcd9378_codec_get_dev_num);
-
-static int wcd9378_ear_pa_put_gain(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
-	struct wcd9378_priv *wcd9378 =
-				snd_soc_component_get_drvdata(component);
-
-	if (wcd9378->comp1_enable) {
-		dev_err(component->dev, "Can not set EAR PA Gain, compander1 is enabled\n");
-		return -EINVAL;
-	}
-
-	snd_soc_component_update_bits(component, WCD9378_AUX_INT_MISC,
-				      WCD9378_ANA_EAR_COMPANDER_CTL_EAR_GAIN_MASK,
-				      ucontrol->value.integer.value[0]);
-
-	return 1;
-}
-
-static int wcd9378_aux_pa_put_gain(struct snd_kcontrol *kcontrol,
-				   struct snd_ctl_elem_value *ucontrol)
-{
-	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
-	struct wcd9378_priv *wcd9378 =
-				snd_soc_component_get_drvdata(component);
-
-	if (wcd9378->comp1_enable) {
-		dev_err(component->dev, "Can not set EAR PA Gain, compander1 is enabled\n");
-		return -EINVAL;
-	}
-
-	snd_soc_component_update_bits(component, WCD9378_ANA_EAR_COMPANDER_CTL,
-				      WCD9378_AUX_INT_MISC_PA_GAIN_MASK,
-				      ucontrol->value.integer.value[0]);
-
-	return 1;
-}
 
 static int wcd9378_get_compander(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
@@ -3026,17 +3100,6 @@ static int wcd9378_codec_enable_vdd_buck(struct snd_soc_dapm_widget *w,
 	}
 	return 0;
 }
-
-const char * const tx_master_ch_text[] = {
-	"ZERO", "SWRM_TX1_CH1", "SWRM_TX1_CH2", "SWRM_TX1_CH3", "SWRM_TX1_CH4",
-	"SWRM_TX2_CH1", "SWRM_TX2_CH2", "SWRM_TX2_CH3", "SWRM_TX2_CH4",
-	"SWRM_TX3_CH1", "SWRM_TX3_CH2", "SWRM_TX3_CH3", "SWRM_TX3_CH4",
-	"SWRM_PCM_IN",
-};
-
-const struct soc_enum tx_master_ch_enum =
-	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tx_master_ch_text),
-					tx_master_ch_text);
 
 static void wcd9378_tx_get_slave_ch_type_idx(const char *wname, int *ch_idx)
 {
@@ -3203,6 +3266,38 @@ static const struct soc_enum rx_hph_mode_mux_enum =
 	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(rx_hph_mode_mux_text),
 			    rx_hph_mode_mux_text);
 
+
+static const char * const ear_pa_gain_text[] = {
+	"GAIN_6DB", "GAIN_4P5DB", "GAIN_3DB", "GAIN_1P5DB", "GAIN_0DB",
+	"GAIN_M1P5DB", "GAIN_M3DB", "GAIN_M4P5DB", "GAIN_M6DB",
+	"GAIN_M7P5DB", "GAIN_M9DB", "GAIN_M10P5DB", "GAIN_M12DB",
+	"GAIN_M13P5DB", "GAIN_M15DB", "GAIN_M16P5DB", "GAIN_M18DB",
+};
+
+static const struct soc_enum ear_pa_gain_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(ear_pa_gain_text),
+			    ear_pa_gain_text);
+
+static const char * const aux_pa_gain_text[] = {
+	"GAIN_6DB", "GAIN_4P5DB", "GAIN_3DB", "GAIN_1P5DB", "GAIN_0DB",
+	"GAIN_M1P5DB", "GAIN_M3DB", "GAIN_M4P5DB", "GAIN_M6DB",
+};
+
+static const struct soc_enum aux_pa_gain_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(aux_pa_gain_text),
+			    aux_pa_gain_text);
+
+const char * const tx_master_ch_text[] = {
+	"ZERO", "SWRM_TX1_CH1", "SWRM_TX1_CH2", "SWRM_TX1_CH3", "SWRM_TX1_CH4",
+	"SWRM_TX2_CH1", "SWRM_TX2_CH2", "SWRM_TX2_CH3", "SWRM_TX2_CH4",
+	"SWRM_TX3_CH1", "SWRM_TX3_CH2", "SWRM_TX3_CH3", "SWRM_TX3_CH4",
+	"SWRM_PCM_IN",
+};
+
+const struct soc_enum tx_master_ch_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tx_master_ch_text),
+					tx_master_ch_text);
+
 static const struct snd_kcontrol_new wcd9378_snd_controls[] = {
 	SOC_SINGLE_EXT("HPHL_COMP Switch", SND_SOC_NOPM, 0, 1, 0,
 		wcd9378_get_compander, wcd9378_set_compander),
@@ -3226,15 +3321,15 @@ static const struct snd_kcontrol_new wcd9378_snd_controls[] = {
 		     wcd9378_tx_mode_get, wcd9378_tx_mode_put),
 
 	SOC_ENUM_EXT("RX2 Mode", rx2_mode_enum,
-		       NULL, wcd9378_rx2_mode_put),
+			NULL, wcd9378_rx2_mode_put),
 	SOC_ENUM_EXT("RX HPH Mode", rx_hph_mode_mux_enum,
-		     wcd9378_rx_hph_mode_get, wcd9378_rx_hph_mode_put),
+			wcd9378_rx_hph_mode_get, wcd9378_rx_hph_mode_put),
 	SOC_SINGLE_EXT("HPH Volume", SND_SOC_NOPM, 0, 0x14, 0,
-		       wcd9378_hph_get_gain, wcd9378_hph_put_gain),
-	WCD9378_EAR_PA_GAIN_TLV("EAR_PA Volume", WCD9378_ANA_EAR_COMPANDER_CTL,
-		       2, 0x10, 0, ear_pa_gain),
-	WCD9378_AUX_PA_GAIN_TLV("AUX_PA Volume", WCD9378_AUX_INT_MISC,
-		       0, 0x8, 0, aux_pa_gain),
+			wcd9378_hph_get_gain, wcd9378_hph_put_gain),
+	SOC_ENUM_EXT("EAR_PA Gain", ear_pa_gain_enum,
+			wcd9378_ear_pa_gain_get, wcd9378_ear_pa_gain_put),
+	SOC_ENUM_EXT("AUX_PA Gain", aux_pa_gain_enum,
+			wcd9378_aux_pa_gain_get, wcd9378_aux_pa_gain_put),
 
 	SOC_SINGLE_TLV("ADC1 Volume", WCD9378_ANA_TX_CH1, 0, 20, 0,
 			analog_gain),
@@ -3264,7 +3359,6 @@ static const struct snd_kcontrol_new wcd9378_snd_controls[] = {
 	SOC_ENUM_EXT("DMIC5 ChMap", tx_master_ch_enum,
 			wcd9378_tx_master_ch_get, wcd9378_tx_master_ch_put),
 };
-
 
 static const struct snd_kcontrol_new amic1_switch[] = {
 	SOC_DAPM_SINGLE("Switch", SND_SOC_NOPM, 0, 1, 0)
@@ -4225,6 +4319,13 @@ static struct snd_soc_dai_driver wcd9378_dai[] = {
 	},
 };
 
+static irqreturn_t wcd9378_wd_handle_irq(int irq, void *data)
+{
+	pr_err_ratelimited("%s: Watchdog interrupt for irq =%d triggered\n",
+			   __func__, irq);
+	return IRQ_HANDLED;
+}
+
 static int wcd9378_bind(struct device *dev)
 {
 	int ret = 0;
@@ -4294,6 +4395,18 @@ static int wcd9378_bind(struct device *dev)
 			__func__);
 	wcd9378->tx_swr_dev->slave_irq = wcd9378->virq;
 
+	/* Request for watchdog interrupt */
+	wcd_request_irq(&wcd9378->irq_info, WCD9378_IRQ_HPHR_PDM_WD_INT,
+			"HPHR PDM WD INT", wcd9378_wd_handle_irq, NULL);
+	wcd_request_irq(&wcd9378->irq_info, WCD9378_IRQ_HPHL_PDM_WD_INT,
+			"HPHL PDM WD INT", wcd9378_wd_handle_irq, NULL);
+	wcd_request_irq(&wcd9378->irq_info, WCD9378_IRQ_AUX_PDM_WD_INT,
+			"AUX PDM WD INT", wcd9378_wd_handle_irq, NULL);
+	/* Disable watchdog interrupt for HPH and AUX */
+	wcd_disable_irq(&wcd9378->irq_info, WCD9378_IRQ_HPHR_PDM_WD_INT);
+	wcd_disable_irq(&wcd9378->irq_info, WCD9378_IRQ_HPHL_PDM_WD_INT);
+	wcd_disable_irq(&wcd9378->irq_info, WCD9378_IRQ_AUX_PDM_WD_INT);
+
 	ret = snd_soc_register_component(dev, &soc_codec_dev_wcd9378,
 					wcd9378_dai, ARRAY_SIZE(wcd9378_dai));
 	if (ret) {
@@ -4315,6 +4428,9 @@ static void wcd9378_unbind(struct device *dev)
 {
 	struct wcd9378_priv *wcd9378 = dev_get_drvdata(dev);
 
+	wcd_free_irq(&wcd9378->irq_info, WCD9378_IRQ_HPHR_PDM_WD_INT, NULL);
+	wcd_free_irq(&wcd9378->irq_info, WCD9378_IRQ_HPHL_PDM_WD_INT, NULL);
+	wcd_free_irq(&wcd9378->irq_info, WCD9378_IRQ_AUX_PDM_WD_INT, NULL);
 	wcd_irq_exit(&wcd9378->irq_info, wcd9378->virq);
 	snd_soc_unregister_component(dev);
 	component_unbind_all(dev, wcd9378);
