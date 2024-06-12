@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -129,7 +129,6 @@ static struct regmap_irq_chip besbev_regmap_irq_chip = {
 	.mask_base = BESBEV_INTR_MASK0,
 	.ack_base = BESBEV_INTR_CLEAR0,
 	.use_ack = 1,
-	.type_base = BESBEV_INTR_LEVEL0,
 	.runtime_pm = false,
 	.handle_post_irq = besbev_handle_post_irq,
 	.irq_drv_data = NULL,
@@ -673,7 +672,7 @@ static int besbev_get_logical_addr(struct swr_device *swr_dev)
 		ret = swr_get_logical_dev_num(swr_dev, swr_dev->addr, &devnum);
 		if (ret) {
 			dev_err(&swr_dev->dev,
-				"%s get devnum %d for dev addr %lx failed\n",
+				"%s get devnum %d for dev addr %llx failed\n",
 				__func__, devnum, swr_dev->addr);
 			/* retry after 1ms */
 			usleep_range(1000, 1010);
@@ -771,6 +770,7 @@ static int besbev_rx_event_notify(struct notifier_block *block,
 	case BOLERO_SLV_EVT_PA_ON_POST_FSCLK_ADIE_LB:
 		if (test_bit(SPKR_STATUS, &besbev->status_mask))
 			set_bit(SPKR_ADIE_LB, &besbev->status_mask);
+		break;
 	default:
 		dev_err(component->dev, "%s: invalid event %d\n", __func__,
 			event);
