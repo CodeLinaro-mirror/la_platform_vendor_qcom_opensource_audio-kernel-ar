@@ -34,7 +34,7 @@ LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile monaco), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -59,7 +59,7 @@ KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
 
-ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4 monaco),true)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 endif
 
@@ -406,6 +406,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
+ifneq ($(call is-board-platform-in-list, monaco),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := hdmi_dlkm.ko
@@ -416,6 +417,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 LOCAL_REQUIRED_MODULES    := msm-ext-disp-module-symvers
 LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 ########################### QMP1000 CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -427,7 +429,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 
-ifeq ($(call is-board-platform-in-list, bengal holi blair),true)
+ifeq ($(call is-board-platform-in-list, bengal holi blair monaco),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -514,6 +516,35 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 ##########################################################
+########################## BESBEV #################################
+ifeq ($(call is-board-platform-in-list, monaco),true)
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := besbev_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/besbev/besbev_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := besbev-slave_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/besbev/besbev-slave_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := pmw5100-spmi_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/besbev/pmw5100-spmi_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 endif # DLKM check
 endif # supported target check
 endif
