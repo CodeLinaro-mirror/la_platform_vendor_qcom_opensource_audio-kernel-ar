@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -31,6 +31,8 @@
 			SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000)
 #define LPASS_CDC_WSA_MACRO_RX_MIX_RATES (SNDRV_PCM_RATE_48000 |\
 			SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000)
+#define LPASS_CDC_WSA_MACRO_VI_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
+			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000)
 #define LPASS_CDC_WSA_MACRO_RX_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
 		SNDRV_PCM_FMTBIT_S24_LE |\
 		SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE)
@@ -473,7 +475,7 @@ static struct snd_soc_dai_driver lpass_cdc_wsa_macro_dai[] = {
 		.id = LPASS_CDC_WSA_MACRO_AIF_VI,
 		.capture = {
 			.stream_name = "WSA_AIF_VI Capture",
-			.rates = SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_48000,
+			.rates = LPASS_CDC_WSA_MACRO_VI_RATES,
 			.formats = LPASS_CDC_WSA_MACRO_RX_FORMATS,
 			.rate_max = 48000,
 			.rate_min = 8000,
@@ -743,6 +745,7 @@ static int lpass_cdc_wsa_macro_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_STREAM_CAPTURE:
 		if (dai->id == LPASS_CDC_WSA_MACRO_AIF_VI)
 			wsa_priv->pcm_rate_vi = params_rate(params);
+		break;
 	default:
 		break;
 	}
@@ -1895,7 +1898,7 @@ static int lpass_cdc_wsa_macro_get_ec_hq(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int ec_tx = ((struct soc_multi_mixer_control *)
+	int ec_tx = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct device *wsa_dev = NULL;
 	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
@@ -1912,7 +1915,7 @@ static int lpass_cdc_wsa_macro_set_ec_hq(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int ec_tx = ((struct soc_multi_mixer_control *)
+	int ec_tx = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 	struct device *wsa_dev = NULL;
@@ -1936,7 +1939,7 @@ static int lpass_cdc_wsa_macro_get_rx_mute_status(struct snd_kcontrol *kcontrol,
 				snd_soc_kcontrol_component(kcontrol);
 	struct device *wsa_dev = NULL;
 	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
-	int wsa_rx_shift = ((struct soc_multi_mixer_control *)
+	int wsa_rx_shift = ((struct soc_mixer_control *)
 		       kcontrol->private_value)->shift;
 
 	if (!lpass_cdc_wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
@@ -1955,7 +1958,7 @@ static int lpass_cdc_wsa_macro_set_rx_mute_status(struct snd_kcontrol *kcontrol,
 	struct device *wsa_dev = NULL;
 	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
 	int value = ucontrol->value.integer.value[0];
-	int wsa_rx_shift = ((struct soc_multi_mixer_control *)
+	int wsa_rx_shift = ((struct soc_mixer_control *)
 			kcontrol->private_value)->shift;
 	int ret = 0;
 
@@ -2059,7 +2062,7 @@ static int lpass_cdc_wsa_macro_get_compander(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct device *wsa_dev = NULL;
 	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
@@ -2076,7 +2079,7 @@ static int lpass_cdc_wsa_macro_set_compander(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 	struct device *wsa_dev = NULL;
@@ -2309,7 +2312,7 @@ static int lpass_cdc_wsa_macro_soft_clip_enable_get(struct snd_kcontrol *kcontro
 			snd_soc_kcontrol_component(kcontrol);
 	struct device *wsa_dev = NULL;
 	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
-	int path = ((struct soc_multi_mixer_control *)
+	int path = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 
 	if (!lpass_cdc_wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
@@ -2330,7 +2333,7 @@ static int lpass_cdc_wsa_macro_soft_clip_enable_put(struct snd_kcontrol *kcontro
 			snd_soc_kcontrol_component(kcontrol);
 	struct device *wsa_dev = NULL;
 	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
-	int path = ((struct soc_multi_mixer_control *)
+	int path = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 
 	if (!lpass_cdc_wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
@@ -2418,8 +2421,8 @@ static int lpass_cdc_wsa_macro_vi_feed_mixer_get(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_kcontrol_widget(kcontrol);
 	struct snd_soc_component *component =
 				snd_soc_dapm_to_component(widget->dapm);
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 spk_tx_id = mixer->shift;
 	struct device *wsa_dev = NULL;
@@ -2443,8 +2446,8 @@ static int lpass_cdc_wsa_macro_vi_feed_mixer_put(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_kcontrol_widget(kcontrol);
 	struct snd_soc_component *component =
 				snd_soc_dapm_to_component(widget->dapm);
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 spk_tx_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
 	struct device *wsa_dev = NULL;
@@ -2498,6 +2501,94 @@ static const struct snd_kcontrol_new aif_vi_mixer[] = {
 	SOC_SINGLE_EXT("WSA_SPKR_VI_2", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_TX1, 1, 0,
 			lpass_cdc_wsa_macro_vi_feed_mixer_get,
 			lpass_cdc_wsa_macro_vi_feed_mixer_put),
+};
+
+static int lpass_cdc_wsa_macro_cps_feed_mixer_get(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dapm_widget *widget =
+		snd_soc_dapm_kcontrol_widget(kcontrol);
+	struct snd_soc_component *component =
+				snd_soc_dapm_to_component(widget->dapm);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
+	u32 dai_id = widget->shift;
+	u32 spk_tx_id = mixer->shift;
+	struct device *wsa_dev = NULL;
+	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
+
+	if (!lpass_cdc_wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
+		return -EINVAL;
+
+	if (test_bit(spk_tx_id, &wsa_priv->active_ch_mask[dai_id]))
+		ucontrol->value.integer.value[0] = 1;
+	else
+		ucontrol->value.integer.value[0] = 0;
+
+	return 0;
+}
+
+static int lpass_cdc_wsa_macro_cps_feed_mixer_put(struct snd_kcontrol *kcontrol,
+				   struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_dapm_widget *widget =
+		snd_soc_dapm_kcontrol_widget(kcontrol);
+	struct snd_soc_component *component =
+				snd_soc_dapm_to_component(widget->dapm);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
+	u32 dai_id = widget->shift;
+	u32 spk_tx_id = mixer->shift;
+	u32 enable = ucontrol->value.integer.value[0];
+	struct device *wsa_dev = NULL;
+	struct lpass_cdc_wsa_macro_priv *wsa_priv = NULL;
+
+	if (!lpass_cdc_wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
+		return -EINVAL;
+
+	if (enable) {
+		if (spk_tx_id == LPASS_CDC_WSA_MACRO_TX0 &&
+			!test_bit(LPASS_CDC_WSA_MACRO_TX0,
+				&wsa_priv->active_ch_mask[dai_id])) {
+			set_bit(LPASS_CDC_WSA_MACRO_TX0,
+				&wsa_priv->active_ch_mask[dai_id]);
+			wsa_priv->active_ch_cnt[dai_id]++;
+		}
+		if (spk_tx_id == LPASS_CDC_WSA_MACRO_TX1 &&
+			!test_bit(LPASS_CDC_WSA_MACRO_TX1,
+				&wsa_priv->active_ch_mask[dai_id])) {
+			set_bit(LPASS_CDC_WSA_MACRO_TX1,
+				&wsa_priv->active_ch_mask[dai_id]);
+			wsa_priv->active_ch_cnt[dai_id]++;
+		}
+	} else {
+		if (spk_tx_id == LPASS_CDC_WSA_MACRO_TX0 &&
+			test_bit(LPASS_CDC_WSA_MACRO_TX0,
+				&wsa_priv->active_ch_mask[dai_id])) {
+			clear_bit(LPASS_CDC_WSA_MACRO_TX0,
+				&wsa_priv->active_ch_mask[dai_id]);
+			wsa_priv->active_ch_cnt[dai_id]--;
+		}
+		if (spk_tx_id == LPASS_CDC_WSA_MACRO_TX1 &&
+			test_bit(LPASS_CDC_WSA_MACRO_TX1,
+				&wsa_priv->active_ch_mask[dai_id])) {
+			clear_bit(LPASS_CDC_WSA_MACRO_TX1,
+				&wsa_priv->active_ch_mask[dai_id]);
+			wsa_priv->active_ch_cnt[dai_id]--;
+		}
+	}
+	snd_soc_dapm_mixer_update_power(widget->dapm, kcontrol, enable, NULL);
+
+	return 0;
+}
+
+static const struct snd_kcontrol_new aif_cps_mixer[] = {
+	SOC_SINGLE_EXT("WSA_SPKR_CPS_1", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_TX0, 1, 0,
+			lpass_cdc_wsa_macro_cps_feed_mixer_get,
+			lpass_cdc_wsa_macro_cps_feed_mixer_put),
+	SOC_SINGLE_EXT("WSA_SPKR_CPS_2", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_TX1, 1, 0,
+			lpass_cdc_wsa_macro_cps_feed_mixer_get,
+			lpass_cdc_wsa_macro_cps_feed_mixer_put),
 };
 
 static const struct snd_soc_dapm_widget lpass_cdc_wsa_macro_dapm_widgets[] = {
@@ -2969,7 +3060,7 @@ static int lpass_cdc_wsa_macro_set_cur_state(
 		wsa_priv->thermal_cur_state = state;
 	} else {
 		dev_err(wsa_priv->dev,
-			"%s: incorrect requested state:%d\n",
+			"%s: incorrect requested state:%lu\n",
 			__func__, state);
 		return -EINVAL;
 	}

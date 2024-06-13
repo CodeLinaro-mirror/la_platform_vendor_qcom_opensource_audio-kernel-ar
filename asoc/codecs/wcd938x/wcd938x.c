@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -142,10 +142,9 @@ static struct regmap_irq_chip wcd938x_regmap_irq_chip = {
 	.num_regs = 3,
 	.status_base = WCD938X_DIGITAL_INTR_STATUS_0,
 	.mask_base = WCD938X_DIGITAL_INTR_MASK_0,
-	.type_base = WCD938X_DIGITAL_INTR_LEVEL_0,
 	.ack_base = WCD938X_DIGITAL_INTR_CLEAR_0,
 	.use_ack = 1,
-	.mask_writeonly = 1,
+	//.mask_writeonly = 1,
 	.runtime_pm = false,
 	.handle_post_irq = wcd938x_handle_post_irq,
 	.irq_drv_data = NULL,
@@ -1450,6 +1449,7 @@ static int wcd938x_codec_enable_dmic(struct snd_soc_dapm_widget *w,
 		break;
 	case 2:
 		dmic2_left_en = WCD938X_DIGITAL_CDC_DMIC2_CTL;
+		fallthrough;
 	case 3:
 		dmic_clk_cnt = &(wcd938x->dmic_2_3_clk_cnt);
 		dmic_clk_reg = WCD938X_DIGITAL_CDC_DMIC_RATE_1_2;
@@ -2790,9 +2790,9 @@ static int wcd938x_get_compander(struct snd_kcontrol *kcontrol,
 				snd_soc_kcontrol_component(kcontrol);
 	struct wcd938x_priv *wcd938x = snd_soc_component_get_drvdata(component);
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 
 	ucontrol->value.integer.value[0] = hphr ? wcd938x->comp2_enable :
@@ -2808,9 +2808,9 @@ static int wcd938x_set_compander(struct snd_kcontrol *kcontrol,
 	struct wcd938x_priv *wcd938x = snd_soc_component_get_drvdata(component);
 	int value = ucontrol->value.integer.value[0];
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 	if (hphr)
 		wcd938x->comp2_enable = value;
@@ -3001,7 +3001,7 @@ static int wcd938x_tx_master_ch_put(struct snd_kcontrol *kcontrol,
 		return -EINVAL;
 
 	dev_dbg(component->dev, "%s: slave_ch_idx: %d", __func__, slave_ch_idx);
-	dev_dbg(component->dev, "%s: ucontrol->value.enumerated.item[0] = %ld\n",
+	dev_dbg(component->dev, "%s: ucontrol->value.enumerated.item[0] = %i\n",
 			__func__, ucontrol->value.enumerated.item[0]);
 
 	idx = ucontrol->value.enumerated.item[0];

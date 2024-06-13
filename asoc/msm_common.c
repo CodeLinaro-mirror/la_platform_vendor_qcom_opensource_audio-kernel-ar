@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/gpio.h>
@@ -73,6 +73,17 @@ struct chmap_pdata {
 	int id;
 	uint32_t num_codec_dai;
 	struct snd_soc_dai *dai[MAX_CODEC_DAI];
+};
+
+static const struct snd_pcm_hardware dummy_dma_hardware = {
+	/* Random values to keep userspace happy when checking constraints */
+	.info               = SNDRV_PCM_INFO_INTERLEAVED |
+					SNDRV_PCM_INFO_BLOCK_TRANSFER,
+	.buffer_bytes_max   = 128*1024,
+	.period_bytes_min   = PAGE_SIZE,
+	.period_bytes_max   = PAGE_SIZE*2,
+	.periods_min        = 2,
+	.periods_max        = 128,
 };
 
 #define MAX_USR_INPUT 10
@@ -506,6 +517,9 @@ int msm_common_snd_startup(struct snd_pcm_substream *substream)
 		return -EINVAL;
 	}
 
+	if (!rtd->dai_link->no_pcm)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
+
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
 		if (pdata->mi2s_gpio_p[index]) {
@@ -601,7 +615,7 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 	}
 }
 
-static void msm_audio_add_qos_request()
+static void msm_audio_add_qos_request(void)
 {
 	int num_req = 0;
 	int cpu = 0;
@@ -642,7 +656,7 @@ static void msm_audio_add_qos_request()
 	}
 }
 
-static void msm_audio_remove_qos_request()
+static void msm_audio_remove_qos_request(void)
 {
 	int cpu = 0;
 	int ret = 0;
@@ -839,7 +853,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 			ch_cnt = tx_ch_cnt;
 		}
 		if (ch_cnt > 2) {
-			pr_err("%s: Incorrect channel count: %d\n", ch_cnt);
+			pr_err("%s: Incorrect channel count: %d\n", __func__, ch_cnt);
 			return -EINVAL;
 		}
 		len = sizeof(uint32_t) * (ch_cnt + 1);
@@ -888,9 +902,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		/* reset return value from the loop above */
 		ret = 0;
 		if (rx_ch_cnt == 0 && tx_ch_cnt == 0) {
-			pr_debug("%s: got incorrect channel map for backend_id:%d, ",
-				"RX Channel Count:%d,"
-				"TX Channel Count:%d\n",
+			pr_debug("%s: got incorrect channel map for backend_id:%d, RX Channel Count:%d, TX Channel Count:%d\n",
 				__func__, backend_id, rx_ch_cnt, tx_ch_cnt);
 			return ret;
 		}
@@ -1095,8 +1107,8 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 			pdata->id = SLIM;
 		} else {
 			pdata->id = CODEC_DMA;
-			if (rtd->num_codecs <= MAX_CODEC_DAI) {
-				pdata->num_codec_dai = rtd->num_codecs;
+			if (rtd->dai_link->num_codecs <= MAX_CODEC_DAI) {
+				pdata->num_codec_dai = rtd->dai_link->num_codecs;
 				for_each_rtd_codec_dais(rtd, index, codec_dai) {
 					pdata->dai[index] = codec_dai;
 				}
