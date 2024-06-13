@@ -160,15 +160,6 @@ audio_modules.register(
         "CONFIG_SND_SOC_PINEAPPLE": [
             "pineapple.c"
         ],
-        "CONFIG_SND_SOC_PITTI": [
-            "pineapple.c"
-        ],
-	"CONFIG_SND_SOC_VOLCANO": [
-	    "pineapple.c"
-	],
-        "CONFIG_SND_SOC_NIOBE": [
-            "pineapple.c"
-        ],
         "CONFIG_SND_SOC_HOLI": [
             "holi.c"
         ],
