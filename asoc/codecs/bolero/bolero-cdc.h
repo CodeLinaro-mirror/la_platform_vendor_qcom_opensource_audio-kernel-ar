@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef BOLERO_CDC_H
@@ -60,6 +60,7 @@ enum {
 	BOLERO_MACRO_EVT_RX_PA_GAIN_UPDATE,
 	BOLERO_MACRO_EVT_HPHL_HD2_ENABLE, /* Enable HD2 cfg for HPHL */
 	BOLERO_MACRO_EVT_HPHR_HD2_ENABLE, /* Enable HD2 cfg for HPHR */
+	BOLERO_MACRO_EVT_TX_DEC_MUTE,
 };
 
 enum {

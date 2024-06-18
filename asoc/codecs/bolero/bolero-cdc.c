@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of_platform.h>
@@ -257,6 +257,12 @@ static int bolero_cdc_update_wcd_event(void *handle, u16 event, u32 data)
 			priv->macro_params[RX_MACRO].event_handler(
 				priv->component,
 				BOLERO_MACRO_EVT_HPHR_HD2_ENABLE, data);
+		break;
+	case SLV_BOLERO_EVT_TX_DEC_MUTE:
+		if (priv->macro_params[TX_MACRO].event_handler)
+			priv->macro_params[TX_MACRO].event_handler(
+				priv->component,
+				BOLERO_MACRO_EVT_TX_DEC_MUTE, data);
 		break;
 	default:
 		dev_err(priv->dev, "%s: Invalid event %d trigger from wcd\n",
@@ -1530,8 +1536,22 @@ audio_vote:
 	trace_printk("%s: audio vote count %d\n",
 		__func__, priv->core_audio_vote_count);
 
+	if (priv->core_clk_vote_count == 0) {
+		ret = bolero_clk_rsc_request_clock(dev, TX_CORE_CLK,
+							TX_CORE_CLK, true);
+		if (ret < 0) {
+			dev_err_ratelimited(dev, "%s:lpass Tx core clk enable failed\n",
+				__func__);
+			goto done;
+		}
+	}
+	priv->core_clk_vote_count++;
+
 done:
 	mutex_unlock(&priv->vote_lock);
+	dev_dbg(dev, "%s, leave, hw_vote %d, audio_vote %d, core_clk_vote %d\n",
+		 __func__, priv->core_hw_vote_count,
+		 priv->core_audio_vote_count, priv->core_clk_vote_count);
 	pm_runtime_set_autosuspend_delay(priv->dev, BOLERO_AUTO_SUSPEND_DELAY);
 	return 0;
 }
@@ -1568,7 +1588,18 @@ int bolero_runtime_suspend(struct device *dev)
 	trace_printk("%s: audio vote count %d\n",
 		__func__, priv->core_audio_vote_count);
 
+	if (--priv->core_clk_vote_count == 0) {
+		bolero_clk_rsc_request_clock(dev, TX_CORE_CLK,
+						  TX_CORE_CLK, false);
+	}
+	if (priv->core_clk_vote_count < 0)
+		priv->core_clk_vote_count = 0;
+
 	mutex_unlock(&priv->vote_lock);
+
+	dev_dbg(dev, "%s, leave, hw_vote %d, audio_vote %d, core_clk_vote %d\n",
+		__func__, priv->core_hw_vote_count,
+		priv->core_audio_vote_count, priv->core_clk_vote_count);
 	return 0;
 }
 EXPORT_SYMBOL(bolero_runtime_suspend);

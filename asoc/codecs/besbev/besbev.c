@@ -123,7 +123,6 @@ static const struct bb_reg_mask_val bb_init[] = {
 	{BESBEV_IVSENSE_ADC_2,                  0x40,   0x00},
 	{BESBEV_IVSENSE_ADC_7,                  0x04,   0x04},
 	{BESBEV_IVSENSE_ADC_7,                  0x02,   0x02},
-	{BESBEV_SPK_TOP_SPKR_DRV_LF_MISC_CTL,   0x30,   0x20},
 	{BESBEV_SPK_TOP_DAC_CTRL_REG,           0x01,   0x01},
 	{BESBEV_DRE_CTL_1,                      0x01,   0x01},
 	{BESBEV_VAGC_TIME,                      0x0C,   0x0C},
@@ -1233,10 +1232,17 @@ static int besbev_spkr_event(struct snd_soc_dapm_widget *w,
 			}
 			set_bit(BESBEV_SPKR_BOOST_ENABLE, &besbev->status_mask);
 		}
+		if (besbev->update_wcd_event)
+			besbev->update_wcd_event(besbev->handle,
+						SLV_BOLERO_EVT_TX_DEC_MUTE,
+						0x10);
+		msleep(1);
+
 		swr_slvdev_datapath_control(besbev->swr_dev,
 					    besbev->swr_dev->dev_num,
 					    true);
 		besbev_global_mbias_enable(component);
+		msleep(1);
 		/* Set Gain from SWR */
 		if (besbev->comp_support)
 			snd_soc_component_update_bits(component,
@@ -1255,6 +1261,12 @@ static int besbev_spkr_event(struct snd_soc_dapm_widget *w,
 
 		snd_soc_component_update_bits(component,
 				BESBEV_PA_FSM_CTL, 0x01, 0x01);
+		msleep(1);
+
+		if (besbev->update_wcd_event)
+			besbev->update_wcd_event(besbev->handle,
+						SLV_BOLERO_EVT_TX_DEC_MUTE,
+						0x00);
 		if (besbev->update_wcd_event)
 			besbev->update_wcd_event(besbev->handle,
 						SLV_BOLERO_EVT_RX_MUTE,
