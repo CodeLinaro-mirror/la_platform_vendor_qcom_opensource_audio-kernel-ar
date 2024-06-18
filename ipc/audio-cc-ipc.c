@@ -544,7 +544,7 @@ static int cc_ipc_create_char_device(struct cc_ipc_priv *ipriv)
 		goto done;
 	}
 
-	cdev->cls = class_create(THIS_MODULE, cdev_name);
+	cdev->cls = class_create(cdev_name);
 	if (IS_ERR(cdev->cls)) {
 		ret = PTR_ERR(cdev->cls);
 		dev_err(dev, "%s: Failed to create class, dev %s, ch %s, err %d\n",
@@ -590,7 +590,7 @@ static int cc_ipc_notifier_service_cb(struct notifier_block *this,
 {
 	struct audio_notifier_cb_data *cb_data = ptr;
 
-	pr_debug("%s: opcode %d\n", __func__, opcode);
+	pr_debug("%s: opcode %lu\n", __func__, opcode);
 
 	switch (opcode) {
 	case AUDIO_NOTIFIER_SERVICE_DOWN:
@@ -655,7 +655,7 @@ static int cc_ipc_plat_init(struct cc_ipc_plat_private *iplat_priv)
 	of_for_each_phandle(&of_itr, err, dev->of_node, "qcom,glink-cc-ipc",
 			    NULL, 0) {
 		if (itr >= CC_IPC_MAX_DEV) {
-			dev_err(dev, "%s: cc_ipc out of range\n", __func__,
+			dev_err(dev, "%s: cc_ipc out of range %d\n", __func__,
 				itr);
 			ret = -ERANGE;
 			goto err_range;

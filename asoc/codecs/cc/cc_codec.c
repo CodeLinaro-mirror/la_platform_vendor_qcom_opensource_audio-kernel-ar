@@ -90,7 +90,7 @@ struct cc_action {
 	char (*enum_str)[CC_MAX_STRLEN];
 	char **texts;
 	struct soc_enum action_enum;
-	struct soc_multi_mixer_control mixer;
+	struct soc_mixer_control mixer;
 	uint32_t num_params;
 	uint32_t def;
 	uint32_t param_min;
@@ -373,7 +373,7 @@ static ssize_t cc_reg_region_info_show(struct device *dev,
 {
 	struct register_region *reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -389,7 +389,7 @@ static ssize_t cc_reg_range_show(struct device *dev,
 {
 	struct register_region *reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -405,7 +405,7 @@ static ssize_t cc_reg_addr_show(struct device *dev,
 {
 	struct register_region *reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -421,7 +421,7 @@ static ssize_t cc_reg_addr_store(struct device *dev,
 	int ret = 0;
 	struct register_region *reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -452,7 +452,7 @@ static ssize_t cc_reg_count_show(struct device *dev,
 {
 	struct register_region *reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -468,7 +468,7 @@ static ssize_t cc_reg_count_store(struct device *dev,
 	int ret = 0;
 	struct register_region *reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -544,7 +544,7 @@ static ssize_t cc_reg_value_show(struct device *dev,
 
 	reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -640,7 +640,7 @@ static ssize_t cc_reg_value_store(struct device *dev,
 
 	reg_region = dev_get_drvdata(dev);
 	if (IS_ERR_OR_NULL(reg_region)) {
-		dev_err(dev, "%s: error reg_region=%d\n", __func__,
+		dev_err(dev, "%s: error reg_region=%ld\n", __func__,
 			PTR_ERR(reg_region));
 		return -EINVAL;
 	}
@@ -658,7 +658,7 @@ static ssize_t cc_reg_value_store(struct device *dev,
 	     sizeof(cc_reg_request_t));
 	write_req = (cc_reg_request_t *) kzalloc(req_size, GFP_KERNEL);
 	if (IS_ERR_OR_NULL(write_req)) {
-		dev_err(dev, "%s: error write_req mem=%d\n", __func__,
+		dev_err(dev, "%s: error write_req mem=%ld\n", __func__,
 			PTR_ERR(write_req));
 		return -ENOMEM;
 	}
@@ -749,7 +749,7 @@ static int cc_enable_reg_debugging(struct cc_codec_priv *cc_priv,
 	}
 	num_dev = cc_priv->num_reg_region;
 
-	cc_priv->class = class_create(THIS_MODULE, CC_CODEC_STR);
+	cc_priv->class = class_create(CC_CODEC_STR);
 	if (IS_ERR_OR_NULL(cc_priv->class)) {
 		ret = PTR_ERR(cc_priv->class);
 		dev_err(dev, "%s: class_create failed: ret %d\n", __func__,
@@ -1012,8 +1012,8 @@ static int cc_elem_ctl_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *comp = snd_soc_dapm_to_component(w->dapm);
 	struct cc_codec_priv *cc_priv = dev_get_drvdata(comp->dev);
 	struct cc_path_list *path_list = NULL;
-	struct soc_multi_mixer_control *mixer =
-		(struct soc_multi_mixer_control *)kcontrol->private_value;
+	struct soc_mixer_control *mixer =
+		(struct soc_mixer_control *)kcontrol->private_value;
 	struct cc_element *elem = &cc_priv->elems[w->shift];
 	uint32_t sink_id = elem->elem_id->id;
 	uint32_t src_id = 0;
@@ -1079,8 +1079,8 @@ static int cc_elem_ctl_get(struct snd_kcontrol *kcontrol,
 	struct snd_soc_dapm_widget *w = snd_soc_dapm_kcontrol_widget(kcontrol);
 	struct snd_soc_component *comp = snd_soc_dapm_to_component(w->dapm);
 	struct cc_codec_priv *cc_priv = dev_get_drvdata(comp->dev);
-	struct soc_multi_mixer_control *mixer =
-		(struct soc_multi_mixer_control *)kcontrol->private_value;
+	struct soc_mixer_control *mixer =
+		(struct soc_mixer_control *)kcontrol->private_value;
 	struct cc_element *elem = &cc_priv->elems[w->shift];
 	struct cc_path_list *path_list = NULL;
 	struct list_head *node = NULL, *next = NULL;
@@ -1573,7 +1573,8 @@ static int cc_parse_element(struct cc_codec_priv *cc_priv,
 
 		ret = elem_func(elem, i);
 		if (ret) {
-			pr_err("%s: could not add element: %d\n");
+			pr_err("%s: could not add element: %d\n",
+					__func__, elem->elem_id->id);
 			return ret;
 		}
 
@@ -1729,8 +1730,8 @@ static int cc_action_ctl_array_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *comp = snd_soc_kcontrol_component(kcontrol);
 	struct cc_codec_priv *cc_priv = dev_get_drvdata(comp->dev);
-	struct soc_multi_mixer_control *mixer =
-		(struct soc_multi_mixer_control *)kcontrol->private_value;
+	struct soc_mixer_control *mixer =
+		(struct soc_mixer_control *)kcontrol->private_value;
 	struct cc_action *act = &cc_priv->actions[mixer->shift];
 	struct cc_action_value_list *act_val = NULL;
 	int found = 0;
@@ -1805,8 +1806,8 @@ static int cc_action_ctl_array_put(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *comp = snd_soc_kcontrol_component(kcontrol);
 	struct cc_codec_priv *cc_priv = dev_get_drvdata(comp->dev);
-	struct soc_multi_mixer_control *mixer =
-		(struct soc_multi_mixer_control *)kcontrol->private_value;
+	struct soc_mixer_control *mixer =
+		(struct soc_mixer_control *)kcontrol->private_value;
 	struct cc_action *act = &cc_priv->actions[mixer->shift];
 	struct cc_action_value_list *act_val = NULL;
 	int found = 0;
@@ -1937,13 +1938,12 @@ static int cc_create_array_action(struct cc_codec_priv *cc_priv,
 	action->mixer.shift = index;
 	action->mixer.rshift = index;
 	action->mixer.max = action->param_max;
-	action->mixer.count = action->num_params;
 	action->mixer.platform_max = action->param_max;
 	action->mixer.invert = 0;
 
 	action->kcontrol.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 	action->kcontrol.name = action->act_id->name;
-	action->kcontrol.info = snd_soc_info_multi_ext;
+	action->kcontrol.info = snd_soc_info_volsw;
 	action->kcontrol.get = cc_action_ctl_array_get;
 	action->kcontrol.put = cc_action_ctl_array_put;
 	action->kcontrol.private_value = (unsigned long)&action->mixer;
