@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -1193,6 +1193,12 @@ static void monaco_update_snd_card_status(struct msm_asoc_mach_data *pdata,
 	switch (opcode) {
 	case AUDIO_NOTIFIER_SERVICE_DOWN:
 		pdata->cs.state_counter--;
+		/**
+		 * If state_counter decrements beyond invalid(-1) assign it to minimum value
+		 * to avoid incorrect counter values that may result in incorrect soundcard status
+		 */
+		if (pdata->cs.state_counter < SND_CARD_STATUS_INVALID)
+			pdata->cs.state_counter = SND_CARD_STATUS_INVALID;
 		/**
 		 * On 1st service down(ADSP SSR) event, MSM which has companion
 		 * chip, API updates soundcard status as STANDBY so that userspace
