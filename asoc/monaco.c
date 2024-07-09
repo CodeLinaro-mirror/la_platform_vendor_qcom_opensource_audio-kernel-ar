@@ -121,6 +121,17 @@ static int dmic_0_1_gpio_cnt;
 static int dmic_2_3_gpio_cnt;
 static atomic_t bt_slim_clk_src_value = ATOMIC_INIT(SLIMBUS_CLOCK_SRC_XO);
 
+static const struct snd_pcm_hardware dummy_dma_hardware = {
+	/* Random values to keep userspace happy when checking constraints */
+	.info               = SNDRV_PCM_INFO_INTERLEAVED |
+					SNDRV_PCM_INFO_BLOCK_TRANSFER,
+	.buffer_bytes_max   = 128*1024,
+	.period_bytes_min   = PAGE_SIZE,
+	.period_bytes_max   = PAGE_SIZE*2,
+	.periods_min        = 2,
+	.periods_max        = 128,
+};
+
 static const char *get_domain_str(int domain)
 {
 	const char *domain_name = NULL;
@@ -237,6 +248,9 @@ static int msm_monaco_snd_startup(struct snd_pcm_substream *substream)
 		dev_err(rtd->card->dev, "%s: pdata is NULL\n", __func__);
 		return -EINVAL;
 	}
+
+	if (!rtd->dai_link->no_pcm)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
 
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
