@@ -118,7 +118,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	}
 	swr->master = master;
 	swr->addr = info->addr;
-	strlcpy(swr->name, info->name, sizeof(swr->name));
+	strscpy(swr->name, info->name, sizeof(swr->name));
 	swr->dev.type = &swr_dev_type;
 	swr->dev.parent = &master->dev;
 	swr->dev.bus = &soundwire_type;

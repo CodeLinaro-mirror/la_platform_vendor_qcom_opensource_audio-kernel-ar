@@ -17,6 +17,7 @@
 #include <linux/dma-buf.h>
 #include <linux/dma-buf-map.h>
 #include <linux/platform_device.h>
+#include <linux/of_platform.h>
 #include <linux/of_device.h>
 #include <linux/export.h>
 #include <linux/ioctl.h>
@@ -30,7 +31,9 @@
 #include <dsp/msm_audio_ion.h>
 #include <linux/msm_audio.h>
 #include <soc/qcom/secure_buffer.h>
-#include <bindings/qcom,gpr.h>
+#include <linux/of.h>
+
+MODULE_IMPORT_NS(DMA_BUF);
 
 #define MSM_AUDIO_ION_PROBED (1 << 0)
 
