@@ -31,6 +31,8 @@ def define_monaco():
             "besbev_dlkm",
             "pmw5100-spmi_dlkm",
             "besbev-slave_dlkm",
+            "audio_cc_ipc_dlkm",
+            "cc_dlkm",
         ],
         config_options = [
             "CONFIG_SND_SOC_MONACO",

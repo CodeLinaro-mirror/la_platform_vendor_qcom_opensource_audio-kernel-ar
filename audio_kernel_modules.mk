@@ -71,6 +71,11 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/pmw5100-spmi_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/besbev_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/besbev-slave_dlkm.ko
+ifeq ($(TARGET_SUPPORTS_WEAR_AON), true)
+AUDIO_KERNEL_MODULES += \
+	$(KERNEL_MODULES_OUT)/cc_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/audio_cc_ipc_dlkm.ko
+endif	#wear_aon
 endif	#monaco
 ifeq ($(call is-board-platform-in-list, holi blair), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
