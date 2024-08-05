@@ -4,7 +4,7 @@ load(":module_mgr.bzl", "define_target_modules")
 def define_monaco():
     define_target_modules(
         target = "monaco",
-        variants = ["consolidate", "gki"],
+        variants = ["consolidate", "perf"],
         registry = audio_modules,
         modules = [
             "q6_notifier_dlkm",
