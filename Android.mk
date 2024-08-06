@@ -2,12 +2,12 @@
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(call is-board-platform, taro parrot neo),true)
+ifeq ($(call is-board-platform-in-list, taro parrot neo neo61),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_WAIPIO=m
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama parrot neo), true)
+ifeq ($(call is-board-platform-in-list,taro kalama parrot neo neo61), true)
 
 LOCAL_PATH := $(call my-dir)
 
@@ -40,6 +40,11 @@ AUDIO_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*/*/*/*)
 
 ########################### dsp ################################
+ifeq ($(TARGET_KERNEL_VERSION), 6.1)
+ifeq ($(TARGET_BOARD_PLATFORM), neo61)
+	LOCAL_MODULE_DDK_BUILD := true
+endif
+endif
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -288,7 +293,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
-
+ifneq ($(call is-board-platform-in-list, neo61),true)
 ########################### WCD938x CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -317,6 +322,7 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -326,8 +332,9 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-
 ###########################################################
+endif
+
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := hdmi_dlkm.ko

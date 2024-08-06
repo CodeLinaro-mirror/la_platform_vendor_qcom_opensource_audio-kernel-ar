@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/slab.h>
@@ -72,6 +72,7 @@ static int audio_prm_callback(struct gpr_device *adev, void *data)
 			pr_err("%s: hit default case",__func__);
 			break;
 		};
+		break;
 	default:
 		break;
 	};

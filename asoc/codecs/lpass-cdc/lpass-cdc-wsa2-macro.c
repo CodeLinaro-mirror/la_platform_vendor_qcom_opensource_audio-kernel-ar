@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
-   Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+   Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -736,6 +736,7 @@ static int lpass_cdc_wsa2_macro_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_STREAM_CAPTURE:
 		if (dai->id == LPASS_CDC_WSA2_MACRO_AIF_VI)
 			wsa2_priv->pcm_rate_vi = params_rate(params);
+	        fallthrough;
 	default:
 		break;
 	}

@@ -1,6 +1,6 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -367,7 +367,7 @@ static int gpr_device_probe(struct device *dev)
 	return adrv->probe(adev);
 }
 
-static int gpr_device_remove(struct device *dev)
+static void  gpr_device_remove(struct device *dev)
 {
 	struct gpr_device *adev = to_gpr_device(dev);
 	struct gpr_driver *adrv;
@@ -382,7 +382,7 @@ static int gpr_device_remove(struct device *dev)
 		spin_unlock(&gpr->svcs_lock);
 	}
 
-	return 0;
+	return ;
 }
 
 static int gpr_uevent(struct device *dev, struct kobj_uevent_env *env)
