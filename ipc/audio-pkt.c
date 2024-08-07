@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -38,8 +38,10 @@ static void *audio_pkt_ilctxt;
 static int audio_pkt_debug_mask;
 module_param_named(debug_mask, audio_pkt_debug_mask, int, 0664);
 
+#define APM_CMD_GLOBAL_SHARED_MEM_MAP_REGIONS 0x01001059
 #define APM_CMD_SHARED_MEM_MAP_REGIONS		0x0100100C
 #define APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE	0x00000004UL
+#define APM_MEMORY_MAP_BIT_MASK_PHYS_ADDRESS 0x000001C1UL
 enum {
 	AUDIO_PKT_INFO = 1U << 0,
 };
@@ -134,6 +136,23 @@ struct audio_pkt_apm_mem_map {
 struct audio_gpr_pkt {
 	struct gpr_hdr audpkt_hdr;
 	struct audio_pkt_apm_mem_map audpkt_mem_map;
+};
+
+struct audio_pkt_apm_cmd_global_shared_mem_map_regions_t {
+	uint32_t shmem_id;
+	uint16_t mem_pool_id;
+	uint16_t num_regions;
+	uint32_t property_flag;
+};
+
+struct audio_pkt_apm_glb_shm_mem_map {
+	struct audio_pkt_apm_cmd_global_shared_mem_map_regions_t mmap_header;
+	struct audio_pkt_apm_shared_map_region_payload_t mmap_payload;
+};
+
+struct audio_gpr_pkt_glb_shm {
+	struct gpr_hdr audpkt_hdr;
+	struct audio_pkt_apm_glb_shm_mem_map audpkt_mem_map;
 };
 
 typedef void (*audio_pkt_clnt_cb_fn)(void *buf, int len, void *priv);
@@ -297,26 +316,55 @@ ssize_t audio_pkt_read(struct file *file, char __user *buf,
  * audpkt_update_physical_addr - Update physical address
  * audpkt_hdr:	Pointer to the file structure.
  */
-int audpkt_chk_and_update_physical_addr(struct audio_gpr_pkt *gpr_pkt)
+int audpkt_chk_and_update_physical_addr(struct gpr_hdr *gpr_pkt)
 {
 	int ret = 0;
-        size_t pa_len = 0;
+	size_t pa_len = 0;
 	dma_addr_t paddr;
+	struct audio_gpr_pkt *a_gpr_pkt;
+	struct audio_gpr_pkt_glb_shm *g_gpr_pkt;
 
-	if (gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
-				APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE) {
-		ret = msm_audio_get_phy_addr(
-			(int) gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw,
-			&paddr, &pa_len);
-		if (ret < 0) {
-			AUDIO_PKT_ERR("%s Get phy. address failed, ret %d\n",
-					__func__, ret);
-			return ret;
+	switch (gpr_pkt->opcode) {
+	case APM_CMD_SHARED_MEM_MAP_REGIONS:
+		a_gpr_pkt = (struct audio_gpr_pkt *) gpr_pkt;
+		if ((a_gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
+				APM_MEMORY_MAP_BIT_MASK_PHYS_ADDRESS) == 0) {
+			ret = msm_audio_get_phy_addr(
+				(int) a_gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw,
+				&paddr, &pa_len);
+			if (ret < 0) {
+				AUDIO_PKT_ERR("%s Get phy. address failed, ret %d\n",
+						__func__, ret);
+				return ret;
+			}
+			AUDIO_PKT_INFO("%s physical address %pK", __func__,
+					(void *) paddr);
+			a_gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (uint32_t) paddr;
+			a_gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw =
+									(uint64_t) paddr >> 32;
 		}
-		AUDIO_PKT_INFO("%s physical address %pK", __func__,
-				(void *) paddr);
-		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (uint32_t) paddr;
-		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw = (uint64_t) paddr >> 32;
+	break;
+	case APM_CMD_GLOBAL_SHARED_MEM_MAP_REGIONS:
+		g_gpr_pkt = (struct audio_gpr_pkt_glb_shm *) gpr_pkt;
+		if ((g_gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
+				APM_MEMORY_MAP_BIT_MASK_PHYS_ADDRESS) == 0) {
+			ret = msm_audio_get_phy_addr(
+				(int) g_gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw,
+				&paddr, &pa_len);
+			if (ret < 0) {
+				AUDIO_PKT_ERR("%s Get phy. address failed, ret %d\n",
+						__func__, ret);
+				return ret;
+			}
+			AUDIO_PKT_INFO("%s physical address %pK", __func__,
+					(void *) paddr);
+			g_gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (uint32_t) paddr;
+			g_gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw =
+									(uint64_t) paddr >> 32;
+		}
+		break;
+	default:
+		break;
 	}
 	return ret;
 }
@@ -385,7 +433,18 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 			ret = -EINVAL;
 			goto free_kbuf;
 		}
-		ret = audpkt_chk_and_update_physical_addr((struct audio_gpr_pkt *) audpkt_hdr);
+		ret = audpkt_chk_and_update_physical_addr(audpkt_hdr);
+		if (ret < 0) {
+			AUDIO_PKT_ERR("Update Physical Address Failed -%d\n", ret);
+			goto free_kbuf;
+		}
+	} else if (audpkt_hdr->opcode == APM_CMD_GLOBAL_SHARED_MEM_MAP_REGIONS) {
+		if (count < sizeof(struct audio_gpr_pkt_glb_shm)) {
+			AUDIO_PKT_ERR("Invalid count %zu\n", count);
+			ret = -EINVAL;
+			goto free_kbuf;
+		}
+		ret = audpkt_chk_and_update_physical_addr(audpkt_hdr);
 		if (ret < 0) {
 			AUDIO_PKT_ERR("Update Physical Address Failed -%d\n", ret);
 			goto free_kbuf;
