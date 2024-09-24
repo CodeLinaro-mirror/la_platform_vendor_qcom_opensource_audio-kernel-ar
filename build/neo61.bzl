@@ -3,7 +3,7 @@ load(":module_mgr.bzl", "define_target_modules")
 
 def define_neo61():
     define_target_modules(
-        target = "neo61",
+        target = "neo-la",
         variants = ["consolidate", "gki"],
         registry = audio_modules,
         modules = [
@@ -37,6 +37,8 @@ def define_neo61():
             "wsa883x_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
+            "wcd937x_dlkm",
+            "wcd937x_slave_dlkm",
         ],
         config_options = [
             "CONFIG_SND_SOC_WAIPIO",
