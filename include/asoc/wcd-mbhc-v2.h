@@ -1,6 +1,6 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+/*
+ * SPDX-License-Identifier: GPL-2.0-only
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef __WCD_MBHC_V2_H__
 #define __WCD_MBHC_V2_H__
@@ -455,7 +455,7 @@ struct wcd_mbhc_intr {
 
 struct wcd_mbhc_register {
 	const char *id;
-	u16 reg;
+	int reg;
 	u8 mask;
 	u8 offset;
 	u8 invert;
@@ -532,6 +532,9 @@ struct wcd_mbhc_cb {
 	void (*mbhc_moisture_detect_en)(struct wcd_mbhc *mbhc, bool enable);
 	void (*surge_reset_routine)(struct wcd_mbhc *mbhc);
 	void (*zdet_leakage_resistance)(struct wcd_mbhc *mbhc, bool enable);
+	void (*mbhc_button_debounce_set)(struct snd_soc_component *component);
+	int (*mbhc_force_micbias_disable)(struct snd_soc_component *component,
+				int micb_num);
 };
 
 struct wcd_mbhc_fn {
@@ -623,6 +626,8 @@ struct wcd_mbhc {
 
 	struct wcd_mbhc_fn *mbhc_fn;
 	bool force_linein;
+	struct device_node *wcd_usbss_aatc_dev_np;
+	struct device_node *fsa_aatc_dev_np;
 	struct device_node *aatc_dev_np;
 	struct notifier_block aatc_dev_nb;
 
