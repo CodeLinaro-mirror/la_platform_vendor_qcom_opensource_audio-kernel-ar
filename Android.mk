@@ -18,6 +18,7 @@ ifneq ($(findstring opensource,$(LOCAL_PATH)),)
 	AUDIO_BLD_DIR := $(abspath .)/vendor/qcom/opensource/audio-kernel
 endif # opensource
 
+include $(AUDIO_BLD_DIR)/EnableBazel.mk
 DLKM_DIR := $(TOP)/device/qcom/common/dlkm
 
 
