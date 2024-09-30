@@ -305,6 +305,7 @@ struct swr_driver {
 	int	(*device_up)(struct swr_device *swr);
 	int	(*device_down)(struct swr_device *swr);
 	int	(*reset_device)(struct swr_device *swr);
+	int	(*interrupt_callback)(struct swr_device *swr, u8 devnum);
 	struct device_driver		driver;
 	const struct swr_device_id	*id_table;
 };
@@ -400,6 +401,8 @@ extern void swr_unregister_master(struct swr_master *master);
 extern int swr_register_master(struct swr_master *master);
 
 extern int swr_device_up(struct swr_device *swr_dev);
+
+extern int swr_device_handle_interrupt(struct swr_device *swr_dev, u8 devnum);
 
 extern int swr_device_down(struct swr_device *swr_dev);
 

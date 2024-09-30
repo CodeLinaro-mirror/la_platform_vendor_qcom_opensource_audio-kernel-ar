@@ -2442,6 +2442,7 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 	struct swr_device *swr_dev;
 	struct swr_master *mstr = &swrm->master;
 	int retry = 5;
+	bool interrupt_handled = false;
 
 	if (unlikely(swrm_lock_sleep(swrm) == false)) {
 		dev_err_ratelimited(swrm->dev, "%s Failed to hold suspend\n", __func__);
@@ -2487,6 +2488,20 @@ handle_irq:
 					__func__);
 				break;
 			}
+
+			list_for_each_entry(swr_dev, &mstr->devices, dev_list) {
+				if (swr_dev->dev_num != devnum)
+					continue;
+				if (!swr_dev->slave_irq) {
+					swr_device_handle_interrupt(swr_dev, devnum);
+					interrupt_handled = true;
+					break;
+				}
+			}
+
+			if (interrupt_handled)
+				break;
+
 			swrm_cmd_fifo_rd_cmd(swrm, &temp, devnum,
 						get_cmd_id(swrm),
 						SWRS_SCP_INT_STATUS_CLEAR_1, 1);

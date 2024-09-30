@@ -60,6 +60,32 @@ static void swr_dev_release(struct device *dev)
 	swr_master_put(swr_dev->master);
 	kfree(swr_dev);
 }
+/**
+ * swr_device_callback_interupt - interrupt callback to soundwire slave device
+ * @swr_dev: pointer to soundwire slave device
+ *
+ * Interrupt callback notification to soundwire slave device.
+ *
+ */
+int swr_device_handle_interrupt(struct swr_device *swr_dev, u8 devnum)
+{
+	struct device *dev;
+	const struct swr_driver *sdrv;
+
+	if (!swr_dev)
+		return -EINVAL;
+
+	dev = &swr_dev->dev;
+	sdrv = to_swr_driver(dev->driver);
+	if (!sdrv)
+		return 0;
+
+	if (sdrv->device_up)
+		return sdrv->interrupt_callback(to_swr_device(dev), devnum);
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL(swr_device_handle_interrupt);
 
 /**
  * swr_remove_device - remove a soundwire device
