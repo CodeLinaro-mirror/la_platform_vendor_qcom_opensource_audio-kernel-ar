@@ -177,6 +177,9 @@ audio_modules.register(
         ],
         "CONFIG_SND_SOC_SUN": [
             "sun.c"
+        ],
+        "CONFIG_SND_SOC_CANOE": [
+            "audio_machine.c"
         ]
     },
 )
