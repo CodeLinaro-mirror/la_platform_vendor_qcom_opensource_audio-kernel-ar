@@ -462,3 +462,14 @@ audio_modules.register(
         "qmp-aggregator.c",
     ]
 )
+# >>>> SIMPLE AMP MODULES <<<<
+audio_modules.register(
+    name = "simple_amp_dlkm",
+    path = ASOC_CODECS_PATH + "/sdca",
+    config_option = "CONFIG_SND_SOC_SIMPLE_AMP",
+    srcs = [
+        "simple-amp.c",
+        "simple-amp-regdump.c",
+        "wsa8855-xu.c",
+    ]
+)

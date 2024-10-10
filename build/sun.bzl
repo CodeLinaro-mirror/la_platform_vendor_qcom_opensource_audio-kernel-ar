@@ -41,7 +41,8 @@ def define_sun():
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
             "lpass_bt_swr_dlkm",
-			"qmp_dlkm"
+            "qmp_dlkm",
+            "simple_amp_dlkm"
         ],
         config_options = [
             "CONFIG_SND_SOC_SUN",
@@ -59,5 +60,6 @@ def define_sun():
             "CONFIG_AUDIO_BTFM_PROXY",
             "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
+            "CONFIG_SND_SOC_SIMPLE_AMP",
         ]
     )
