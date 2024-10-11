@@ -240,6 +240,7 @@ enum {
 	LPASS_CDC_WSA_MACRO_AIF_ECHO,
 	LPASS_CDC_WSA_MACRO_AIF_CPS,
 	LPASS_CDC_WSA_MACRO_AIF4_PB,
+	LPASS_CDC_WSA_MACRO_AIF_PCM_PB,
 	LPASS_CDC_WSA_MACRO_MAX_DAIS,
 };
 
@@ -348,7 +349,8 @@ static const char *const rx_mix_ec_text[] = {
 };
 
 static const char *const rx_mux_text[] = {
-	"ZERO", "AIF1_PB", "AIF_MIX1_PB"
+	"ZERO", "AIF1_PB", "AIF_MIX1_PB", "INVALID1", "INVALID2", "INVALID3",
+	"AIF4_PB", "AIF_PCM_PB"
 };
 
 static const char *const rx_sidetone_mix_text[] = {
@@ -544,6 +546,20 @@ static struct snd_soc_dai_driver lpass_cdc_wsa_macro_dai[] = {
 				.rate_min = 8000,
 				.channels_min = 1,
 				.channels_max = 2,
+		},
+		.ops = &lpass_cdc_wsa_macro_dai_ops,
+	},
+	{
+		.name = "wsa_macro_rx_pcm",
+		.id = LPASS_CDC_WSA_MACRO_AIF_PCM_PB,
+		.playback = {
+				.stream_name = "WSA AIF PCM Playback",
+				.rates = LPASS_CDC_WSA_MACRO_RX_RATES,
+				.formats = LPASS_CDC_WSA_MACRO_RX_FORMATS,
+				.rate_max = 192000,
+				.rate_min = 8000,
+				.channels_min = 1,
+				.channels_max = 4,
 		},
 		.ops = &lpass_cdc_wsa_macro_dai_ops,
 	},
@@ -895,6 +911,10 @@ static int lpass_cdc_wsa_macro_get_channel_map(struct snd_soc_dai *dai,
 		}
 		*tx_slot = mask;
 		*tx_num = cnt;
+		break;
+	case LPASS_CDC_WSA_MACRO_AIF_PCM_PB:
+		*rx_slot = wsa_priv->active_ch_mask[dai->id];
+		*rx_num = wsa_priv->active_ch_cnt[dai->id];
 		break;
 	default:
 		dev_err_ratelimited(wsa_dev, "%s: Invalid AIF\n", __func__);
@@ -2575,7 +2595,7 @@ static int lpass_cdc_wsa_macro_rx_mux_put(struct snd_kcontrol *kcontrol,
 	bit_input = widget->shift;
 
 	dev_dbg(wsa_dev,
-		"%s: mux input: %d, mux output: %d, bit: %d\n",
+		"%s: mux input(aif): %d, mux output: %d, bit: %d\n",
 		__func__, rx_port_value, widget->shift, bit_input);
 
 	switch (rx_port_value) {
@@ -2588,6 +2608,7 @@ static int lpass_cdc_wsa_macro_rx_mux_put(struct snd_kcontrol *kcontrol,
 		break;
 	case 1:
 	case 2:
+	case LPASS_CDC_WSA_MACRO_AIF_PCM_PB:
 		set_bit(bit_input,
 			&wsa_priv->active_ch_mask[rx_port_value]);
 		wsa_priv->active_ch_cnt[rx_port_value]++;
@@ -2792,6 +2813,13 @@ static const struct snd_kcontrol_new rx_mux[LPASS_CDC_WSA_MACRO_RX_MAX] = {
 			lpass_cdc_wsa_macro_rx_mux_get, lpass_cdc_wsa_macro_rx_mux_put),
 };
 
+static const struct snd_kcontrol_new rx_pcm_mux[] = {
+	SOC_DAPM_ENUM_EXT("WSA PCM CH1 Mux", rx_mux_enum,
+			  lpass_cdc_wsa_macro_rx_mux_get, lpass_cdc_wsa_macro_rx_mux_put),
+	SOC_DAPM_ENUM_EXT("WSA PCM CH2 Mux", rx_mux_enum,
+			  lpass_cdc_wsa_macro_rx_mux_get, lpass_cdc_wsa_macro_rx_mux_put),
+};
+
 static int lpass_cdc_wsa_macro_vi_feed_mixer_get(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
@@ -2990,6 +3018,9 @@ static const struct snd_soc_dapm_widget lpass_cdc_wsa_macro_dapm_widgets[] = {
 	SND_SOC_DAPM_AIF_IN("WSA AIF4 PB", "WSA AIF4 Playback", 0,
 		SND_SOC_NOPM, 0, 0),
 
+	SND_SOC_DAPM_AIF_IN("WSA AIF PCM PB", "WSA AIF PCM Playback", 0,
+		SND_SOC_NOPM, 0, 0),
+
 	SND_SOC_DAPM_MIXER("WSA_AIF_VI Mixer", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_AIF_VI,
 		0, aif_vi_mixer, ARRAY_SIZE(aif_vi_mixer)),
 	SND_SOC_DAPM_MIXER("WSA_AIF_CPS Mixer", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_AIF_CPS,
@@ -3002,6 +3033,11 @@ static const struct snd_soc_dapm_widget lpass_cdc_wsa_macro_dapm_widgets[] = {
 			LPASS_CDC_WSA_MACRO_EC1_MUX, 0,
 			&rx_mix_ec1_mux, lpass_cdc_wsa_macro_enable_echo,
 			SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_MUX("WSA PCM CH1 MUX", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_RX0, 0,
+				&rx_pcm_mux[LPASS_CDC_WSA_MACRO_RX0]),
+	SND_SOC_DAPM_MUX("WSA PCM CH2 MUX", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_RX1, 0,
+				&rx_pcm_mux[LPASS_CDC_WSA_MACRO_RX1]),
 
 	SND_SOC_DAPM_MUX("WSA RX0 MUX", SND_SOC_NOPM, LPASS_CDC_WSA_MACRO_RX0, 0,
 				&rx_mux[LPASS_CDC_WSA_MACRO_RX0]),
@@ -3130,6 +3166,12 @@ static const struct snd_soc_dapm_route wsa_audio_map[] = {
 	{"WSA AIF_ECHO", NULL, "WSA RX_MIX EC0_MUX"},
 	{"WSA AIF_ECHO", NULL, "WSA RX_MIX EC1_MUX"},
 	{"WSA AIF_ECHO", NULL, "WSA_MCLK"},
+
+	{"WSA AIF PCM PB", NULL, "WSA_MCLK"},
+	{"WSA PCM CH1 MUX", "AIF_PCM_PB", "WSA AIF PCM PB"},
+	{"WSA PCM CH2 MUX", "AIF_PCM_PB", "WSA AIF PCM PB"},
+	{"WSA_SPK1 OUT", NULL, "WSA PCM CH1 MUX"},
+	{"WSA_SPK2 OUT", NULL, "WSA PCM CH2 MUX"},
 
 	{"WSA AIF1 PB", NULL, "WSA_MCLK"},
 	{"WSA AIF_MIX1 PB", NULL, "WSA_MCLK"},
@@ -3679,6 +3721,7 @@ static int lpass_cdc_wsa_macro_init(struct snd_soc_component *component)
 	snd_soc_dapm_ignore_suspend(dapm, "WSA_AIF_VI Capture");
 	snd_soc_dapm_ignore_suspend(dapm, "WSA_AIF_ECHO Capture");
 	snd_soc_dapm_ignore_suspend(dapm, "WSA_AIF_CPS Capture");
+	snd_soc_dapm_ignore_suspend(dapm, "WSA AIF PCM Playback");
 	snd_soc_dapm_ignore_suspend(dapm, "WSA_SPK1 OUT");
 	snd_soc_dapm_ignore_suspend(dapm, "WSA_SPK2 OUT");
 	snd_soc_dapm_ignore_suspend(dapm, "WSA_HAPT OUT");
