@@ -3002,6 +3002,9 @@ static int swrm_master_init(struct swr_mstr_ctrl *swrm)
 #ifdef CONFIG_SWRM_VER_2P0
 	reg[len] = SWRM_CLK_CTRL(swrm->ee_val);
 	value[len++] = 0x01;
+#else
+	reg[len] = SWRM_MCP_BUS_CTRL;
+	value[len++] = 0x02;
 #endif
 
 	swr_master_bulk_write(swrm, reg, value, len);
@@ -3592,6 +3595,7 @@ err_irq_fail:
 	cpu_latency_qos_remove_request(&swrm->pm_qos_req);
 
 err_pdata_fail:
+	platform_set_drvdata(pdev, NULL);
 err_memory_fail:
 	return ret;
 }
