@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -14,7 +14,6 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/of_device.h>
-#include <linux/soc/qcom/fsa4480-i2c.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/soc/qcom/slatecom_intf.h>
 #include <sound/core.h>
@@ -31,7 +30,6 @@
 #include <dsp/audio_notifier.h>
 #include "device_event.h"
 #include "asoc/msm-cdc-pinctrl.h"
-#include "asoc/wcd-mbhc-v2.h"
 #include "codecs/besbev/besbev.h"
 #include "codecs/wsa883x/wsa883x.h"
 #include "codecs/bolero/bolero-cdc.h"
@@ -97,11 +95,6 @@ struct msm_asoc_mach_data {
 	struct msm_common_pdata *common_pdata;
 	struct device_node *dmic01_gpio_p; /* used by pinctrl API */
 	struct device_node *dmic23_gpio_p; /* used by pinctrl API */
-	struct device_node *us_euro_gpio_p; /* used by pinctrl API */
-	struct pinctrl *usbc_en2_gpio_p; /* used by pinctrl API */
-	struct device_node *hph_en1_gpio_p; /* used by pinctrl API */
-	struct device_node *hph_en0_gpio_p; /* used by pinctrl API */
-	struct device_node *fsa_handle;
 	bool visense_enable;
 	struct srcu_notifier_head *slatecom_notifier_chain;
 	struct notifier_block notifier_cc_dsp_nb;
@@ -187,27 +180,6 @@ static const char *get_snd_card_state_str(int cs)
 	return card_state;
 }
 
-static void check_userspace_service_state(struct snd_soc_pcm_runtime *rtd,
-						struct msm_common_pdata *pdata)
-{
-	dev_info(rtd->card->dev,"%s: pcm_id %d state %d\n", __func__,
-				rtd->num, pdata->aud_dev_state[rtd->num]);
-
-	if (pdata->aud_dev_state[rtd->num] == DEVICE_ENABLE) {
-		dev_info(rtd->card->dev, "%s userspace service crashed\n",
-					__func__);
-		if (pdata->dsp_sessions_closed == 0) {
-			/*Issue close all graph cmd to DSP*/
-			spf_core_apm_close_all();
-			/*unmap all dma mapped buffers*/
-			msm_audio_ion_crash_handler();
-			pdata->dsp_sessions_closed = 1;
-		}
-		/*Reset the state as sysfs node wont be triggred*/
-		pdata->aud_dev_state[rtd->num] = 0;
-	}
-}
-
 static int get_intf_index(const char *stream_name)
 {
 	if (strnstr(stream_name, "LPAIF_VA", strlen(stream_name)))
@@ -275,8 +247,6 @@ static void msm_monaco_snd_shutdown(struct snd_pcm_substream *substream)
 		return;
 	}
 
-	check_userspace_service_state(rtd, pdata);
-
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
 		if (pdata->mi2s_gpio_p[index]) {
@@ -292,84 +262,6 @@ static void msm_monaco_snd_shutdown(struct snd_pcm_substream *substream)
 		}
 		mutex_unlock(&pdata->lock[index]);
 	}
-}
-
-/*
- * Need to report LINEIN
- * if R/L channel impedance is larger than 5K ohm
- */
-static struct wcd_mbhc_config wcd_mbhc_cfg = {
-	.read_fw_bin = false,
-	.calibration = NULL,
-	.detect_extn_cable = true,
-	.mono_stero_detection = false,
-	.swap_gnd_mic = NULL,
-	.hs_ext_micbias = true,
-	.key_code[0] = KEY_MEDIA,
-	.key_code[1] = KEY_VOICECOMMAND,
-	.key_code[2] = KEY_VOLUMEUP,
-	.key_code[3] = KEY_VOLUMEDOWN,
-	.key_code[4] = 0,
-	.key_code[5] = 0,
-	.key_code[6] = 0,
-	.key_code[7] = 0,
-	.linein_th = 5000,
-	.moisture_en = false,
-	.mbhc_micbias = MIC_BIAS_2,
-	.anc_micbias = MIC_BIAS_2,
-	.enable_anc_mic_detect = false,
-	.moisture_duty_cycle_en = true,
-};
-
-static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component,
-				  bool active)
-{
-	struct snd_soc_card *card = component->card;
-	struct msm_asoc_mach_data *pdata =
-				snd_soc_card_get_drvdata(card);
-
-	if (!pdata->fsa_handle)
-		return false;
-
-	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
-}
-
-static bool msm_swap_gnd_mic(struct snd_soc_component *component, bool active)
-{
-	int value = 0;
-	bool ret = false;
-	struct snd_soc_card *card;
-	struct msm_asoc_mach_data *pdata;
-
-	if (!component) {
-		pr_err("%s component is NULL\n", __func__);
-		return false;
-	}
-	card = component->card;
-	pdata = snd_soc_card_get_drvdata(card);
-
-	if (!pdata)
-		return false;
-
-	if (wcd_mbhc_cfg.enable_usbc_analog)
-		return msm_usbc_swap_gnd_mic(component, active);
-
-	/* if usbc is not defined, swap using us_euro_gpio_p */
-	if (pdata->us_euro_gpio_p) {
-		value = msm_cdc_pinctrl_get_state(
-				pdata->us_euro_gpio_p);
-		if (value)
-			msm_cdc_pinctrl_select_sleep_state(
-					pdata->us_euro_gpio_p);
-		else
-			msm_cdc_pinctrl_select_active_state(
-					pdata->us_euro_gpio_p);
-		dev_dbg(component->dev, "%s: swap select switch %d to %d\n",
-			__func__, value, !value);
-		ret = true;
-	}
-
-	return ret;
 }
 
 static int msm_dmic_event(struct snd_soc_dapm_widget *w,
@@ -595,12 +487,12 @@ int slimbus_clock_src_put(struct snd_kcontrol *kcontrol,
 
 	if (ucontrol->value.integer.value[0] < SLIMBUS_CLOCK_SRC_XO ||
 			ucontrol->value.integer.value[0] > SLIMBUS_CLOCK_SRC_RCO) {
-		pr_err("%s: Invalid ctrl value %s=%d\n", __func__, BT_SLIMBUS_CLK_STR,
+		pr_err("%s: Invalid ctrl value %s=%ld\n", __func__, BT_SLIMBUS_CLK_STR,
 				ucontrol->value.integer.value[0]);
 		return -EINVAL;
 	}
 
-	dev_dbg(component->dev, "%s: old_clock = %d : new_clock = %d\n", __func__,
+	dev_dbg(component->dev, "%s: old_clock = %d : new_clock = %ld\n", __func__,
 			atomic_read(&bt_slim_clk_src_value),
 			ucontrol->value.integer.value[0]);
 
@@ -611,7 +503,7 @@ int slimbus_clock_src_put(struct snd_kcontrol *kcontrol,
 			atomic_set(&bt_slim_clk_src_value,
 					ucontrol->value.integer.value[0]);
 		} else {
-			pr_err("%s: audio_prm_set_slimbus_clock_src value = %d failed : ret = %d\n",
+			pr_err("%s: audio_prm_set_slimbus_clock_src value = %ld failed : ret = %d\n",
 					__func__, ucontrol->value.integer.value[0], ret);
 		}
 	}
@@ -1380,7 +1272,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	struct snd_soc_card *card = NULL;
 	struct msm_asoc_mach_data *pdata = NULL;
 	const char *codec_name = NULL;
-	const char *mbhc_audio_jack_type = NULL;
 	int ret = 0, val = 0;
 
 	if (!pdev->dev.of_node) {
@@ -1445,69 +1336,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		 __func__, card->name);
 
 	msm_common_snd_init(pdev, card);
-
-	pdata->hph_en1_gpio_p = of_parse_phandle(pdev->dev.of_node,
-						"qcom,hph-en1-gpio", 0);
-	if (!pdata->hph_en1_gpio_p) {
-		dev_dbg(&pdev->dev, "%s: property %s not detected in node %s\n",
-			__func__, "qcom,hph-en1-gpio",
-			pdev->dev.of_node->full_name);
-	}
-
-	pdata->hph_en0_gpio_p = of_parse_phandle(pdev->dev.of_node,
-						"qcom,hph-en0-gpio", 0);
-	if (!pdata->hph_en0_gpio_p) {
-		dev_dbg(&pdev->dev, "%s: property %s not detected in node %s\n",
-			__func__, "qcom,hph-en0-gpio",
-			pdev->dev.of_node->full_name);
-	}
-
-	ret = of_property_read_string(pdev->dev.of_node,
-		"qcom,mbhc-audio-jack-type", &mbhc_audio_jack_type);
-	if (ret) {
-		dev_dbg(&pdev->dev, "%s: Looking up %s property in node %s failed\n",
-			__func__, "qcom,mbhc-audio-jack-type",
-			pdev->dev.of_node->full_name);
-		dev_dbg(&pdev->dev, "Jack type properties set to default\n");
-	} else {
-		if (!strcmp(mbhc_audio_jack_type, "4-pole-jack")) {
-			wcd_mbhc_cfg.enable_anc_mic_detect = false;
-			dev_dbg(&pdev->dev, "This hardware has 4 pole jack");
-		} else if (!strcmp(mbhc_audio_jack_type, "5-pole-jack")) {
-			wcd_mbhc_cfg.enable_anc_mic_detect = true;
-			dev_dbg(&pdev->dev, "This hardware has 5 pole jack");
-		} else if (!strcmp(mbhc_audio_jack_type, "6-pole-jack")) {
-			wcd_mbhc_cfg.enable_anc_mic_detect = true;
-			dev_dbg(&pdev->dev, "This hardware has 6 pole jack");
-		} else {
-			wcd_mbhc_cfg.enable_anc_mic_detect = false;
-			dev_dbg(&pdev->dev, "Unknown value, set to default\n");
-		}
-	}
-	/*
-	 * Parse US-Euro gpio info from DT. Report no error if us-euro
-	 * entry is not found in DT file as some targets do not support
-	 * US-Euro detection
-	 */
-	pdata->us_euro_gpio_p = of_parse_phandle(pdev->dev.of_node,
-					"qcom,us-euro-gpios", 0);
-	if (!pdata->us_euro_gpio_p) {
-		dev_dbg(&pdev->dev, "property %s not detected in node %s",
-			"qcom,us-euro-gpios", pdev->dev.of_node->full_name);
-	} else {
-		dev_dbg(&pdev->dev, "%s detected\n",
-			"qcom,us-euro-gpios");
-		wcd_mbhc_cfg.swap_gnd_mic = msm_swap_gnd_mic;
-	}
-
-	if (wcd_mbhc_cfg.enable_usbc_analog)
-		wcd_mbhc_cfg.swap_gnd_mic = msm_usbc_swap_gnd_mic;
-
-	pdata->fsa_handle = of_parse_phandle(pdev->dev.of_node,
-					"fsa4480-i2c-handle", 0);
-	if (!pdata->fsa_handle)
-		dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
-			"fsa4480-i2c-handle", pdev->dev.of_node->full_name);
 
 	pdata->dmic01_gpio_p = of_parse_phandle(pdev->dev.of_node,
 					      "qcom,cdc-dmic01-gpios",
