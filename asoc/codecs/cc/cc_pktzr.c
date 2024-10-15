@@ -297,8 +297,6 @@ done:
 	return 0;
 err:
 	if (ppriv) {
-		if (ppriv->handle)
-			kfree(ppriv->handle);
 		if (ppriv->channel_name)
 			kfree(ppriv->channel_name);
 		kfree(ppriv);
@@ -317,8 +315,6 @@ void cc_pktzr_deinit(void)
 		return;
 
 	cc_pktzr_deregister_device();
-	if (ppriv->handle)
-		kfree(ppriv->handle);
 	if (ppriv->channel_name)
 		kfree(ppriv->channel_name);
 	kfree(ppriv);
