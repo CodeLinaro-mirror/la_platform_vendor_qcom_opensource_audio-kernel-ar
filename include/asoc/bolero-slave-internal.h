@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 /* from Slave to bolero events */
@@ -14,6 +14,7 @@ enum {
 	SLV_BOLERO_EVT_RX_PA_GAIN_UPDATE,
 	SLV_BOLERO_EVT_HPHL_HD2_ENABLE, /* to enable hd2 config for hphl */
 	SLV_BOLERO_EVT_HPHR_HD2_ENABLE, /* to enable hd2 config for hphr */
+	SLV_BOLERO_EVT_TX_DEC_MUTE,
 };
 
 /* from bolero to SLV events */

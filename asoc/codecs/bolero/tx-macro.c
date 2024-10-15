@@ -413,6 +413,8 @@ static int tx_macro_event_handler(struct snd_soc_component *component,
 	struct device *tx_dev = NULL;
 	struct tx_macro_priv *tx_priv = NULL;
 	int ret = 0;
+	u16 tx_vol_ctl_reg = 0;
+	u8 decimator = 0;
 
 	if (!tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
 		return -EINVAL;
@@ -453,6 +455,24 @@ static int tx_macro_event_handler(struct snd_soc_component *component,
 			tx_priv->hs_slow_insert_complete = true;
 		else
 			tx_priv->hs_slow_insert_complete = false;
+		break;
+	case BOLERO_MACRO_EVT_TX_DEC_MUTE:
+		if (test_bit(TX_MACRO_DEC2, &tx_priv->active_ch_mask[TX_MACRO_AIF2_CAP])) {
+			decimator = TX_MACRO_DEC2;
+			tx_vol_ctl_reg =
+				BOLERO_CDC_TX0_TX_PATH_CTL +
+					TX_MACRO_TX_PATH_OFFSET * decimator;
+			snd_soc_component_update_bits(component,
+				tx_vol_ctl_reg, 0x10, data);
+		}
+		if (test_bit(TX_MACRO_DEC3, &tx_priv->active_ch_mask[TX_MACRO_AIF2_CAP])) {
+			decimator = TX_MACRO_DEC3;
+			tx_vol_ctl_reg =
+				BOLERO_CDC_TX0_TX_PATH_CTL +
+					TX_MACRO_TX_PATH_OFFSET * decimator;
+			snd_soc_component_update_bits(component,
+				tx_vol_ctl_reg, 0x10, data);
+		}
 		break;
 	default:
 		pr_debug("%s Invalid Event\n", __func__);
