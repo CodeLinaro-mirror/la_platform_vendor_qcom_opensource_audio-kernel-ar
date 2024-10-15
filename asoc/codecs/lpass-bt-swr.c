@@ -10,6 +10,7 @@
 #include <linux/printk.h>
 #include <linux/kernel.h>
 #include <linux/clk.h>
+#include <linux/version.h>
 #include <linux/pm_runtime.h>
 #include <soc/swr-common.h>
 #include <asoc/msm-cdc-pinctrl.h>
@@ -502,12 +503,19 @@ static int lpass_bt_swr_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_bt_swr_remove(struct platform_device *pdev)
+#else
 static int lpass_bt_swr_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_bt_swr_priv *priv = dev_get_drvdata(&pdev->dev);
 
-	if (!priv)
-		return -EINVAL;
+	if (!priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	pm_runtime_disable(&pdev->dev);
 	pm_runtime_set_suspended(&pdev->dev);
@@ -515,8 +523,10 @@ static int lpass_bt_swr_remove(struct platform_device *pdev)
 	mutex_destroy(&priv->vote_lock);
 	mutex_destroy(&priv->swr_clk_lock);
 	mutex_destroy(&priv->ssr_lock);
-
-	return 0;
+exit:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+	return rc;
+#endif
 }
 
 #ifdef CONFIG_PM

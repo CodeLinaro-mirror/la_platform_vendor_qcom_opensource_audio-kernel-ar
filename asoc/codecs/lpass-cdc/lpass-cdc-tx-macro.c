@@ -13,6 +13,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
+#include <linux/version.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include "lpass-cdc.h"
 #include "lpass-cdc-registers.h"
@@ -2289,14 +2290,21 @@ err_reg_macro:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_tx_macro_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_tx_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 
 	tx_priv = platform_get_drvdata(pdev);
 
-	if (!tx_priv)
-		return -EINVAL;
+	if (!tx_priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	cancel_delayed_work_sync(
 		&tx_priv->tx_dec_unmute_work.dwork);
@@ -2305,7 +2313,10 @@ static int lpass_cdc_tx_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&tx_priv->mclk_lock);
 	mutex_destroy(&tx_priv->wlock);
 	lpass_cdc_unregister_macro(&pdev->dev, TX_MACRO);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+	return rc;
+#endif
 }
 
 

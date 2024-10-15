@@ -16,7 +16,7 @@
 #include <sound/tlv.h>
 #include <soc/swr-common.h>
 #include <soc/swr-wcd.h>
-
+#include <linux/version.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include "lpass-cdc.h"
 #include "lpass-cdc-comp.h"
@@ -4160,15 +4160,22 @@ reg_macro_fail:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_wsa2_macro_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_wsa2_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_cdc_wsa2_macro_priv *wsa2_priv;
 	u16 count = 0;
 
 	wsa2_priv = dev_get_drvdata(&pdev->dev);
 
-	if (!wsa2_priv)
-		return -EINVAL;
+	if (!wsa2_priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	if (wsa2_priv->tcdev)
 		thermal_cooling_device_unregister(wsa2_priv->tcdev);
@@ -4182,7 +4189,10 @@ static int lpass_cdc_wsa2_macro_remove(struct platform_device *pdev)
 	lpass_cdc_unregister_macro(&pdev->dev, WSA2_MACRO);
 	mutex_destroy(&wsa2_priv->mclk_lock);
 	mutex_destroy(&wsa2_priv->swr_clk_lock);
+exit:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id lpass_cdc_wsa2_macro_dt_match[] = {

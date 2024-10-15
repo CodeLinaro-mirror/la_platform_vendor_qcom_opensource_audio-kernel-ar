@@ -18,6 +18,7 @@
 #include <soc/swr-common.h>
 #include <soc/swr-wcd.h>
 #include <dsp/digital-cdc-rsc-mgr.h>
+#include <linux/version.h>
 #include "lpass-cdc.h"
 #include "lpass-cdc-registers.h"
 #include "lpass-cdc-clk-rsc.h"
@@ -2461,15 +2462,21 @@ reg_macro_fail:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_va_macro_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_va_macro_remove(struct platform_device *pdev)
+#endif
 {
 	struct lpass_cdc_va_macro_priv *va_priv;
-	int count = 0;
+	int count = 0, rc = 0;
 
 	va_priv = dev_get_drvdata(&pdev->dev);
 
-	if (!va_priv)
-		return -EINVAL;
+	if (!va_priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 	if (va_priv->is_used_va_swr_gpio) {
 		if (va_priv->swr_ctrl_data)
 			kfree(va_priv->swr_ctrl_data);
@@ -2488,7 +2495,10 @@ static int lpass_cdc_va_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&va_priv->wlock);
 	if (va_priv->is_used_va_swr_gpio)
 		mutex_destroy(&va_priv->swr_clk_lock);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+	return rc;
+#endif
 }
 
 

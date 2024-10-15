@@ -16,7 +16,7 @@
 #include <sound/tlv.h>
 #include <soc/swr-common.h>
 #include <soc/swr-wcd.h>
-
+#include <linux/version.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include "lpass-cdc.h"
 #include "lpass-cdc-comp.h"
@@ -4859,15 +4859,22 @@ err_reg_macro:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_rx_macro_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_rx_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 	u16 count = 0;
 
 	rx_priv = dev_get_drvdata(&pdev->dev);
 
-	if (!rx_priv)
-		return -EINVAL;
+	if (!rx_priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	for (count = 0; count < rx_priv->child_count &&
 		count < LPASS_CDC_RX_MACRO_CHILD_DEVICES_MAX; count++)
@@ -4879,7 +4886,10 @@ static int lpass_cdc_rx_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&rx_priv->mclk_lock);
 	mutex_destroy(&rx_priv->swr_clk_lock);
 	kfree(rx_priv->swr_ctrl_data);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+	return rc;
+#endif
 }
 
 static const struct of_device_id lpass_cdc_rx_macro_dt_match[] = {

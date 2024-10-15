@@ -14,6 +14,7 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <soc/qcom/socinfo.h>
+#include <linux/version.h>
 #include <linux/of_device.h>
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 #include <linux/soc/qcom/wcd939x-i2c.h>
@@ -2447,8 +2448,11 @@ err:
 	devm_kfree(&pdev->dev, pdata);
 	return ret;
 }
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void msm_asoc_machine_remove(struct platform_device *pdev)
+#else
 static int msm_asoc_machine_remove(struct platform_device *pdev)
+#endif
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct msm_asoc_mach_data *pdata = NULL;
@@ -2463,8 +2467,9 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	msm_common_snd_deinit(common_pdata);
 	snd_event_master_deregister(&pdev->dev);
 	snd_soc_unregister_card(card);
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static struct platform_driver canoe_asoc_machine_driver = {

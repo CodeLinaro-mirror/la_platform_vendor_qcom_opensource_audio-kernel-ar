@@ -927,11 +927,18 @@ static int msm_ext_disp_audio_codec_rx_plat_probe(
 		ARRAY_SIZE(msm_ext_disp_audio_codec_rx_dais));
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void msm_ext_disp_audio_codec_rx_plat_remove(
+                struct platform_device *pdev)
+#else
 static int msm_ext_disp_audio_codec_rx_plat_remove(
 		struct platform_device *pdev)
+#endif
 {
 	snd_soc_unregister_component(&pdev->dev);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 static const struct of_device_id msm_ext_disp_audio_codec_rx_dt_match[] = {
 	{ .compatible = "qcom,msm-ext-disp-audio-codec-rx", },
