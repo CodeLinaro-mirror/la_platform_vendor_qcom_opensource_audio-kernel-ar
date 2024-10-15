@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.*/
+/* Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.*/
 
 #ifndef __AUDIO_CODEC_PORT_TYPES_H
 #define __AUDIO_CODEC_PORT_TYPES_H
@@ -96,6 +96,7 @@
 #define SWRM_TX_PCM_IN 58
 #define HIFI_PCM_L 59
 #define HIFI_PCM_R 60
+#define SWRM_RX_PCM_IN 61
 
 // BT SWR PORT defines
 #define BT_AUDIO_RX1 101
