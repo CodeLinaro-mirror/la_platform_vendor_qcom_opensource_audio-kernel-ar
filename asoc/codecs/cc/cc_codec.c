@@ -1187,7 +1187,7 @@ static int cc_trigger_uc(struct cc_element *elem, int on)
 	uc->direction = iface->uc_info.uc_id;
 	uc->num_paths = count;
 	memcpy(uc->payload, buf, i * sizeof(uint32_t));
-	tmp = uc->payload + i * sizeof(uint32_t);
+	tmp = (uint8_t *)uc->payload + i * sizeof(uint32_t);
 
 
 	count = 0;
@@ -1603,7 +1603,7 @@ static int cc_action_set(uint32_t id, void *ptr, size_t size)
 		return -ENOMEM;
 
 	set_param->action_id = id;
-	memcpy(set_param->payload, ptr, size);
+	memcpy((uint8_t *)set_param + sizeof(struct cc_set_get_param_t), ptr, size);
 
 	rc = cc_send_pkt_with_response(CC_CODEC_OPCODE_SET_PARAM,
 					set_param, param_sz);
