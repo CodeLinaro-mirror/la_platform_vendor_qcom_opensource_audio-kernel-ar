@@ -136,4 +136,8 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/besbev/pmw5100-spmi_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/besbev/besbev_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/besbev/besbev-slave_dlkm.ko
 
+ifeq ($(TARGET_SUPPORTS_WEAR_AON), true)
+LOCAL_MODULE_KO_DIRS += asoc/codecs/cc/cc_dlkm.ko
+LOCAL_MODULE_KO_DIRS += ipc/audio_cc_ipc_dlkm.ko
+endif   #wear_aon
 endif   #monaco
