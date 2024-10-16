@@ -17,7 +17,6 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/audpkt_ion_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/gpr_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/audio_pkt_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/q6_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/adsp_loader_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/audio_prm_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/q6_pdr_dlkm.ko \
@@ -26,11 +25,14 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/swr_ctrl_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/snd_event_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd_core_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/mbhc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/machine_dlkm.ko
-ifneq ($(call is-board-platform-in-list,bengal holi blair), true)
+ifneq ($(call is-board-platform-in-list, monaco), true)
+AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/mbhc_dlkm.ko
+endif
+ifneq ($(call is-board-platform-in-list,bengal holi blair monaco), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/swr_haptics_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko \
@@ -60,6 +62,16 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
 endif
+ifeq ($(call is-board-platform-in-list, monaco), true)
+AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/va_macro_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/tx_macro_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/rx_macro_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wsa883x_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/pmw5100-spmi_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/besbev_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/besbev-slave_dlkm.ko
+endif	#monaco
 ifeq ($(call is-board-platform-in-list, holi blair), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko

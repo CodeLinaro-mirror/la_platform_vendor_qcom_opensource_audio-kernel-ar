@@ -177,7 +177,10 @@ audio_modules.register(
         ],
         "CONFIG_SND_SOC_SUN": [
             "sun.c"
-        ]
+        ],
+	"CONFIG_SND_SOC_MONACO": [
+            "monaco.c"
+        ],
     },
 )
 # >>>> ASOC/CODEC MODULES <<<<
@@ -458,4 +461,28 @@ audio_modules.register(
         "qmp-dmic.c",
         "qmp-aggregator.c",
     ]
+)
+
+# >>>> BESBEV MODULE <<<<
+audio_modules.register(
+    name = "besbev_dlkm",
+    path = ASOC_CODECS_PATH + "/besbev",
+    config_option = "CONFIG_SND_SOC_BESBEV",
+    srcs = [
+        "besbev.c",
+        "besbev-regmap.c",
+        "besbev-tables.c",
+    ],
+)
+audio_modules.register(
+    name = "pmw5100-spmi_dlkm",
+    path = ASOC_CODECS_PATH + "/besbev",
+    config_option = "CONFIG_PMW5100_SPMI",
+    srcs = ["pmw5100-spmi.c"],
+)
+audio_modules.register(
+    name = "besbev-slave_dlkm",
+    path = ASOC_CODECS_PATH + "/besbev",
+    config_option = "CONFIG_SND_SOC_BESBEV_SLAVE",
+    srcs = ["besbev-slave.c"],
 )
