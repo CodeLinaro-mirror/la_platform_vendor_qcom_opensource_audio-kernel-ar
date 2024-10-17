@@ -30,6 +30,7 @@
 #include <ipc/gpr-lite.h>
 #include <dsp/spf-core.h>
 #include <dsp/msm_audio_ion.h>
+#include <linux/version.h>
 
 /* Define IPC Logging Macros */
 #define AUDIO_PKT_IPC_LOG_PAGE_CNT 2
@@ -824,7 +825,11 @@ done:
  * This function is called when the underlying device tree driver
  * removes a platform device, mapped to a Audio packet device.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void audio_pkt_platform_driver_remove(struct platform_device *adev)
+#else
 static int audio_pkt_platform_driver_remove(struct platform_device *adev)
+#endif
 {
 	struct audio_pkt_priv *ap_priv = platform_get_drvdata(adev);
 	struct audio_pkt_device *audpkt_dev = ap_priv->ap_dev;
@@ -845,7 +850,9 @@ static int audio_pkt_platform_driver_remove(struct platform_device *adev)
 	//of_platform_depopulate(&adev->dev);
 	AUDIO_PKT_INFO("Audio Packet Port Driver Removed\n");
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 
 }
 

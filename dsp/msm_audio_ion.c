@@ -1001,13 +1001,19 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	return rc;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void msm_audio_ion_remove(struct platform_device *pdev)
+#else
 static int msm_audio_ion_remove(struct platform_device *pdev)
+#endif
 {
 	struct msm_audio_ion_private *ion_data = dev_get_drvdata(&pdev->dev);
 	ion_data->smmu_enabled = 0;
 	ion_data->device_status = 0;
 	msm_audio_ion_unreg_chrdev(ion_data);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static struct platform_driver msm_audio_ion_driver = {

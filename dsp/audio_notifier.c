@@ -17,6 +17,7 @@
 #include <linux/remoteproc.h>
 #include <linux/remoteproc/qcom_rproc.h>
 #include <dsp/audio_notifier.h>
+#include <linux/version.h>
 #include "audio_ssr.h"
 #include "audio_pdr.h"
 
@@ -688,9 +689,15 @@ static int audio_notify_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void audio_notify_remove(struct platform_device *pdev)
+#else
 static int audio_notify_remove(struct platform_device *pdev)
+#endif
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id adsp_notify_dt_match[] = {
