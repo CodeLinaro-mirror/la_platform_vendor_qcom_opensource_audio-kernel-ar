@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2023, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/init.h>
@@ -1242,7 +1243,11 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	return rc;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void msm_audio_ion_remove(struct platform_device *pdev)
+#else
 static int msm_audio_ion_remove(struct platform_device *pdev)
+#endif
 {
 	struct device *dev = &pdev->dev;
 	const char *mdm_audio_ion_scm = "qcom,scm-mp-enabled";
@@ -1268,7 +1273,9 @@ static int msm_audio_ion_remove(struct platform_device *pdev)
 	ion_data->smmu_enabled = 0;
 	ion_data->device_status = 0;
 	msm_audio_ion_unreg_chrdev(ion_data);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static struct platform_driver msm_audio_ion_driver = {
