@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2017, 2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -16,6 +17,7 @@
 #include <dt-bindings/clock/audio-ext-clk.h>
 #include <sound/q6afe-v2.h>
 #include "audio-ext-clk-up.h"
+#include <linux/version.h>
 
 struct pinctrl_info {
 	struct pinctrl *pinctrl;
@@ -293,7 +295,11 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void audio_ref_clk_remove(struct platform_device *pdev)
+#else
 static int audio_ref_clk_remove(struct platform_device *pdev)
+#endif
 {
 	struct pinctrl_info *pnctrl_info = &audio_ap_clk2.pnctrl_info;
 
@@ -306,8 +312,9 @@ static int audio_ref_clk_remove(struct platform_device *pdev)
 		devm_pinctrl_put(pnctrl_info->pinctrl);
 		pnctrl_info->pinctrl = NULL;
 	}
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id audio_ref_clk_match[] = {

@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -34,6 +34,8 @@
 #ifdef CONFIG_AUTO_AMS
 #include <dsp/ams.h>
 #endif
+#include <linux/version.h>
+
 /* Define IPC Logging Macros */
 #define AUDIO_PKT_IPC_LOG_PAGE_CNT 2
 static void *audio_pkt_ilctxt;
@@ -942,7 +944,11 @@ done:
  * This function is called when the underlying device tree driver
  * removes a platform device, mapped to a Audio packet device.
  */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void audio_pkt_platform_driver_remove(struct platform_device *adev)
+#else
 static int audio_pkt_platform_driver_remove(struct platform_device *adev)
+#endif
 {
 	struct audio_pkt_priv *ap_priv = platform_get_drvdata(adev);
 	struct audio_pkt_device *audpkt_dev = ap_priv->ap_dev;
@@ -964,7 +970,9 @@ static int audio_pkt_platform_driver_remove(struct platform_device *adev)
 
 	AUDIO_PKT_INFO("Audio Packet Port Driver Removed\n");
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 
 }
 
