@@ -4190,7 +4190,9 @@ static int lpass_cdc_wsa2_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&wsa2_priv->mclk_lock);
 	mutex_destroy(&wsa2_priv->swr_clk_lock);
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return 0;
 #endif
 }

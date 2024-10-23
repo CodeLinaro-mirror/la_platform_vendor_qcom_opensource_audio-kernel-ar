@@ -339,7 +339,9 @@ static int adsp_loader_remove(struct platform_device *pdev)
 		priv->boot_adsp_obj = NULL;
 	}
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return 0;
 #endif
 }

@@ -689,7 +689,9 @@ static int lpass_cdc_clk_rsc_remove(struct platform_device *pdev)
 	mutex_destroy(&priv->rsc_clk_lock);
 	mutex_destroy(&priv->fs_gen_lock);
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return rc;
 #endif
 }

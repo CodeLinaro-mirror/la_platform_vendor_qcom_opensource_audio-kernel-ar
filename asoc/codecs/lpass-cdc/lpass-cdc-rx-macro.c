@@ -4887,7 +4887,9 @@ static int lpass_cdc_rx_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&rx_priv->swr_clk_lock);
 	kfree(rx_priv->swr_ctrl_data);
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return rc;
 #endif
 }

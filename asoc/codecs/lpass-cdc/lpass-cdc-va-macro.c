@@ -2496,7 +2496,9 @@ static int lpass_cdc_va_macro_remove(struct platform_device *pdev)
 	if (va_priv->is_used_va_swr_gpio)
 		mutex_destroy(&va_priv->swr_clk_lock);
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return rc;
 #endif
 }

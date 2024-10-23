@@ -2314,7 +2314,9 @@ static int lpass_cdc_tx_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&tx_priv->wlock);
 	lpass_cdc_unregister_macro(&pdev->dev, TX_MACRO);
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return rc;
 #endif
 }

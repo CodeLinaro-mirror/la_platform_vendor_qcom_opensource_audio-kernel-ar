@@ -1506,7 +1506,9 @@ static int lpass_cdc_remove(struct platform_device *pdev)
 	mutex_destroy(&priv->clk_lock);
 	mutex_destroy(&priv->vote_lock);
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return rc;
 #endif
 }

@@ -524,7 +524,9 @@ static int lpass_bt_swr_remove(struct platform_device *pdev)
 	mutex_destroy(&priv->swr_clk_lock);
 	mutex_destroy(&priv->ssr_lock);
 exit:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return rc;
 #endif
 }
