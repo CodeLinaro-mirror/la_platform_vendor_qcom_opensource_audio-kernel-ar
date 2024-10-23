@@ -28,6 +28,7 @@
 #include <dsp/digital-cdc-rsc-mgr.h>
 #include "swr-mstr-ctrl.h"
 #include <linux/proc_fs.h>
+#include <linux/version.h>
 
 #define SWR_NUM_PORTS    4 /* TODO - Get this info from DT */
 

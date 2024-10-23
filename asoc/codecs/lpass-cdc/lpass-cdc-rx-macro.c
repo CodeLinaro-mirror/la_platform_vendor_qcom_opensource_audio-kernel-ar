@@ -420,9 +420,15 @@ static int lpass_cdc_rx_macro_core_vote(void *handle, bool enable);
 static int lpass_cdc_rx_macro_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params,
 			       struct snd_soc_dai *dai);
-static int lpass_cdc_rx_macro_get_channel_map(struct snd_soc_dai *dai,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int lpass_cdc_rx_macro_get_channel_map(const struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot);
+#else
+static int lpass_cdc_rx_macro_get_channel_map( struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot);
+#endif
 static int lpass_cdc_rx_macro_int_dem_inp_mux_put(struct snd_kcontrol *kcontrol,
 				     struct snd_ctl_elem_value *ucontrol);
 static int lpass_cdc_rx_macro_mux_get(struct snd_kcontrol *kcontrol,
@@ -1194,9 +1200,15 @@ static int lpass_cdc_rx_macro_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int lpass_cdc_rx_macro_get_channel_map(const struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot)
+#else
 static int lpass_cdc_rx_macro_get_channel_map(struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct snd_soc_component *component = dai->component;
 	struct device *rx_dev = NULL;

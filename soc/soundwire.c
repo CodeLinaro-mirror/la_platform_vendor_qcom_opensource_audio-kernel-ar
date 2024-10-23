@@ -1034,7 +1034,11 @@ static const struct swr_device_id *swr_match(const struct swr_device_id *id,
 	return NULL;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int swr_device_match(struct device *dev, const struct device_driver *driver)
+#else
 static int swr_device_match(struct device *dev, struct device_driver *driver)
+#endif
 {
 	struct swr_device *swr_dev;
 	struct swr_driver *drv = to_swr_driver(driver);
