@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _LINUX_SOUNDWIRE_H
@@ -9,6 +11,7 @@
 #include <linux/mutex.h>
 #include <linux/irqdomain.h>
 #include <linux/regmap.h>
+#include <linux/version.h>
 #include "audio_mod_devicetable.h"
 
 enum {
@@ -302,7 +305,11 @@ struct swr_driver {
 	const struct swr_device_id	*id_table;
 };
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static inline struct swr_driver *to_swr_driver(const struct device_driver *drv)
+#else
 static inline struct swr_driver *to_swr_driver(struct device_driver *drv)
+#endif
 {
 	return drv ? container_of(drv, struct swr_driver, driver) : NULL;
 }
