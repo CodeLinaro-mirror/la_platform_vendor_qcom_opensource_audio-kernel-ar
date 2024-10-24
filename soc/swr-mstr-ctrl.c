@@ -1533,7 +1533,11 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->lane_ctrl = 0;
 	} else {
 		/* copy master port config to slave */
-		port_req->sinterval = mport->sinterval;
+		if (swrm->master_id == MASTER_ID_RX)
+			port_req->sinterval = mport->sinterval;
+		else
+			port_req->sinterval =
+				((swrm->bus_clk * 2) / port_req->ch_rate) - 1;
 		port_req->offset1 = mport->offset1;
 		port_req->offset2 = mport->offset2;
 		port_req->hstart = mport->hstart;
@@ -1558,7 +1562,7 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 
 static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 {
-	u32 value = 0, slv_id = 0;
+	u32 value = 0, slv_port_id = 0;
 	struct swr_port_info *port_req;
 	int i, j;
 	u16 sinterval = 0xFFFF;
@@ -1572,6 +1576,10 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 	struct swr_mstr_ctrl *swrm = swr_get_ctrl_data(master);
 	u8 dev_offset[SWRM_NUM_AUTO_ENUM_SLAVES];
 
+	/* ch_mask and offset1 configuration for slave port */
+	u8 agg_slv_port_ch_mask[SWR_MAX_DEV_NUM][SWR_MAX_DEV_PORT_NUM];
+	u8 agg_slv_port_offset1[SWR_MAX_DEV_NUM][SWR_MAX_DEV_PORT_NUM];
+
 	if (!swrm) {
 		pr_err_ratelimited("%s: swrm is null\n", __func__);
 		return;
@@ -1579,6 +1587,9 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 
 	dev_dbg(swrm->dev, "%s: master num_port: %d\n", __func__,
 		master->num_port);
+
+	memset(agg_slv_port_ch_mask, 0, sizeof(agg_slv_port_ch_mask));
+	memset(agg_slv_port_offset1, 0, sizeof(agg_slv_port_offset1));
 
 	for (i = 0; i < SWR_MSTR_PORT_LEN; i++) {
 		mport = &(swrm->mport_cfg[i]);
@@ -1596,7 +1607,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 				continue;
 
 			j++;
-			slv_id = port_req->slave_port_id;
+			slv_port_id = port_req->slave_port_id;
 			/* Assumption: If different channels in the same port
 			 * on master is enabled for different slaves, then each
 			 * slave offset should be configured differently.
@@ -1616,11 +1627,14 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 				return;
 			}
 
+			agg_slv_port_ch_mask[port_req->dev_num][slv_port_id] |=
+							port_req->req_ch;
+
 			if (len < SWRM_MAX_PORT_REG) {
 				reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
-				val[len++] = SWR_REG_VAL_PACK(port_req->req_ch,
+				val[len++] = SWR_REG_VAL_PACK(agg_slv_port_ch_mask[port_req->dev_num][slv_port_id],
 						port_req->dev_num, get_cmd_id(swrm),
-						SWRS_DP_CHANNEL_ENABLE_BANK(slv_id,
+						SWRS_DP_CHANNEL_ENABLE_BANK(slv_port_id,
 									bank));
 			}
 
@@ -1629,7 +1643,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 				val[len++] = SWR_REG_VAL_PACK(
 						port_req->sinterval & 0xFF,
 						port_req->dev_num, get_cmd_id(swrm),
-						SWRS_DP_SAMPLE_CONTROL_1_BANK(slv_id,
+						SWRS_DP_SAMPLE_CONTROL_1_BANK(slv_port_id,
 									bank));
 			}
 
@@ -1639,16 +1653,25 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 				val[len++] = SWR_REG_VAL_PACK(
 						(port_req->sinterval >> 8) & 0xFF,
 						port_req->dev_num, get_cmd_id(swrm),
-						SWRS_DP_SAMPLE_CONTROL_2_BANK(slv_id,
+						SWRS_DP_SAMPLE_CONTROL_2_BANK(slv_port_id,
 									bank));
 			}
 
+			if (agg_slv_port_offset1[port_req->dev_num][slv_port_id] == 0)
+				agg_slv_port_offset1[port_req->dev_num][slv_port_id] =
+						port_req->offset1;
+			else {
+				agg_slv_port_offset1[port_req->dev_num][slv_port_id] =
+					min(agg_slv_port_offset1[port_req->dev_num][slv_port_id],
+							port_req->offset1);
+			}
 			if (len < SWRM_MAX_PORT_REG
 				&& port_req->offset1 != SWR_INVALID_PARAM) {
 				reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
-				val[len++] = SWR_REG_VAL_PACK(port_req->offset1,
+				val[len++] =
+				SWR_REG_VAL_PACK(agg_slv_port_offset1[port_req->dev_num][slv_port_id],
 						port_req->dev_num, get_cmd_id(swrm),
-						SWRS_DP_OFFSET_CONTROL_1_BANK(slv_id,
+						SWRS_DP_OFFSET_CONTROL_1_BANK(slv_port_id,
 									bank));
 			}
 
@@ -1658,7 +1681,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 				val[len++] = SWR_REG_VAL_PACK(port_req->offset2,
 						port_req->dev_num, get_cmd_id(swrm),
 						SWRS_DP_OFFSET_CONTROL_2_BANK(
-							slv_id, bank));
+							slv_port_id, bank));
 			}
 
 			if (len < SWRM_MAX_PORT_REG
@@ -1669,7 +1692,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 				reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
 				val[len++] = SWR_REG_VAL_PACK(hparams,
 						port_req->dev_num, get_cmd_id(swrm),
-						SWRS_DP_HCONTROL_BANK(slv_id,
+						SWRS_DP_HCONTROL_BANK(slv_port_id,
 									bank));
 			}
 
@@ -1679,7 +1702,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 				val[len++] =
 					SWR_REG_VAL_PACK(port_req->word_length,
 						port_req->dev_num, get_cmd_id(swrm),
-						SWRS_DP_BLOCK_CONTROL_1(slv_id));
+						SWRS_DP_BLOCK_CONTROL_1(slv_port_id));
 			}
 
 			if (len < SWRM_MAX_PORT_REG
@@ -1689,7 +1712,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 					SWR_REG_VAL_PACK(
 					port_req->blk_pack_mode,
 					port_req->dev_num, get_cmd_id(swrm),
-					SWRS_DP_BLOCK_CONTROL_3_BANK(slv_id,
+					SWRS_DP_BLOCK_CONTROL_3_BANK(slv_port_id,
 									bank));
 			}
 
@@ -1701,7 +1724,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 						port_req->blk_grp_count,
 						port_req->dev_num, get_cmd_id(swrm),
 						SWRS_DP_BLOCK_CONTROL_2_BANK(
-								slv_id, bank));
+								slv_port_id, bank));
 			}
 
 			if (len < SWRM_MAX_PORT_REG
@@ -1711,7 +1734,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 					SWR_REG_VAL_PACK(port_req->lane_ctrl,
 						port_req->dev_num, get_cmd_id(swrm),
 						SWRS_DP_LANE_CONTROL_BANK(
-								slv_id, bank));
+								slv_port_id, bank));
 			}
 
 			if (len < SWRM_MAX_PORT_REG
@@ -1723,14 +1746,14 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 						SWR_REG_VAL_PACK(1,
 							port_req->dev_num, get_cmd_id(swrm),
 							SWRS_DP_PORT_CONTROL(
-								slv_id));
+								slv_port_id));
 				} else if (mport->dir == 1) {
 					reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
 					val[len++] =
 						SWR_REG_VAL_PACK(2,
 							port_req->dev_num, get_cmd_id(swrm),
 							SWRS_DP_PORT_CONTROL(
-								slv_id));
+								slv_port_id));
 				}
 
 				if (len < SWRM_MAX_PORT_REG) {
@@ -1761,7 +1784,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 					reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
 					val[len++] = SWR_REG_VAL_PACK(0, port_req->dev_num,
 								get_cmd_id(swrm),
-								SWRS_DP_PORT_CONTROL(slv_id));
+								SWRS_DP_PORT_CONTROL(slv_port_id));
 				}
 
 				if (len < SWRM_MAX_PORT_REG &&
