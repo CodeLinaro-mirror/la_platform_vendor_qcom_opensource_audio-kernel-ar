@@ -1,11 +1,12 @@
-AUDIO_ROOT=$(PWD)
-UAPI_OUT=$(PWD)
+CUR_MKFILE = $(abspath $(lastword $(MAKEFILE_LIST)))
+AUDIO_ROOT=$(dir $(CUR_MKFILE))
+UAPI_OUT=$(dir $(CUR_MKFILE))
 HEADER_INSTALL_DIR=$(KERNEL_SRC)/scripts
-KERNEL_BINARY_DIR=$(KERNEL_SRC)/../kernel-build-artifacts
+KERNEL_BINARY_DIR=${KERNEL_UAPI_HEADERS_DIR}
 
-KBUILD_OPTIONS := AUDIO_ROOT=$(PWD)
+KBUILD_OPTIONS := AUDIO_ROOT=$(dir $(CUR_MKFILE))
 KBUILD_OPTIONS += MODNAME=audio
-KBUILD_OPTIONS += UAPI_OUT=$(PWD)
+KBUILD_OPTIONS += UAPI_OUT=${UAPI_OUT}
 
 AUDIO_KERNEL_HEADERS_PATH1 =  $(shell ls ./include/uapi/audio/linux/*.h)
 AUDIO_KERNEL_HEADERS_PATH2 =  $(shell ls ./include/uapi/audio/linux/mfd/wcd9xxx/*.h)
@@ -41,6 +42,10 @@ endif
 ifeq ($(TARGET_SUPPORT), sdmsteppe)
 obj-m += asoc/codecs/bolero/
 obj-m += asoc/codecs/wcd937x/
+endif
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), pineapple))
+KBUILD_OPTIONS += CONFIG_SND_SOC_PINEAPPLE=m
+KBUILD_OPTIONS += CONFIG_ARCH_PINEAPPLE=y
 endif
 
 ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa8155 sa8155ivi sa6155 sa8195 qtiquingvm))
