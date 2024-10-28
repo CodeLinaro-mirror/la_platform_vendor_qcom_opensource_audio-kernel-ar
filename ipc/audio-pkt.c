@@ -27,10 +27,13 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/termios.h>
+#include <linux/kdev_t.h>
 #include <ipc/gpr-lite.h>
 #include <dsp/spf-core.h>
 #include <dsp/msm_audio_ion.h>
-
+#ifdef CONFIG_AUTO_AMS
+#include <dsp/ams.h>
+#endif
 /* Define IPC Logging Macros */
 #define AUDIO_PKT_IPC_LOG_PAGE_CNT 2
 static void *audio_pkt_ilctxt;
@@ -63,8 +66,17 @@ do {									      \
 
 #define MODULE_NAME "audio-pkt"
 #define MINOR_NUMBER_COUNT 1
+#define MINOR_NUMBER_FIRST 0
+#define MINOR_NUMBER_ADSP MINOR_NUMBER_FIRST
+#define MINOR_NUMBER_MODEM_AMS (MINOR_NUMBER_ADSP + 1)
+
+#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+#define AUDPKT_DRIVER_NAME "aud_pasthru_modem"
+#define CHANNEL_NAME "modem_apps"
+#else
 #define AUDPKT_DRIVER_NAME "aud_pasthru_adsp"
 #define CHANNEL_NAME "adsp_apps"
+#endif
 #define MAX_PACKET_SIZE 4096
 
 
@@ -304,7 +316,7 @@ ssize_t audio_pkt_read(struct file *file, char __user *buf,
 	if (AUDIO_PKT_PROBED != ap_priv->status)
 	{
 		mutex_unlock(&ap_priv->lock);
-		AUDIO_PKT_ERR("dev is in reset\n");
+		AUDIO_PKT_ERR("dev is in reset(status=%d)\n",ap_priv->status);
 		return -ENETRESET;
 	}
 	mutex_unlock(&ap_priv->lock);
@@ -419,8 +431,8 @@ int audpkt_chk_and_update_satellite_physical_addr(struct audio_satellite_gpr_pkt
 					__func__, ret);
 			return ret;
 		}
-		AUDIO_PKT_INFO("%s physical address %pK", __func__,
-				(void *) paddr);
+		AUDIO_PKT_INFO("%s physical address %pK pa_len %zu", __func__,
+				(void *) paddr, pa_len);
 		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (uint32_t) paddr;
 		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw = (uint64_t) paddr >> 32;
 	}
@@ -445,7 +457,7 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 	struct audio_pkt_device *audpkt_dev = NULL;
 	struct gpr_hdr *audpkt_hdr = NULL;
 	void *kbuf;
-	int ret;
+	int ret = 0;
 
 	if (file == NULL || file->private_data == NULL || buf == NULL) {
 		AUDIO_PKT_ERR("invalid parameters\n");
@@ -463,7 +475,7 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 	if (AUDIO_PKT_PROBED != ap_priv->status)
 	{
 		mutex_unlock(&ap_priv->lock);
-		AUDIO_PKT_ERR("dev is in reset\n");
+		AUDIO_PKT_ERR("dev is in reset(status=%d)\n",ap_priv->status);
 		return -ENETRESET;
 	}
 	mutex_unlock(&ap_priv->lock);
@@ -520,7 +532,10 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 		mutex_unlock(&audpkt_dev->lock);
 		goto free_kbuf;
 	}
-	ret = gpr_send_pkt(ap_priv->adev,(struct gpr_pkt *) kbuf);
+	if (gpr_get_q6_state() != GPR_SUBSYS_DOWN)
+		ret = gpr_send_pkt(ap_priv->adev, (struct gpr_pkt *) kbuf);
+	else
+		AUDIO_PKT_ERR("q6 is down\n");
 	if (ret < 0) {
 		AUDIO_PKT_ERR("APR Send Packet Failed ret -%d\n", ret);
 		if (ret == -ECONNRESET)
