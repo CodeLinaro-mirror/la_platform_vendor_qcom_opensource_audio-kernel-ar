@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (c) 2012, 2014, 2017, 2020, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _UAPI_LINUX_MSM_AUDIO_H
@@ -14,6 +14,8 @@
 
 #define AUDIO_IOCTL_MAGIC 'a'
 
+#define COMPAT_IOCTL_MAP_PHYS_ADDR 97
+#define COMPAT_IOCTL_UNMAP_PHYS_ADDR 98
 #define IOCTL_MAP_PHYS_ADDR _IOW(AUDIO_IOCTL_MAGIC, 97, int)
 #define IOCTL_UNMAP_PHYS_ADDR _IOW(AUDIO_IOCTL_MAGIC, 98, int)
 
@@ -23,6 +25,17 @@
 #define IOCTL_UNMAP_HYP_ASSIGN_V2 _IOW(AUDIO_IOCTL_MAGIC, 112, struct msm_mdf_data)
 
 #define AUDIO_MAX_COMMON_IOCTL_NUM 113
+
+#define ADSP_STREAM_PP_EVENT				0
+#define ADSP_STREAM_ENCDEC_EVENT			1
+#define ADSP_STREAM_IEC_61937_FMT_UPDATE_EVENT		2
+#define ADSP_STREAM_EVENT_MAX				3
+
+struct msm_adsp_event_data {
+	__u32 event_type;
+	__u32 payload_len;
+	__u8 payload[0];
+};
 
 /* ss_masks is generated from sys_ids
  * for id in sys_ids
