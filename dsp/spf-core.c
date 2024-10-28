@@ -131,7 +131,7 @@ static bool __spf_core_is_apm_ready(struct spf_core *core)
 	pkt.hdr.src_domain_id = GPR_IDS_DOMAIN_ID_APPS_V;
 	pkt.hdr.opcode = APM_CMD_GET_SPF_STATE;
 
-	dev_err_ratelimited(spf_core_priv->dev, "%s: send_command ret\n", __func__);
+	dev_info_ratelimited(spf_core_priv->dev, "%s: send_command ret\n", __func__);
 
 	rc = gpr_send_pkt(adev, &pkt);
 	if (rc < 0) {
@@ -175,6 +175,10 @@ bool spf_core_is_apm_ready(int timeout_ms)
 
 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	mutex_lock(&core->lock);
+
+	/* sleep for 100ms before querying AVS up */
+	msleep(100);
+
 	for (;;) {
 		if (__spf_core_is_apm_ready(core)) {
 			ret = true;
@@ -338,7 +342,7 @@ static struct gpr_driver qcom_spf_core_driver = {
 static void spf_core_add_child_devices(struct work_struct *work)
 {
 	int ret;
-        pr_err("%s:enumarate machine driver\n", __func__);
+        pr_info("%s:enumarate machine driver\n", __func__);
 
 	if (spf_core_is_apm_ready(ADD_CHILD_DEVICES_APM_TIMEOUT_MS)) {
 		dev_err(spf_core_priv->dev, "%s: apm is up\n",

@@ -13,6 +13,7 @@
 #include <linux/mutex.h>
 #include <linux/list.h>
 #include <linux/dma-mapping.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/dma-buf.h>
 #include <linux/iosys-map.h>
 #include <linux/platform_device.h>
@@ -20,6 +21,7 @@
 #include <linux/of_device.h>
 #include <linux/export.h>
 #include <linux/ioctl.h>
+#include <linux/compat.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/device.h>
@@ -32,6 +34,7 @@
 #include <linux/firmware/qcom/qcom_scm.h>
 #include <soc/qcom/secure_buffer.h>
 #include <linux/of.h>
+#include <bindings/qcom,gpr.h>
 
 MODULE_IMPORT_NS(DMA_BUF);
 
@@ -474,6 +477,7 @@ int msm_audio_get_phy_addr(int fd, dma_addr_t *paddr, size_t *pa_len)
 }
 EXPORT_SYMBOL(msm_audio_get_phy_addr);
 
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 static int msm_audio_set_hyp_assign(int fd, bool assign)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
@@ -494,6 +498,7 @@ static int msm_audio_set_hyp_assign(int fd, bool assign)
 	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
 	return status;
 }
+#endif
 
 void msm_audio_get_handle(int fd, void **handle)
 {
@@ -737,12 +742,14 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	size_t pa_len = 0;
 	struct iosys_map *iosys_vmap = NULL;
 	int ret = 0;
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS);
 	struct qcom_scm_vmperm dst_vmids_map[] = {{VMID_LPASS, PERM_READ | PERM_WRITE},
 		{VMID_ADSP_HEAP, PERM_READ | PERM_WRITE}};
 	u64 src_vmid_unmap_list = BIT(VMID_LPASS) | BIT(VMID_ADSP_HEAP);
 	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
 		PERM_READ | PERM_WRITE | PERM_EXEC}};
+#endif
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	struct msm_audio_ion_private *ion_data =
 			container_of(file->f_inode->i_cdev, struct msm_audio_ion_private, cdev);
@@ -750,6 +757,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	pr_debug("%s ioctl num %u\n", __func__, ioctl_num);
 	switch (ioctl_num) {
 	case IOCTL_MAP_PHYS_ADDR:
+	case COMPAT_IOCTL_MAP_PHYS_ADDR:
 		iosys_vmap = kzalloc(sizeof(struct msm_audio_fd_data), GFP_KERNEL);
 		if (!iosys_vmap)
 			return -ENOMEM;
@@ -776,6 +784,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		msm_audio_update_fd_list(msm_audio_fd_data);
 		break;
 	case IOCTL_UNMAP_PHYS_ADDR:
+	case COMPAT_IOCTL_UNMAP_PHYS_ADDR:
 		msm_audio_get_handle((int)ioctl_param, &mem_handle);
 		ret = msm_audio_ion_free(mem_handle, ion_data);
 		if (ret < 0) {
@@ -785,6 +794,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		msm_audio_delete_fd_entry(mem_handle);
 		break;
 	case IOCTL_MAP_HYP_ASSIGN:
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	    ret = msm_audio_get_phy_addr((int)ioctl_param, &paddr, &pa_len);
 		if (ret < 0) {
 			pr_err("%s get phys addr failed %d\n", __func__, ret);
@@ -799,8 +809,10 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		}
 		pr_debug("%s: qcom scm assign success\n", __func__);
 		msm_audio_set_hyp_assign((int)ioctl_param, true);
+#endif
 		break;
 	case IOCTL_UNMAP_HYP_ASSIGN:
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	    ret = msm_audio_get_phy_addr((int)ioctl_param, &paddr, &pa_len);
 		if (ret < 0) {
 			pr_err("%s get phys addr failed %d\n", __func__, ret);
@@ -815,6 +827,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		}
 		pr_debug("%s: qcom scm unassign success\n", __func__);
 		msm_audio_set_hyp_assign((int)ioctl_param, false);
+#endif
 	    break;
 	default:
 		pr_err("%s Entered default. Invalid ioctl num %u",
@@ -824,6 +837,15 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	}
 	return ret;
 }
+
+static long msm_audio_ion_compat_ioctl(struct file *file, unsigned int ioctl_num,
+                                 unsigned long __user ioctl_param)
+{
+	unsigned int ioctl_nr = _IOC_NR(ioctl_num);
+
+	return (long)msm_audio_ion_ioctl(file, ioctl_nr, ioctl_param);
+}
+
 
 static const struct of_device_id msm_audio_ion_dt_match[] = {
 	{ .compatible = "qcom,msm-audio-ion" },
@@ -837,6 +859,7 @@ static const struct file_operations msm_audio_ion_fops = {
 	.open = msm_audio_ion_open,
 	.release = msm_audio_ion_release,
 	.unlocked_ioctl = msm_audio_ion_ioctl,
+	.compat_ioctl = msm_audio_ion_compat_ioctl,
 };
 
 static int msm_audio_ion_reg_chrdev(struct msm_audio_ion_private *ion_data)
@@ -909,7 +932,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	enum apr_subsys_state q6_state;
 #endif
 
-	dev_err(dev, "%s: msm_audio_ion_probe\n", __func__);
+	dev_info(dev, "%s: msm_audio_ion_probe\n", __func__);
 	if (dev->of_node == NULL) {
 		dev_err(dev,
 			"%s: device tree is not found\n",
@@ -978,7 +1001,11 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 		msm_audio_ion_data->smmu_sid_bits =
 			smmu_sid << MSM_AUDIO_SMMU_SID_OFFSET;
 	} else {
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 		msm_audio_ion_data->driver_name = "msm_audio_ion_cma";
+#else
+		msm_audio_ion_data->driver_name = "msm_audio_ion";
+#endif
 	}
 
 	if (!rc)
