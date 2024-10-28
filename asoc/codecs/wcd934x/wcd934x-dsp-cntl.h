@@ -8,8 +8,9 @@
 
 #include <linux/miscdevice.h>
 #include <sound/soc.h>
-#include <sound/wcd-dsp-mgr.h>
 
+#ifndef CONFIG_WCD934X_I2S
+#include <sound/wcd-dsp-mgr.h>
 enum cdc_ssr_event {
 	WCD_CDC_DOWN_EVENT,
 	WCD_CDC_UP_EVENT,
@@ -114,4 +115,6 @@ void wcd_dsp_cntl_init(struct snd_soc_component *component,
 		       struct wcd_dsp_cntl **cntl);
 void wcd_dsp_cntl_deinit(struct wcd_dsp_cntl **cntl);
 int wcd_dsp_ssr_event(struct wcd_dsp_cntl *cntl, enum cdc_ssr_event event);
+#endif
+
 #endif /* end __WCD_DSP_CONTROL_H__ */
