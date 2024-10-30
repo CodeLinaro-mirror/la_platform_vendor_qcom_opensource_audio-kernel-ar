@@ -274,6 +274,7 @@ struct swr_device {
 	u64 addr;
 	u8 group_id;
 	bool paging_support;
+	bool ignore_nested_irq;
 	struct irq_domain *slave_irq;
 	bool slave_irq_pending;
 	bool clk_scale_initialized;

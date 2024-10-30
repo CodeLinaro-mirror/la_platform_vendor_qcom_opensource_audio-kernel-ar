@@ -1863,6 +1863,7 @@ static int simple_amp_probe(struct swr_device *peripheral)
 	struct regmap *regmap;
 
 	peripheral->paging_support = true;
+	peripheral->ignore_nested_irq = true;
 
 	get_reg_defaults(&reg_def, &num_reg_def);
 	simple_amp_regmap.reg_defaults = reg_def;
