@@ -43,6 +43,7 @@
 #define SWRM_VERSION_1_6   0x01060000
 #define SWRM_VERSION_1_7   0x01070000
 #define SWRM_VERSION_2_0   0x02000000
+#define SWRM_VERSION_2_1   0x02010000
 
 #define SWR_MAX_CH_PER_PORT 8
 
@@ -152,6 +153,7 @@ struct swr_mstr_ctrl {
 	int irq;
 	int wake_irq;
 	int version;
+	int version_index;
 	int mclk_freq;
 	int bus_clk;
 	u32 num_dev;
