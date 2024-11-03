@@ -109,6 +109,11 @@ enum sdca_function_type {
 #define SIMPLE_AMP_FU21_RIGHT_CH_VOL_CH2X1_LSB SDW_SDCA_NEXT_CTL(SIMPLE_AMP_FU21_RIGHT_CH_VOL_CH2X1)
 #define SIMPLE_AMP_FU21_RIGHT_CH_VOL_CH2X1_MSB SDW_SDCA_MBQ_CTL(SIMPLE_AMP_FU21_RIGHT_CH_VOL_CH2X1_LSB)
 
+/* FSM registers (Impl. def) */
+#define SIMPLE_AMP_IMPL_DEF_POWER_FSM 0x40580423
+#define SIMPLE_AMP_IMPL_DEF_PA0_FSM  0x4058042A
+#define SIMPLE_AMP_IMPL_DEF_PA1_FSM  0x40580434
+
 struct port_config {
 	int num_ports;
 	u8 port_id[MAX_SWR_SLV_PORTS];
@@ -137,6 +142,11 @@ struct entity_idx_table {
 struct impl_def_reg_val_pair {
 	uint32_t reg;
 	uint32_t value;
+};
+
+struct impl_def_fsm_regs {
+	uint32_t reg;
+	uint8_t bit_pos;
 };
 
 struct simple_amp_priv {

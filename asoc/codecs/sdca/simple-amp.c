@@ -207,6 +207,9 @@ static enum access_mode get_access_mode(struct simple_amp_priv *simple_amp,
 	switch (reg) {
 		case 0x40580600 ... 0x405806FF:
 		case 0x4058041C:
+		case SIMPLE_AMP_IMPL_DEF_POWER_FSM:
+		case SIMPLE_AMP_IMPL_DEF_PA0_FSM:
+		case SIMPLE_AMP_IMPL_DEF_PA1_FSM:
 		case 0x40580460 ... 0x405804BF:
 		case 0x405800CA:
 		case 0x405800CB:
@@ -249,6 +252,11 @@ static bool simple_amp_writeable_register(struct device *dev, unsigned int reg)
 static bool simple_amp_volatile_register(struct device *dev, unsigned int reg)
 {
 	struct simple_amp_priv *simple_amp = dev_get_drvdata(dev);
+
+	if ((reg == SIMPLE_AMP_IMPL_DEF_POWER_FSM) ||
+		(reg == SIMPLE_AMP_IMPL_DEF_PA0_FSM) ||
+		(reg == SIMPLE_AMP_IMPL_DEF_PA1_FSM))
+		return true;
 
 	switch (get_access_mode(simple_amp, reg)) {
 		case READ_ONLY:
@@ -911,6 +919,11 @@ static int simple_amp_component_probe(struct snd_soc_component *component)
 					SIMPLE_AMP_CTL_POSTURE_NUM, 0),
 				0x1);
 	}
+
+	/* Enable interrupts */
+	regmap_write(simple_amp->regmap, SDW_SCP_SDCA_INTMASK1, SDCA_INT1_MASK);
+	regmap_write(simple_amp->regmap, SDW_SCP_SDCA_INTMASK2, SDCA_INT2_MASK);
+	regmap_write(simple_amp->regmap, SDW_SCP_SDCA_INTMASK3, SDCA_INT3_MASK);
 
 	return 0;
 }
@@ -1730,127 +1743,106 @@ err:
 
 }
 
-
-static void int_disable_handle(void)
-{
-}
-
-static void pa0_ocp_int_handle(void)
-{
-}
-
-static void pa1_ocp_int_handle(void)
-{
-}
-
-static void clock_stop_int_handle(void)
-{
-}
-
-static void uvlo_int_handle(void)
-{
-}
-
-static void pa0_fsm_error_int_handle(void)
-{
-}
-
-static void pa1_fsm_error_int_handle(void)
-{
-}
-
-static void power_fsm_error_int_handle(void)
-{
-}
-
-static void stereo_protection_Mode_Changed_handle(void)
-{
-}
-
-static void stereo_playback_clock_valid_handle(void)
-{
-}
-
-static void stereo_sense_clock_valid_handle(void)
-{
-}
+static const char *simple_amp_interrupts[] = {
+	"int_safe2war",
+	"int_war2saf",
+	"int_disable",
+	"pa0_ocp_int",
+	"pa1_ocp_int",
+	"int_clip0",
+	"int_clip1",
+	"clock_stop_int",
+	"GPIO0_INTR",
+	"GPIO1_INTR",
+	"uvlo_int",
+	"bop_int",
+	"pa0_fsm_error_int",
+	"pa1_fsm_error_int",
+	"power_fsm_error_int",
+	"ch0_pcm_stuck",
+	"ch1_pcm_stuck",
+	"ch0_dc_detected",
+	"ch1_dc_detected",
+	"pll_unlocked_int",
+	"stereo_protection_Mode_Changed",
+	"stereo_playback_clock_valid",
+	"stereo_sense_clock_valid",
+	"mono_left_protection_Mode_Changed",
+};
 
 static int simple_amp_interrupt_cb(struct swr_device *swr_dev, u8 devnum)
 {
-	uint32_t stat1, stat2, stat3;
-	uint32_t tmp;
+	unsigned long stat1 = 0, stat2 = 0, stat3 = 0;
+	uint32_t i, fsm_status;
 	struct simple_amp_priv *simple_amp = dev_get_drvdata(&swr_dev->dev);
-
-	dev_dbg(simple_amp->dev, "%s: Enter\n", __func__);
+	struct impl_def_fsm_regs fsm_regs[] = {
+		{.reg = SIMPLE_AMP_IMPL_DEF_POWER_FSM, .bit_pos = BIT(3)},
+		{.reg = SIMPLE_AMP_IMPL_DEF_PA0_FSM, .bit_pos = BIT(2)},
+		{.reg = SIMPLE_AMP_IMPL_DEF_PA1_FSM, .bit_pos = BIT(2)},
+	};
+	bool toggle_fsm =  false;
+	uint8_t bit = 0;
 
 	do {
-
 		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT1 , &stat1, 1);
 		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT2 , &stat2, 1);
 		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT3 , &stat3, 1);
 
-		/* Check and handle each bit for register1 */
-		if (stat1 & SDW_SCP_SDCA_INTMASK_SDCA_3) {
-			int_disable_handle();
-		}
-		if (stat1 & SDW_SCP_SDCA_INTMASK_SDCA_4) {
-			pa0_ocp_int_handle();
-		}
-		if (stat1 & SDW_SCP_SDCA_INTMASK_SDCA_5) {
-			pa1_ocp_int_handle();
+		/* 7..0,      15,...8,    23,...,16 */
+		/* INT1[7:0], INT2[7:0],  INT3[7:0] */
+		if (stat3 & SDCA_INT3_MASK) {
+			for_each_set_bit(bit, &stat3, 8) {
+				dev_dbg(simple_amp->dev, "interrupt %s triggered\n",
+						simple_amp_interrupts[16 + bit]);
+			}
 		}
 
-		/* Check and handle each bit for register2 */
-		if (stat2 & SDW_SCP_SDCA_INTMASK_SDCA_8) {
-			clock_stop_int_handle();
-		}
-		if (stat2 & SDW_SCP_SDCA_INTMASK_SDCA_11) {
-			uvlo_int_handle();
-		}
-		if (stat2 & SDW_SCP_SDCA_INTMASK_SDCA_13) {
-			pa0_fsm_error_int_handle();
-		}
-		if (stat2 & SDW_SCP_SDCA_INTMASK_SDCA_14) {
-			pa1_fsm_error_int_handle();
-		}
-		if (stat2 & SDW_SCP_SDCA_INTMASK_SDCA_15) {
-			power_fsm_error_int_handle();
-		}
+		/* check for FSM errors */
+		if ((stat1 & SDCA_INT1_MASK) || (stat2 & SDCA_INT2_MASK)) {
+			toggle_fsm = true;
 
-		/* Check and handle each bit for register3 */
-		if (stat3 & SDW_SCP_SDCA_INTMASK_SDCA_21) {
-			stereo_protection_Mode_Changed_handle();
+			for_each_set_bit(bit, &stat1, 8) {
+				dev_err(simple_amp->dev, "interrupt %s triggered\n",
+						simple_amp_interrupts[bit]);
+				if (bit == 2) /* int_disable interrupt */
+					msleep(100);
+			}
+			for_each_set_bit(bit, &stat2, 8) {
+				dev_err(simple_amp->dev, "interrupt %s triggered\n",
+						simple_amp_interrupts[8 + bit]);
+			}
 		}
-		if (stat3 & SDW_SCP_SDCA_INTMASK_SDCA_22) {
-			stereo_playback_clock_valid_handle();
-		}
-		if (stat3 & SDW_SCP_SDCA_INTMASK_SDCA_23) {
-			stereo_sense_clock_valid_handle();
-		}
+		/* clear interrupt status */
+		if (stat1 & SDCA_INT1_MASK)
+			swr_write(swr_dev, devnum, SDW_SCP_SDCA_INT1, &stat1);
+		if (stat2 & SDCA_INT2_MASK)
+			swr_write(swr_dev, devnum, SDW_SCP_SDCA_INT2, &stat2);
+		if (stat3 & SDCA_INT3_MASK)
+			swr_write(swr_dev, devnum, SDW_SCP_SDCA_INT3, &stat3);
 
-		tmp =(uint32_t) ~SDCA_INT1_MASK;
-		stat1 = stat1 & tmp;
-
-		tmp =(uint32_t) ~SDCA_INT2_MASK;
-		stat2 = stat2 & tmp;
-
-		tmp =(uint32_t) ~SDCA_INT3_MASK;
-		stat3 = stat3 & tmp;
-
-		/* Clear the interrupt( write-back 0 to clear the interrupt) */
-		swr_write(swr_dev, devnum, SDW_SCP_SDCA_INT1, &stat1);
-		swr_write(swr_dev, devnum, SDW_SCP_SDCA_INT2, &stat2);
-		swr_write(swr_dev, devnum, SDW_SCP_SDCA_INT3, &stat3);
-
+#if 0
 		/* Read the register values again to check for new interrupts */
 		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT1 , &stat1, 1);
 		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT2 , &stat2, 1);
 		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT3 , &stat3, 1);
+#endif
 
-	} while ((stat1 & SDCA_INT1_MASK) ||
-			(stat2 & SDCA_INT2_MASK) ||
-			(stat3 & SDCA_INT3_MASK)); // Continue if any of the bits are still set
+	} while (0);
 
+	if (!toggle_fsm)
+		goto exit;
+
+	/* fsm:clr_error: 0-->1-->0 */
+	for (i = 0; i < ARRAY_SIZE(fsm_regs); ++i) {
+		swr_read(swr_dev, devnum, fsm_regs[i].reg, &fsm_status, 1);
+		fsm_status &= ~fsm_regs[i].bit_pos;
+		swr_write(swr_dev, devnum, fsm_regs[i].reg, &fsm_status); /* 0 */
+		fsm_status |= fsm_regs[i].bit_pos;
+		swr_write(swr_dev, devnum, fsm_regs[i].reg, &fsm_status); /* 1 */
+		fsm_status &= ~fsm_regs[i].bit_pos;
+		swr_write(swr_dev, devnum, fsm_regs[i].reg, &fsm_status); /* 0 */
+	}
+exit:
 	return 0;
 }
 
