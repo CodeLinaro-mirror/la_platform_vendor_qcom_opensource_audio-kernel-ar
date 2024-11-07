@@ -69,6 +69,7 @@ enum sdca_function_type {
 #define SIMPLE_AMP_CTL_FU21_VOLUME         0x02
 #define SIMPLE_AMP_CTL_CLOCK_VALID         0x02
 #define SIMPLE_AMP_CTL_IT_USAGE            0x04
+#define SIMPLE_AMP_CTL_FUNC_STATUS         0x10
 #define SIMPLE_AMP_CTL_SAMPLE_FREQ_INDEX   0x10
 #define SIMPLE_AMP_CTL_CLUSTER_INDEX       0x10
 #define SIMPLE_AMP_CTL_POSTURE_NUM         0x10

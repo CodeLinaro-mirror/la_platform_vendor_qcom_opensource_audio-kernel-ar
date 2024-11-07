@@ -211,6 +211,8 @@ static enum access_mode get_access_mode(struct simple_amp_priv *simple_amp,
 		case SIMPLE_AMP_IMPL_DEF_PA0_FSM:
 		case SIMPLE_AMP_IMPL_DEF_PA1_FSM:
 		case 0x40580460 ... 0x405804BF:
+		case 0x40580065:
+		case 0x40580067:
 		case 0x405800CA:
 		case 0x405800CB:
 		case 0x405800CC:
@@ -918,6 +920,14 @@ static int simple_amp_component_probe(struct snd_soc_component *component)
 				SDW_SDCA_CTL(i, entity_data->entity_num,
 					SIMPLE_AMP_CTL_POSTURE_NUM, 0),
 				0x1);
+
+		entity_data = &sdca_func_data->entity_data[ENTITY_TYPE_0];
+		regmap_write(simple_amp->regmap,
+				SDW_SDCA_CTL(i, entity_data->entity_num,
+				SIMPLE_AMP_CTL_FUNC_STATUS, 0), 0x20);
+		regmap_write(simple_amp->regmap,
+				SDW_SDCA_CTL(i, entity_data->entity_num,
+				SIMPLE_AMP_CTL_FUNC_STATUS, 0), 0xFF);
 	}
 
 	/* Enable interrupts */
