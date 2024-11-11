@@ -31,6 +31,7 @@
 #define IMPL_DEF_CTL_SEL_START 0x30
 #define SDCA_VALID_REGISTER_MASK 0xfe040000
 #define SDCA_VALID_REGISTER_PATTERN 0x40000000
+#define SIMPLE_AMP_IMPL_DEF_VALID_REG_MASK 0x00339000
 #define IS_VALID_FUNCTION(func)  (((func) > FUNCTION_ZERO) && ((func) < MAX_FUNCTION))
 
 void get_reg_defaults(const struct reg_default **reg_def, size_t *num_defaults);
@@ -118,12 +119,6 @@ enum access_mode {
 	INVALID_MODE,
 };
 
-enum mode_table {
-	MODE_0 = 0,
-	MODE_1,
-	MODE_2,
-};
-
 struct amp_ctrl_platform_data {
 	void *handle;
 	int (*update_amp_event)(void *handle, u16 event, u32 data);
@@ -178,7 +173,38 @@ static enum access_mode get_access_mode(struct simple_amp_priv *simple_amp,
 		return INVALID_MODE;
 
 	/* check for valid SDCA register */
+	/* bit[31] : 0 */
+	/* bit[30:26] :0b10000 */
+	/* bit[25] : S1 : 0 */
+	/* bit[18] : S0 : 0 */
 	if ((reg & SDCA_VALID_REGISTER_MASK) != SDCA_VALID_REGISTER_PATTERN)
+		return INVALID_MODE;
+
+	/* first check if register is impl. defined */
+	/* impl. defined reg addresses are same for stereo and dual-mono function */
+	switch (reg) {
+		case 0x40580600 ... 0x405806FF:
+		case 0x4058041C:
+		case SIMPLE_AMP_IMPL_DEF_POWER_FSM:
+		case SIMPLE_AMP_IMPL_DEF_PA0_FSM:
+		case SIMPLE_AMP_IMPL_DEF_PA1_FSM:
+		case 0x4058042B:
+		case 0x40580435:
+		case 0x40580460 ... 0x405804BF:
+		case 0x40580065:
+		case 0x40580067:
+		case 0x405800CA:
+		case 0x405800CB:
+		case 0x405800CC:
+		case 0x4058005B:
+		case 0x4058005C:
+			return READ_WRITE;
+	}
+
+	/* Now check if register falls in SDCA Controls */
+	/* For simple-amp, higher numbers bits are zero, not implemented */
+	/* So inspect bits at Entity[6:5] : 0b00 , c_sel[5] : 0, c_num[5:3] : 0b000 */
+	if ((reg & SIMPLE_AMP_IMPL_DEF_VALID_REG_MASK) != 0)
 		return INVALID_MODE;
 
 	SDW_SDCA_EXTRACT_ALL(reg, fun, ent, ctl_sel, ch);
@@ -203,23 +229,6 @@ static enum access_mode get_access_mode(struct simple_amp_priv *simple_amp,
 			return entity_data->control_sel_map[ctl_sel]->access_mode;
 	}
 
-	/* impl def registers */
-	switch (reg) {
-		case 0x40580600 ... 0x405806FF:
-		case 0x4058041C:
-		case SIMPLE_AMP_IMPL_DEF_POWER_FSM:
-		case SIMPLE_AMP_IMPL_DEF_PA0_FSM:
-		case SIMPLE_AMP_IMPL_DEF_PA1_FSM:
-		case 0x40580460 ... 0x405804BF:
-		case 0x40580065:
-		case 0x40580067:
-		case 0x405800CA:
-		case 0x405800CB:
-		case 0x405800CC:
-		case 0x4058005B:
-		case 0x4058005C:
-			return READ_WRITE;
-	}
 	return INVALID_MODE;
 }
 
@@ -828,39 +837,6 @@ static int simple_amp_function_init(struct simple_amp_priv *simple_amp,
 	return ret;
 }
 
-static int simple_amp_load_mode_tbl(struct simple_amp_priv *simple_amp,
-		struct sdca_function *sdca_func)
-{
-	char mode_table_property[20];
-	u32 reg_values[MAX_INIT_REGS * 2];
-	int mode, num_regs, i;
-
-	for (mode = 0; mode <= MODE_2; ++mode) {
-
-		snprintf(mode_table_property, sizeof(mode_table_property),
-				"mode_%d_tbl", mode);
-
-		num_regs = of_property_read_variable_u32_array(simple_amp->dev->of_node,
-				mode_table_property, reg_values, 0,
-				ARRAY_SIZE(reg_values));
-		if (num_regs == -EOVERFLOW) {
-			dev_err(simple_amp->dev,
-				"num of DT entries exceed expected for mode_0_table\n");
-			return -EINVAL;
-		}
-		if (num_regs == -ENODATA || num_regs == -EINVAL) {
-			num_regs = 0; /* mode_tbl is optional */
-			dev_dbg(simple_amp->dev, "%s not found\n",
-					mode_table_property);
-		}
-
-		for (i = 0; i < num_regs; i += 2)
-			regmap_write(simple_amp->regmap, reg_values[i],
-					reg_values[i + 1]);
-	}
-	return 0;
-}
-
 static int simple_amp_component_probe(struct snd_soc_component *component)
 {
 	int ret, i;
@@ -889,13 +865,6 @@ static int simple_amp_component_probe(struct snd_soc_component *component)
 			dev_err(simple_amp->dev, "%s: func init failed ret :%d\n",
 				__func__, ret);
 			return -EINVAL;
-		}
-
-		ret = simple_amp_load_mode_tbl(simple_amp, sdca_func_data);
-		if (ret) {
-			dev_info(simple_amp->dev, "%s: load Mode tbl ret: %d\n",
-				__func__, ret);
-			ret = 0;
 		}
 
 	}
