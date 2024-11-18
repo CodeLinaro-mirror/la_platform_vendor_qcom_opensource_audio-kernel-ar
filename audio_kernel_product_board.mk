@@ -17,6 +17,9 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/machine_dlkm.ko
+ifeq ($(call is-board-platform-in-list,volcano),true)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko
+endif
 ifneq ($(call is-board-platform-in-list,bengal holi blair), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_haptics_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko \
