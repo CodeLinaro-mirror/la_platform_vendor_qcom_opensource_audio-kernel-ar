@@ -1028,38 +1028,42 @@ static int wait_for_pde_state(struct simple_amp_priv *simple_amp,
 static void prepare_channel(struct port_config *config, int func,
 		int num_channels, int channel_sel)
 {
-	u8 ch1 = 0x1, ch2 = 0x2;
-	u8 ch1_2 = ch1 | ch2;
+	u8 ch1 = 0x1, ch2 = 0x2, ch12 = ch1 | ch2, channels;
+	u16 prepare_reg;
+
+
 
 	if (func == FUNCTION_STEREO) {
-		if (num_channels == 1) {
-			if (channel_sel == CH1) {
-				swr_write(config->swr_slave,
-						config->swr_slave->dev_num,
-						SWRS_DP_PREPARE_CONTROL(PORT_1), &ch1);
-			} else if (channel_sel == CH2) {
-				swr_write(config->swr_slave,
-						config->swr_slave->dev_num,
-						SWRS_DP_PREPARE_CONTROL(PORT_1), &ch2);
-			}
-		} else {
-			swr_write(config->swr_slave, config->swr_slave->dev_num,
-					SWRS_DP_PREPARE_CONTROL(PORT_1), &ch1);
-			swr_write(config->swr_slave, config->swr_slave->dev_num,
-					SWRS_DP_PREPARE_CONTROL(PORT_1), &ch1_2);
-		}
-		/* delay 2ms for Channels to become ready */
-		/* TODO: poll for CH ready instead */
-		usleep_range(2000, 2010);
-	} else if (func == FUNCTION_MONO_CH1) {
-		swr_write(config->swr_slave, config->swr_slave->dev_num,
-				SWRS_DP_PREPARE_CONTROL(PORT_1), &ch1);
-		usleep_range(2000, 2010);
+		channels = (num_channels == 2) ? ch12 :
+				 ((channel_sel == CH1) ? ch1 : ch2);
+		prepare_reg = SWRS_DP_PREPARE_CONTROL(PORT_1);
 	} else if (func == FUNCTION_MONO_CH2) {
-		swr_write(config->swr_slave, config->swr_slave->dev_num,
-				SWRS_DP_PREPARE_CONTROL(PORT_2), &ch2);
-		usleep_range(2000, 2010);
+			prepare_reg = SWRS_DP_PREPARE_CONTROL(PORT_2);
+			channels = ch1;
+	} else {
+			prepare_reg = SWRS_DP_PREPARE_CONTROL(PORT_1);
+			channels = ch1;
 	}
+
+	swr_write(config->swr_slave, config->swr_slave->dev_num,
+				prepare_reg, &channels);
+	/* delay 2ms for Channels to become ready */
+	/* TODO: poll for CH ready instead */
+	usleep_range(2000, 2010);
+}
+
+static void deprepare_channel(struct port_config *config, int func)
+{
+	u8 ch = 0x0;
+	u16 prepare_reg;
+
+	if (func == FUNCTION_MONO_CH2)
+		prepare_reg = SWRS_DP_PREPARE_CONTROL(PORT_2);
+	else
+		prepare_reg = SWRS_DP_PREPARE_CONTROL(PORT_1);
+
+	swr_write(config->swr_slave, config->swr_slave->dev_num,
+				prepare_reg, &ch);
 }
 
 static void simple_amp_get_port_param(struct port_config *config, int func,
@@ -1359,6 +1363,14 @@ static void simple_amp_shutdown(struct snd_pcm_substream *substream,
 		snd_soc_component_get_drvdata(component);
 	struct sdca_function *sdca_func_data =
 		simple_amp->sdca_func_data[dai->id];
+	struct port_config *pconfig_sel = NULL;
+
+	pconfig_sel = snd_soc_dai_dma_data_get_playback(dai);
+
+	if (!pconfig_sel)
+		return;
+
+	deprepare_channel(pconfig_sel, dai->id);
 
 	/* Set PDE23 control */
 	struct sdca_entity *pde23_entity =
