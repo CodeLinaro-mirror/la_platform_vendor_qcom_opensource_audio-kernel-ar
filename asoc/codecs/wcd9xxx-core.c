@@ -21,7 +21,9 @@
 #include <asoc/wcd9xxx-irq.h>
 #include "wcd9xxx-utils.h"
 #include <asoc/wcd9xxx-regmap.h>
+#ifndef CONFIG_WCD934X_I2S
 #include <asoc/wcd9xxx-slimslave.h>
+#endif
 #include <asoc/wcd9xxx_registers.h>
 
 #define WCD9XXX_REGISTER_START_OFFSET 0x800
@@ -59,6 +61,8 @@ struct wcd9xxx_i2c {
 	int mod_id;
 };
 
+
+#ifndef CONFIG_WCD934X_I2S
 static struct regmap_config wcd9xxx_base_regmap_config = {
 	.reg_bits = 16,
 	.val_bits = 8,
@@ -66,6 +70,7 @@ static struct regmap_config wcd9xxx_base_regmap_config = {
 	.use_single_read = true,
 	.use_single_write = true,
 };
+#endif
 
 static struct regmap_config wcd9xxx_i2c_base_regmap_config = {
 	.reg_bits = 16,
@@ -75,8 +80,10 @@ static struct regmap_config wcd9xxx_i2c_base_regmap_config = {
 	.use_single_write = true,
 };
 
+#ifndef CONFIG_WCD934X_I2S
 static u8 wcd9xxx_pgd_la;
 static u8 wcd9xxx_inf_la;
+#endif
 
 static const int wcd9xxx_cdc_types[] = {
 	[WCD9XXX] = WCD9XXX,
@@ -96,8 +103,10 @@ static const struct of_device_id wcd9xxx_of_match[] = {
 };
 MODULE_DEVICE_TABLE(of, wcd9xxx_of_match);
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_device_up(struct slim_device *sldev);
 static int wcd9xxx_slim_device_down(struct slim_device *sldev);
+#endif
 
 struct wcd9xxx_i2c wcd9xxx_modules[MAX_WCD9XXX_DEVICE];
 
@@ -160,6 +169,7 @@ int wcd9xxx_vote_ondemand_regulator(struct wcd9xxx *wcd9xxx,
 }
 EXPORT_SYMBOL(wcd9xxx_vote_ondemand_regulator);
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_multi_reg_write(struct wcd9xxx *wcd9xxx,
 					const void *data, size_t count)
 {
@@ -214,6 +224,7 @@ static int wcd9xxx_slim_multi_reg_write(struct wcd9xxx *wcd9xxx,
 	kfree(bulk_reg);
 	return ret;
 }
+#endif
 
 /*
  * wcd9xxx_interface_reg_read: Read slim interface registers
@@ -271,6 +282,7 @@ int wcd9xxx_interface_reg_write(struct wcd9xxx *wcd9xxx, unsigned short reg,
 }
 EXPORT_SYMBOL(wcd9xxx_interface_reg_write);
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_read_device(struct wcd9xxx *wcd9xxx, unsigned short reg,
 				int bytes, void *dest, bool interface)
 {
@@ -306,11 +318,13 @@ static int wcd9xxx_slim_read_device(struct wcd9xxx *wcd9xxx, unsigned short reg,
 
 	return ret;
 }
+#endif
 
 /*
  * Interface specifies whether the write is to the interface or general
  * registers.
  */
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_write_device(struct wcd9xxx *wcd9xxx,
 		unsigned short reg, int bytes, void *src, bool interface)
 {
@@ -366,6 +380,7 @@ static int wcd9xxx_slim_get_allowed_slice(struct wcd9xxx *wcd9xxx,
 
 	return allowed_sz;
 }
+#endif
 
 /*
  * wcd9xxx_slim_write_repeat: Write the same register with multiple values
@@ -376,6 +391,13 @@ static int wcd9xxx_slim_get_allowed_slice(struct wcd9xxx *wcd9xxx,
  * This API will write reg with bytes from src in a single slimbus
  * transaction. All values from 1 to 16 are supported by this API.
  */
+#ifdef CONFIG_WCD934X_I2S
+int wcd9xxx_slim_write_repeat(struct wcd9xxx *wcd9xxx, unsigned short reg,
+			      int bytes, void *src)
+{
+	return 0;
+}
+#else
 int wcd9xxx_slim_write_repeat(struct wcd9xxx *wcd9xxx, unsigned short reg,
 			      int bytes, void *src)
 {
@@ -434,6 +456,7 @@ done:
 
 	return ret;
 }
+#endif
 EXPORT_SYMBOL(wcd9xxx_slim_write_repeat);
 
 /*
@@ -443,6 +466,13 @@ EXPORT_SYMBOL(wcd9xxx_slim_write_repeat);
  * @commit: Flag to indicate if bandwidth change is to be committed
  *	    right away
  */
+#ifdef CONFIG_WCD934X_I2S
+int wcd9xxx_slim_reserve_bw(struct wcd9xxx *wcd9xxx,
+		u32 bw_ops, bool commit)
+{
+	return 0;
+}
+#else
 int wcd9xxx_slim_reserve_bw(struct wcd9xxx *wcd9xxx,
 		u32 bw_ops, bool commit)
 {
@@ -455,6 +485,7 @@ int wcd9xxx_slim_reserve_bw(struct wcd9xxx *wcd9xxx,
 
 	return slim_reservemsg_bw(wcd9xxx->slim, bw_ops, commit);
 }
+#endif
 EXPORT_SYMBOL(wcd9xxx_slim_reserve_bw);
 
 /*
@@ -467,6 +498,14 @@ EXPORT_SYMBOL(wcd9xxx_slim_reserve_bw);
  * @return: returns 0 if success or error information to the caller in case
  *	    of failure.
  */
+#ifdef CONFIG_WCD934X_I2S
+int wcd9xxx_slim_bulk_write(struct wcd9xxx *wcd9xxx,
+			    struct wcd9xxx_reg_val *bulk_reg,
+			    unsigned int size, bool is_interface)
+{
+	return 0;
+}
+#else
 int wcd9xxx_slim_bulk_write(struct wcd9xxx *wcd9xxx,
 			    struct wcd9xxx_reg_val *bulk_reg,
 			    unsigned int size, bool is_interface)
@@ -525,6 +564,7 @@ err:
 mem_fail:
 	return ret;
 }
+#endif
 EXPORT_SYMBOL(wcd9xxx_slim_bulk_write);
 
 static int wcd9xxx_num_irq_regs(const struct wcd9xxx *wcd9xxx)
@@ -655,19 +695,23 @@ static void wcd9xxx_device_exit(struct wcd9xxx *wcd9xxx)
 	mutex_destroy(&wcd9xxx->io_lock);
 	mutex_destroy(&wcd9xxx->xfer_lock);
 	mutex_destroy(&wcd9xxx->reset_lock);
+#ifndef CONFIG_WCD934X_I2S
 	if (wcd9xxx_get_intf_type() == WCD9XXX_INTERFACE_TYPE_SLIMBUS)
 		slim_remove_device(wcd9xxx->slim_slave);
+#endif
 }
 
 
 #ifdef CONFIG_DEBUG_FS
 struct wcd9xxx *debugCodec;
 
+#ifndef CONFIG_WCD934X_I2S
 static struct dentry *debugfs_wcd9xxx_dent;
 static struct dentry *debugfs_peek;
 static struct dentry *debugfs_poke;
 static struct dentry *debugfs_power_state;
 static struct dentry *debugfs_reg_dump;
+#endif
 
 static unsigned char read_data;
 
@@ -701,6 +745,13 @@ static int get_parameters(char *buf, long int *param1, int num_of_par)
 	return 0;
 }
 
+#ifdef CONFIG_WCD934X_I2S
+static ssize_t wcd9xxx_slimslave_reg_show(char __user *ubuf, size_t count,
+					  loff_t *ppos)
+{
+	return 0;
+}
+#else
 static ssize_t wcd9xxx_slimslave_reg_show(char __user *ubuf, size_t count,
 					  loff_t *ppos)
 {
@@ -732,6 +783,7 @@ static ssize_t wcd9xxx_slimslave_reg_show(char __user *ubuf, size_t count,
 copy_err:
 	return total;
 }
+#endif
 
 static ssize_t codec_debug_read(struct file *file, char __user *ubuf,
 				size_t count, loff_t *ppos)
@@ -793,7 +845,9 @@ static int codec_debug_process_cdc_power(char *lbuf)
 	if (likely(!rc)) {
 		pdata = debugCodec->slim->dev.platform_data;
 		if (param == 0) {
+#ifndef CONFIG_WCD934X_I2S
 			wcd9xxx_slim_device_down(debugCodec->slim);
+#endif
 			msm_cdc_disable_static_supplies(debugCodec->dev,
 							debugCodec->supplies,
 							pdata->regulator,
@@ -809,7 +863,9 @@ static int codec_debug_process_cdc_power(char *lbuf)
 			usleep_range(1000, 2000);
 			wcd9xxx_set_reset_pin_state(debugCodec, pdata, true);
 			usleep_range(1000, 2000);
+#ifndef CONFIG_WCD934X_I2S
 			wcd9xxx_slim_device_up(debugCodec->slim);
+#endif
 		} else {
 			pr_err("%s: invalid command %ld\n", __func__, param);
 		}
@@ -1030,8 +1086,7 @@ static int wcd9xxx_i2c_get_client_index(struct i2c_client *client,
 	return ret;
 }
 
-static int wcd9xxx_i2c_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int wcd9xxx_i2c_probe(struct i2c_client *client)
 {
 	struct wcd9xxx *wcd9xxx = NULL;
 	struct wcd9xxx_pdata *pdata = NULL;
@@ -1191,9 +1246,12 @@ static int wcd9xxx_i2c_probe(struct i2c_client *client,
 
 		ret = wcd9xxx_i2c_read(wcd9xxx, WCD9XXX_A_CHIP_STATUS, 1,
 				       &val, 0);
-		if (ret < 0)
+		if (ret < 0) {
 			pr_err("%s: failed to read the wcd9xxx status (%d)\n",
 			       __func__, ret);
+			ret = 0;
+		}
+
 		if (val != wcd9xxx->codec_type->i2c_chip_status)
 			pr_err("%s: unknown chip status 0x%x\n", __func__, val);
 
@@ -1220,7 +1278,7 @@ fail:
 	return ret;
 }
 
-static int wcd9xxx_i2c_remove(struct i2c_client *client)
+static void wcd9xxx_i2c_remove(struct i2c_client *client)
 {
 	struct wcd9xxx *wcd9xxx;
 	struct wcd9xxx_pdata *pdata = client->dev.platform_data;
@@ -1231,9 +1289,9 @@ static int wcd9xxx_i2c_remove(struct i2c_client *client)
 				 pdata->num_supplies);
 	wcd9xxx_device_exit(wcd9xxx);
 	dev_set_drvdata(&client->dev, NULL);
-	return 0;
 }
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_dt_parse_slim_interface_dev_info(struct device *dev,
 						struct slim_device *slim_ifd)
 {
@@ -1263,7 +1321,9 @@ static int wcd9xxx_dt_parse_slim_interface_dev_info(struct device *dev,
 
 	return 0;
 }
+#endif
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_get_laddr(struct slim_device *sb,
 				  const u8 *e_addr, u8 e_len, u8 *laddr)
 {
@@ -1283,7 +1343,9 @@ static int wcd9xxx_slim_get_laddr(struct slim_device *sb,
 
 	return ret;
 }
+#endif
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_probe(struct slim_device *slim)
 {
 	struct wcd9xxx *wcd9xxx;
@@ -1507,6 +1569,10 @@ err:
 	devm_kfree(&slim->dev, wcd9xxx);
 	return ret;
 }
+#endif
+
+
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_remove(struct slim_device *pdev)
 {
 	struct wcd9xxx *wcd9xxx;
@@ -1525,7 +1591,9 @@ static int wcd9xxx_slim_remove(struct slim_device *pdev)
 	slim_set_clientdata(pdev, NULL);
 	return 0;
 }
+#endif
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_device_up(struct wcd9xxx *wcd9xxx)
 {
 	int ret = 0;
@@ -1542,7 +1610,9 @@ static int wcd9xxx_device_up(struct wcd9xxx *wcd9xxx)
 	}
 	return ret;
 }
+#endif
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_device_reset(struct slim_device *sldev)
 {
 	int ret;
@@ -1566,7 +1636,8 @@ static int wcd9xxx_slim_device_reset(struct slim_device *sldev)
 
 	return ret;
 }
-
+#endif
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_device_up(struct slim_device *sldev)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
@@ -1615,13 +1686,15 @@ static int wcd9xxx_slim_device_down(struct slim_device *sldev)
 
 	return 0;
 }
-
+#endif
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_resume(struct slim_device *sldev)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
 
 	return wcd9xxx_core_res_resume(&wcd9xxx->core_res);
 }
+#endif
 
 static int wcd9xxx_i2c_resume(struct device *dev)
 {
@@ -1633,12 +1706,14 @@ static int wcd9xxx_i2c_resume(struct device *dev)
 		return 0;
 }
 
+#ifndef CONFIG_WCD934X_I2S
 static int wcd9xxx_slim_suspend(struct slim_device *sldev, pm_message_t pmesg)
 {
 	struct wcd9xxx *wcd9xxx = slim_get_devicedata(sldev);
 
 	return wcd9xxx_core_res_suspend(&wcd9xxx->core_res, pmesg);
 }
+#endif
 
 static int wcd9xxx_i2c_suspend(struct device *dev)
 {
@@ -1651,6 +1726,8 @@ static int wcd9xxx_i2c_suspend(struct device *dev)
 		return 0;
 }
 
+
+#ifndef CONFIG_WCD934X_I2S
 static const struct slim_device_id wcd_slim_device_id[] = {
 	{"sitar-slim", 0},
 	{"sitar1p1-slim", 0},
@@ -1678,6 +1755,7 @@ static struct slim_driver wcd_slim_driver = {
 	.reset_device = wcd9xxx_slim_device_reset,
 	.device_down = wcd9xxx_slim_device_down,
 };
+#endif
 
 static struct i2c_device_id wcd9xxx_id_table[] = {
 	{"wcd9xxx-i2c", WCD9XXX_I2C_TOP_LEVEL},
@@ -1777,10 +1855,12 @@ int wcd9xxx_init(void)
 		pr_err("%s: Failed to add the wcd9335 I2C driver: %d\n",
 			__func__, ret[2]);
 
+#ifndef CONFIG_WCD934X_I2S
 	ret[3] = slim_driver_register(&wcd_slim_driver);
 	if (ret[3])
 		pr_err("%s: Failed to register wcd SB driver: %d\n",
 			__func__, ret[3]);
+#endif
 
 	ret[4] = i2c_add_driver(&wcd934x_i2c_driver);
 	if (ret[4])
@@ -1803,7 +1883,11 @@ void wcd9xxx_exit(void)
 	i2c_del_driver(&wcd9xxx_i2c_driver);
 	i2c_del_driver(&wcd9335_i2c_driver);
 	i2c_del_driver(&wcd934x_i2c_driver);
+
+#ifndef CONFIG_WCD934X_I2S
 	slim_driver_unregister(&wcd_slim_driver);
+#endif
+
 }
 
 MODULE_DESCRIPTION("Codec core driver");
