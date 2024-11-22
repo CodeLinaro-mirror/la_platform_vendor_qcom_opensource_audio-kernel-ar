@@ -156,7 +156,7 @@ int wsa881x_init_thermal(struct wsa881x_tz_priv *tz_pdata)
 		return -EINVAL;
 	}
 	/* Register with the thermal zone */
-	tz_dev = thermal_zone_device_register(tz_pdata->name,
+	tz_dev = thermal_zone_device_register_with_trips(tz_pdata->name, NULL,
 				0, 0, tz_pdata,
 				&wsa881x_thermal_ops, NULL, 0, 0);
 	if (IS_ERR(tz_dev)) {
