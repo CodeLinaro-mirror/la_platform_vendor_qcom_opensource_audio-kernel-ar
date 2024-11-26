@@ -1915,12 +1915,29 @@ static int msm_int_wsa884x_init(struct snd_soc_pcm_runtime *rtd)
 
 static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 {
-	if (strstr(rtd->card->name, "wsa883x"))
-		return msm_int_wsa883x_init(rtd);
-	else if(strstr(rtd->card->name, "wsa884x"))
-		return msm_int_wsa884x_init(rtd);
+	struct snd_soc_component *lpass_cdc_component = NULL;
+	int ret = 0;
 
-	return msm_int_wsa884x_init(rtd);
+	lpass_cdc_component = snd_soc_rtdcom_lookup(rtd, "lpass-cdc");
+	if (!lpass_cdc_component) {
+		pr_err("%s: could not find component for lpass-cdc\n",
+			__func__);
+		return ret;
+	}
+
+	if (strstr(rtd->card->name, "wsa883x")) {
+		lpass_cdc_set_port_map(lpass_cdc_component,
+			ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+		return msm_int_wsa883x_init(rtd);
+	} else if (strstr(rtd->card->name, "wsa884x")) {
+		lpass_cdc_set_port_map(lpass_cdc_component,
+			ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+		return msm_int_wsa884x_init(rtd);
+	}
+
+	lpass_cdc_set_port_map(lpass_cdc_component,
+		ARRAY_SIZE(sm_wsa8855_port_map), sm_wsa8855_port_map);
+	return msm_common_dai_link_init(rtd);
 }
 
 static int msm_int_wsa883x_2_init(struct snd_soc_pcm_runtime *rtd)
@@ -2077,7 +2094,9 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic4");
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic5");
 
-	lpass_cdc_set_port_map(lpass_cdc_component, ARRAY_SIZE(sm_port_map), sm_port_map);
+	if (!pdata->wcd_disabled)
+		lpass_cdc_set_port_map(lpass_cdc_component,
+				ARRAY_SIZE(sm_rx_port_map), sm_rx_port_map);
 
 	card = rtd->card->snd_card;
 	if (!pdata->codec_root) {
