@@ -680,7 +680,7 @@ static const char *impl_def_reg_text[] = { "Dummy" };
 static SOC_ENUM_SINGLE_EXT_DECL(impl_def_reg_enum,
 						impl_def_reg_text);
 
-static int simple_amp_stereo_vol_get(struct snd_kcontrol *kcontrol,
+static int simple_amp_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
@@ -693,14 +693,21 @@ static int simple_amp_stereo_vol_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int simple_amp_stereo_vol_put(struct snd_kcontrol *kcontrol,
+static int simple_amp_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
-	simple_amp->stereo_voldB = ucontrol->value.integer.value[0];
+	if (ucontrol->value.integer.value[0] < 0 ||
+			ucontrol->value.integer.value[0] > 124) {
+		dev_err(component->dev, "%s: Invalid range,  Val: %ld\n",
+				 __func__, ucontrol->value.integer.value[0]);
+		return -EINVAL;
+	}
+
+	simple_amp->stereo_voldB = (ucontrol->value.integer.value[0]) - 84;
 
 	return 0;
 }
@@ -808,9 +815,9 @@ static const struct snd_kcontrol_new simple_amp_snd_controls[] = {
 	SOC_SINGLE_EXT("OT23 Usage Mode", SND_SOC_NOPM, 0, 8, 0,
 			simple_amp_usage_modes_get, simple_amp_usage_modes_put),
 
-	SOC_SINGLE_EXT_TLV("FU21 Stereo Volume DB", SND_SOC_NOPM,
-			0, FU21_VOL_STEPS, 0, simple_amp_stereo_vol_get,
-			simple_amp_stereo_vol_put, fu21_digital_gain),
+	SOC_SINGLE_EXT_TLV("FU21 Stereo Gain Offset dB", SND_SOC_NOPM,
+			0, FU21_VOL_STEPS, 0, simple_amp_stereo_gain_offset_get,
+			simple_amp_stereo_gain_offset_put, fu21_digital_gain),
 
 	SOC_ENUM_EXT("Rx Channel Select", simple_amp_rx_ch_sel_enum,
 			simple_amp_rx_ch_sel_get, simple_amp_rx_ch_sel_put),
