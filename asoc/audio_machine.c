@@ -672,6 +672,40 @@ static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	},
 };
 
+static struct snd_soc_dai_link msm_wsa8855_cdc_dma_be_dai_links[] = {
+	/* WSA8855 CDC DMA Backend DAI Links */
+	{
+		.name = LPASS_BE_WSA_CDC_DMA_RX_3,
+		.stream_name = LPASS_BE_WSA_CDC_DMA_RX_3,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(wsa_dma_rx3),
+		.init = &msm_int_wsa_init,
+	},
+	{
+		.name = LPASS_BE_WSA_CDC_DMA_TX_3,
+		.stream_name = LPASS_BE_WSA_CDC_DMA_TX_3,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(wsa_dma_tx3),
+	},
+	{
+		.name = LPASS_BE_WSA_CDC_DMA_TX_2,
+		.stream_name = LPASS_BE_WSA_CDC_DMA_TX_2,
+		.capture_only = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(cps_feedback),
+	},
+};
+
 static struct snd_soc_dai_link msm_wsa_cdc_dma_be_dai_links[] = {
 	/* WSA CDC DMA Backend DAI Links */
 	{
@@ -1325,6 +1359,7 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 
 static struct snd_soc_dai_link msm_canoe_dai_links[
 			ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links) +
+			ARRAY_SIZE(msm_wsa8855_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_wsa2_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_wsa_wsa2_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_rx_cdc_dma_be_dai_links) +
@@ -1574,10 +1609,20 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 		switch (wsa_max_devs) {
 		case MONO_SPEAKER:
 		case STEREO_SPEAKER:
+		if (of_find_property(dev->of_node,
+				"qcom,wsa8855-supported", NULL)) {
+			dev_dbg(dev, "%s(): WSA8855 support present\n",
+				__func__);
+			memcpy(msm_canoe_dai_links + total_links,
+			       msm_wsa8855_cdc_dma_be_dai_links,
+			       sizeof(msm_wsa8855_cdc_dma_be_dai_links));
+			total_links += ARRAY_SIZE(msm_wsa8855_cdc_dma_be_dai_links);
+		} else {
 			memcpy(msm_canoe_dai_links + total_links,
 			       msm_wsa_cdc_dma_be_dai_links,
 			       sizeof(msm_wsa_cdc_dma_be_dai_links));
 			total_links += ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links);
+		}
 			break;
 		case QUAD_SPEAKER:
 			if (of_find_property(dev->of_node,
