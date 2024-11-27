@@ -80,7 +80,7 @@ int swr_device_handle_interrupt(struct swr_device *swr_dev, u8 devnum)
 	if (!sdrv)
 		return 0;
 
-	if (sdrv->device_up)
+	if (sdrv->interrupt_callback)
 		return sdrv->interrupt_callback(to_swr_device(dev), devnum);
 
 	return -ENODEV;

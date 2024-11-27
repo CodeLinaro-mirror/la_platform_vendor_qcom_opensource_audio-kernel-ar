@@ -2493,7 +2493,7 @@ handle_irq:
 			list_for_each_entry(swr_dev, &mstr->devices, dev_list) {
 				if (swr_dev->dev_num != devnum)
 					continue;
-				if (!swr_dev->slave_irq) {
+				if (swr_dev->ignore_nested_irq) {
 					swr_device_handle_interrupt(swr_dev, devnum);
 					interrupt_handled = true;
 					break;
