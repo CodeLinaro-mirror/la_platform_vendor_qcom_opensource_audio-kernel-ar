@@ -83,6 +83,12 @@ SND_SOC_DAILINK_DEFS(wsa_dma_rx1,
 			   COMP_CODEC("wsa-codec2", "wsa_rx2")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
+SND_SOC_DAILINK_DEFS(wsa_dma_rx3,
+	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "wsa_macro_rx_pcm"),
+			   COMP_CODEC("sdca-simple-amp.01", "simple_amp_stereo_1")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
+
 SND_SOC_DAILINK_DEFS(wsa_dma_tx1,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "wsa_macro_echo"),
@@ -404,6 +410,11 @@ SND_SOC_DAILINK_DEFS(sep_tdm_tx_0,
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(vi_feedback,
+	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "wsa_macro_vifeedback")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
+
+SND_SOC_DAILINK_DEFS(wsa_dma_tx3,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "wsa_macro_vifeedback")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));

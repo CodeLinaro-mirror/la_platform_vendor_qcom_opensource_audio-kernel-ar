@@ -13,6 +13,7 @@
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
+#include <linux/version.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include "lpass-cdc.h"
 #include "lpass-cdc-registers.h"
@@ -58,9 +59,15 @@ static const DECLARE_TLV_DB_SCALE(digital_gain, 0, 1, 0);
 static int lpass_cdc_tx_macro_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params,
 			       struct snd_soc_dai *dai);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int lpass_cdc_tx_macro_get_channel_map(const struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot);
+#else
 static int lpass_cdc_tx_macro_get_channel_map(struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot);
+#endif
 
 #define LPASS_CDC_TX_MACRO_SWR_STRING_LEN 80
 #define LPASS_CDC_TX_MACRO_CHILD_DEVICES_MAX 3
@@ -1291,9 +1298,15 @@ static int lpass_cdc_tx_macro_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int lpass_cdc_tx_macro_get_channel_map(const struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot)
+#else
 static int lpass_cdc_tx_macro_get_channel_map(struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct snd_soc_component *component = dai->component;
 	struct device *tx_dev = NULL;
@@ -2289,14 +2302,21 @@ err_reg_macro:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_tx_macro_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_tx_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 
 	tx_priv = platform_get_drvdata(pdev);
 
-	if (!tx_priv)
-		return -EINVAL;
+	if (!tx_priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	cancel_delayed_work_sync(
 		&tx_priv->tx_dec_unmute_work.dwork);
@@ -2305,7 +2325,12 @@ static int lpass_cdc_tx_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&tx_priv->mclk_lock);
 	mutex_destroy(&tx_priv->wlock);
 	lpass_cdc_unregister_macro(&pdev->dev, TX_MACRO);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
+	return rc;
+#endif
 }
 
 

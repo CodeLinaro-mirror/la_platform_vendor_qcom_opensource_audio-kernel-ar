@@ -28,6 +28,7 @@
 #include <dsp/digital-cdc-rsc-mgr.h>
 #include "swr-mstr-ctrl.h"
 #include <linux/proc_fs.h>
+#include <linux/version.h>
 
 #define SWR_NUM_PORTS    4 /* TODO - Get this info from DT */
 
@@ -2465,6 +2466,7 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 	struct swr_device *swr_dev;
 	struct swr_master *mstr = &swrm->master;
 	int retry = 5;
+	bool interrupt_handled = false;
 
 	if (unlikely(swrm_lock_sleep(swrm) == false)) {
 		dev_err_ratelimited(swrm->dev, "%s Failed to hold suspend\n", __func__);
@@ -2510,6 +2512,20 @@ handle_irq:
 					__func__);
 				break;
 			}
+
+			list_for_each_entry(swr_dev, &mstr->devices, dev_list) {
+				if (swr_dev->dev_num != devnum)
+					continue;
+				if (swr_dev->ignore_nested_irq) {
+					swr_device_handle_interrupt(swr_dev, devnum);
+					interrupt_handled = true;
+					break;
+				}
+			}
+
+			if (interrupt_handled)
+				break;
+
 			swrm_cmd_fifo_rd_cmd(swrm, &temp, devnum,
 						get_cmd_id(swrm),
 						SWRS_SCP_INT_STATUS_CLEAR_1, 1);
@@ -3608,7 +3624,11 @@ err_memory_fail:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void swrm_remove(struct platform_device *pdev)
+#else
 static int swrm_remove(struct platform_device *pdev)
+#endif
 {
 	struct swr_mstr_ctrl *swrm = platform_get_drvdata(pdev);
 
@@ -3646,7 +3666,12 @@ static int swrm_remove(struct platform_device *pdev)
 	mutex_destroy(&swrm->runtime_lock);
 	cpu_latency_qos_remove_request(&swrm->pm_qos_req);
 	devm_kfree(&pdev->dev, swrm);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
 	return 0;
+#endif
 }
 
 static int swrm_clk_pause(struct swr_mstr_ctrl *swrm)

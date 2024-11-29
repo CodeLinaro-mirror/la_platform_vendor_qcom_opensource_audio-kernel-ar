@@ -16,7 +16,7 @@
 #include <sound/tlv.h>
 #include <soc/swr-common.h>
 #include <soc/swr-wcd.h>
-
+#include <linux/version.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include "lpass-cdc.h"
 #include "lpass-cdc-comp.h"
@@ -194,9 +194,15 @@ static int lpass_cdc_wsa_macro_core_vote(void *handle, bool enable);
 static int lpass_cdc_wsa_macro_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params,
 			       struct snd_soc_dai *dai);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int lpass_cdc_wsa_macro_get_channel_map(const struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot);
+#else
 static int lpass_cdc_wsa_macro_get_channel_map(struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot);
+#endif
 static int lpass_cdc_wsa_macro_mute_stream(struct snd_soc_dai *dai, int mute, int stream);
 
 #define LPASS_CDC_WSA_MACRO_VTH_TO_REG(vth) ((vth) == 0 ? 255 : (vth))
@@ -847,9 +853,15 @@ static int lpass_cdc_wsa_macro_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int lpass_cdc_wsa_macro_get_channel_map(const struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot)
+#else
 static int lpass_cdc_wsa_macro_get_channel_map(struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct snd_soc_component *component = dai->component;
 	struct device *wsa_dev = NULL;
@@ -4108,15 +4120,22 @@ reg_macro_fail:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_wsa_macro_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_wsa_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_cdc_wsa_macro_priv *wsa_priv;
 	u16 count = 0;
 
 	wsa_priv = dev_get_drvdata(&pdev->dev);
 
-	if (!wsa_priv)
-		return -EINVAL;
+	if (!wsa_priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	cancel_delayed_work_sync(
 			&wsa_priv->wsa_vi_dec_enable_work.dwork);
@@ -4132,7 +4151,12 @@ static int lpass_cdc_wsa_macro_remove(struct platform_device *pdev)
 	lpass_cdc_unregister_macro(&pdev->dev, WSA_MACRO);
 	mutex_destroy(&wsa_priv->mclk_lock);
 	mutex_destroy(&wsa_priv->swr_clk_lock);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
+	return rc;
+#endif
 }
 
 static const struct of_device_id lpass_cdc_wsa_macro_dt_match[] = {

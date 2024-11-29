@@ -12,6 +12,7 @@
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/clk.h>
+#include <linux/version.h>
 #include <soc/snd_event.h>
 #include <linux/pm_runtime.h>
 #include <soc/swr-common.h>
@@ -1482,12 +1483,19 @@ static int lpass_cdc_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_cdc_priv *priv = dev_get_drvdata(&pdev->dev);
 
-	if (!priv)
-		return -EINVAL;
+	if (!priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 
 	if (priv->lpass_cdc_proc_entry)
 		proc_remove(priv->lpass_cdc_proc_entry);
@@ -1497,7 +1505,12 @@ static int lpass_cdc_remove(struct platform_device *pdev)
 	mutex_destroy(&priv->io_lock);
 	mutex_destroy(&priv->clk_lock);
 	mutex_destroy(&priv->vote_lock);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
+	return rc;
+#endif
 }
 
 #ifdef CONFIG_PM

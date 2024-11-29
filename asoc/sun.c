@@ -19,6 +19,7 @@
 #include <linux/soc/qcom/wcd939x-i2c.h>
 #endif
 #include <linux/pm_qos.h>
+#include <linux/version.h>
 #include <sound/control.h>
 #include <sound/core.h>
 #include <sound/soc.h>
@@ -2448,7 +2449,11 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void msm_asoc_machine_remove(struct platform_device *pdev)
+#else
 static int msm_asoc_machine_remove(struct platform_device *pdev)
+#endif
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct msm_asoc_mach_data *pdata = NULL;
@@ -2464,7 +2469,9 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	snd_event_master_deregister(&pdev->dev);
 	snd_soc_unregister_card(card);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static struct platform_driver sun_asoc_machine_driver = {

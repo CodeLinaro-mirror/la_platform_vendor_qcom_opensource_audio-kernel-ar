@@ -60,6 +60,32 @@ static void swr_dev_release(struct device *dev)
 	swr_master_put(swr_dev->master);
 	kfree(swr_dev);
 }
+/**
+ * swr_device_callback_interupt - interrupt callback to soundwire slave device
+ * @swr_dev: pointer to soundwire slave device
+ *
+ * Interrupt callback notification to soundwire slave device.
+ *
+ */
+int swr_device_handle_interrupt(struct swr_device *swr_dev, u8 devnum)
+{
+	struct device *dev;
+	const struct swr_driver *sdrv;
+
+	if (!swr_dev)
+		return -EINVAL;
+
+	dev = &swr_dev->dev;
+	sdrv = to_swr_driver(dev->driver);
+	if (!sdrv)
+		return 0;
+
+	if (sdrv->interrupt_callback)
+		return sdrv->interrupt_callback(to_swr_device(dev), devnum);
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL(swr_device_handle_interrupt);
 
 /**
  * swr_remove_device - remove a soundwire device
@@ -1008,7 +1034,11 @@ static const struct swr_device_id *swr_match(const struct swr_device_id *id,
 	return NULL;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int swr_device_match(struct device *dev, const struct device_driver *driver)
+#else
 static int swr_device_match(struct device *dev, struct device_driver *driver)
+#endif
 {
 	struct swr_device *swr_dev;
 	struct swr_driver *drv = to_swr_driver(driver);

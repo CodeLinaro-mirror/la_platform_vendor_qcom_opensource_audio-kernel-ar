@@ -23,6 +23,7 @@
 #include <linux/pm_runtime.h>
 #include <dsp/audio_notifier.h>
 #include <linux/gpio/driver.h>
+#include <linux/version.h>
 
 #include "core.h"
 #include "pinctrl-utils.h"
@@ -922,7 +923,12 @@ err_io:
 	return ret;
 }
 
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpi_pinctrl_remove(struct platform_device *pdev)
+#else
 static int lpi_pinctrl_remove(struct platform_device *pdev)
+#endif
 {
 	struct lpi_gpio_state *state = platform_get_drvdata(pdev);
 
@@ -934,8 +940,9 @@ static int lpi_pinctrl_remove(struct platform_device *pdev)
 	gpiochip_remove(&state->chip);
 	mutex_destroy(&state->core_hw_vote_lock);
 	mutex_destroy(&state->slew_access_lock);
-
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id lpi_pinctrl_of_match[] = {

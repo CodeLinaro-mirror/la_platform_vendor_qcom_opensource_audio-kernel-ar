@@ -13,6 +13,7 @@
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include "lpass-cdc.h"
+#include <linux/version.h>
 #include "lpass-cdc-clk-rsc.h"
 
 #define DRV_NAME "lpass-cdc-clk-rsc"
@@ -670,19 +671,29 @@ static int lpass_cdc_clk_rsc_probe(struct platform_device *pdev)
 err:
 	return ret;
 }
-
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void lpass_cdc_clk_rsc_remove(struct platform_device *pdev)
+#else
 static int lpass_cdc_clk_rsc_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct lpass_cdc_clk_rsc *priv = dev_get_drvdata(&pdev->dev);
 
 	lpass_cdc_unregister_res_clk(&pdev->dev);
 	of_platform_depopulate(&pdev->dev);
-	if (!priv)
-		return -EINVAL;
+	if (!priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 	mutex_destroy(&priv->rsc_clk_lock);
 	mutex_destroy(&priv->fs_gen_lock);
-
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
+	return rc;
+#endif
 }
 
 static const struct of_device_id lpass_cdc_clk_rsc_dt_match[] = {

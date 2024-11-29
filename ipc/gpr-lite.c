@@ -22,6 +22,7 @@
 #include <ipc/gpr-lite.h>
 #include <linux/rpmsg.h>
 #include <linux/of.h>
+#include <linux/version.h>
 
 #include <soc/snd_event.h>
 #include <dsp/audio_notifier.h>
@@ -345,7 +346,11 @@ static int gpr_callback(struct rpmsg_device *rpdev, void *buf,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int gpr_device_match(struct device *dev, const struct device_driver *drv)
+#else
 static int gpr_device_match(struct device *dev, struct device_driver *drv)
+#endif
 {
 	struct gpr_device *adev = to_gpr_device(dev);
 	struct gpr_driver *adrv = to_gpr_driver(drv);

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -22,6 +22,7 @@
 #include <asoc/msm-cdc-supply.h>
 #include <bindings/audio-codec-port-types.h>
 #include <linux/qti-regmap-debugfs.h>
+#include <linux/version.h>
 
 #include "wcd938x-registers.h"
 #include "wcd938x.h"
@@ -470,6 +471,12 @@ static int wcd938x_parse_port_mapping(struct device *dev,
 
 	for (i = 0; i < map_length; i++) {
 		port_num = dt_array[NUM_SWRS_DT_PARAMS * i];
+
+		if (port_num >= MAX_PORT || ch_iter >= MAX_CH_PER_PORT) {
+			dev_err(dev, "%s: Invalid port or channel number\n", __func__);
+			goto err_pdata_fail;
+		}
+
 		slave_port_type = dt_array[NUM_SWRS_DT_PARAMS * i + 1];
 		ch_mask = dt_array[NUM_SWRS_DT_PARAMS * i + 2];
 		ch_rate = dt_array[NUM_SWRS_DT_PARAMS * i + 3];
@@ -4636,7 +4643,12 @@ err:
 	return ret;
 }
 
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void wcd938x_remove(struct platform_device *pdev)
+#else
 static int wcd938x_remove(struct platform_device *pdev)
+#endif
 {
 	struct wcd938x_priv *wcd938x = NULL;
 
@@ -4646,7 +4658,9 @@ static int wcd938x_remove(struct platform_device *pdev)
 	mutex_destroy(&wcd938x->wakeup_lock);
 	dev_set_drvdata(&pdev->dev, NULL);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 #ifdef CONFIG_PM_SLEEP

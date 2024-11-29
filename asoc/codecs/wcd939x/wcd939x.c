@@ -32,6 +32,7 @@
 #include "wcd939x-reg-masks.h"
 #include "wcd939x-reg-shifts.h"
 #include <linux/proc_fs.h>
+#include <linux/version.h>
 
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 #include <linux/soc/qcom/wcd939x-i2c.h>
@@ -634,6 +635,12 @@ static int wcd939x_parse_port_mapping(struct device *dev,
 
 	for (i = 0; i < map_length; i++) {
 		port_num = dt_array[NUM_SWRS_DT_PARAMS * i];
+
+		if (port_num >= MAX_PORT || ch_iter >= MAX_CH_PER_PORT) {
+			dev_err(dev, "%s: Invalid port or channel number\n", __func__);
+			goto err_pdata_fail;
+		}
+
 		slave_port_type = dt_array[NUM_SWRS_DT_PARAMS * i + 1];
 		ch_mask = dt_array[NUM_SWRS_DT_PARAMS * i + 2];
 		ch_rate = dt_array[NUM_SWRS_DT_PARAMS * i + 3];
@@ -5682,7 +5689,11 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void wcd939x_remove(struct platform_device *pdev)
+#else
 static int wcd939x_remove(struct platform_device *pdev)
+#endif
 {
 	struct wcd939x_priv *wcd939x = NULL;
 
@@ -5692,7 +5703,9 @@ static int wcd939x_remove(struct platform_device *pdev)
 	mutex_destroy(&wcd939x->wakeup_lock);
 	dev_set_drvdata(&pdev->dev, NULL);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 #ifdef CONFIG_PM_SLEEP
