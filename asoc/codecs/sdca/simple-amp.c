@@ -1616,6 +1616,11 @@ static void simple_amp_regulator_disable(void *data)
 	regulator_bulk_disable(SUPPLIES_NUM, data);
 }
 
+static void simple_amp_gpio_powerdown(void *data)
+{
+	gpiod_direction_output(data, 1);
+}
+
 static int simple_amp_event_notify(struct notifier_block *nb,
 		unsigned long val, void *ptr)
 {
@@ -1699,6 +1704,14 @@ static int simple_amp_init(struct device *dev, struct regmap *regmap,
 	 * soundwire auto enumeration of slave devices as
 	 * per HW requirement.
 	 */
+
+	ret = devm_add_action_or_reset(dev, simple_amp_gpio_powerdown,
+			simple_amp->sd_n);
+	if (ret) {
+		dev_err(dev, "failed to devm_add_action_or_reset, %d\n", ret);
+		return ret;
+	}
+
 	usleep_range(5000, 5010);
 	ret = swr_get_logical_dev_num(peripheral, peripheral->addr, &dev_num);
 	if (ret) {
