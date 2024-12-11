@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1340,7 +1340,9 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 	struct device *tx_dev = NULL;
 	u16 tx_mute_ctl_reg = 0;
 	u16 adc_mux_reg = 0;
+#ifdef CONFIG_BOLERO_VER_2P85
 	u16 adpt_ctrl = 0;
+#endif
 
 	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
 		return -EINVAL;
@@ -1355,14 +1357,16 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 		}
 		tx_mute_ctl_reg = LPASS_CDC_TX0_TX_PATH_CTL +
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
-		adpt_ctrl = LPASS_CDC_TX_ADPT0_CTRL +
-			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 		if (mute) {
 			snd_soc_component_update_bits(component, tx_mute_ctl_reg, 0x10, 0x10);
 		} else {
+#ifdef CONFIG_BOLERO_VER_2P85
 			/*Disable Adapt Block */
+			adpt_ctrl = LPASS_CDC_TX_ADPT0_CTRL +
+			                        LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 			snd_soc_component_update_bits(component, adpt_ctrl,
 								0xFF, 0x00);
+#endif
 			if (!is_msm_dmic_enabled(component, decimator)) {
 				snd_soc_component_update_bits(component, tx_mute_ctl_reg,
 							0x40, 0x40);
