@@ -147,6 +147,7 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_CDC_TX7_TX_PATH_SEC4, 0x20},
 	{ LPASS_CDC_TX7_TX_PATH_SEC5, 0x00},
 	{ LPASS_CDC_TX7_TX_PATH_SEC6, 0x00},
+#ifdef CONFIG_BOLERO_VER_2P85
 	{ LPASS_CDC_TX_ADPT0_CTRL, 0x51},
 	{ LPASS_CDC_TX_ADPT0_CTRL_0, 0x54},
 	{ LPASS_CDC_TX_ADPT0_CTRL_1, 0x01},
@@ -171,6 +172,7 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_CDC_TX_ADPT7_CTRL, 0x51},
 	{ LPASS_CDC_TX_ADPT7_CTRL_0, 0x54},
 	{ LPASS_CDC_TX_ADPT7_CTRL_1, 0x01},
+#endif
 
 	/* RX Macro */
 	{ LPASS_CDC_RX_TOP_TOP_CFG0, 0x00},
