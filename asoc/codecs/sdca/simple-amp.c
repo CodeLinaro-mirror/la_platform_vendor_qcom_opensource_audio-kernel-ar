@@ -183,22 +183,76 @@ static enum access_mode get_access_mode(struct simple_amp_priv *simple_amp,
 	/* first check if register is impl. defined */
 	/* impl. defined reg addresses are same for stereo and dual-mono function */
 	switch (reg) {
-		case 0x40580600 ... 0x405806FF:
-		case 0x4058041C:
-		case SIMPLE_AMP_IMPL_DEF_POWER_FSM:
-		case SIMPLE_AMP_IMPL_DEF_PA0_FSM:
-		case SIMPLE_AMP_IMPL_DEF_PA1_FSM:
-		case 0x4058042B:
-		case 0x40580435:
-		case 0x40580460 ... 0x405804BF:
-		case 0x40580065:
-		case 0x40580067:
-		case 0x405800CA:
-		case 0x405800CB:
-		case 0x405800CC:
-		case 0x4058005B:
-		case 0x4058005C:
+		case 0x40580001 ... 0x40580010:
+		case 0x40580013 ... 0x40580017:
+		case 0x40580020 ... 0x40580034:
+		case 0x40580038 ... 0x4058003D:
+		case 0x40580050 ... 0x4058006F:
+		case 0x40580090 ... 0x40580099:
+		case 0x4058009C ... 0x4058009D:
+		case 0x405800B0 ... 0x405800D3:
+		case 0x40580101 ... 0x4058013C:
+		case 0x40580410 ... 0x40580426:
+		case 0x4058042A ... 0x4058042F:
+		case 0x40580434 ... 0x40580439:
+		case 0x40580441 ... 0x40580451:
+		case 0x40580456 ... 0x40580459:
+		case 0x40580460 ... 0x405804CC:
+		case 0x40580504 ... 0x40580506:
+		case 0x40580510 ... 0x40580512:
+		case 0x40580514 ... 0x40580520:
+		case 0x40580530:
+		case 0x40580532:
+		case 0x40580534 ... 0x4058055C:
+		case 0x40580560 ... 0x4058057C:
+		case 0x40580580 ... 0x40580583:
+		case 0x40580587 ... 0x405805C0:
+		case 0x405805C3 ... 0x405805D4:
+		case 0x405805F1 ... 0x405805F3:
+		case 0x40580601 ... 0x40580613:
+		case 0x40580621 ... 0x40580633:
+		case 0x40580640 ... 0x40580645:
+		case 0x40580647 ... 0x40580656:
+		case 0x40580660 ... 0x40580665:
+		case 0x40580667 ... 0x40580676:
+		case 0x40580680 ... 0x40580684:
+		case 0x405806A1:
+		case 0x405806A9:
+		case 0x405806B1:
+		case 0x405806B9:
+		case 0x405806C1 ... 0x405806CE:
+		case 0x405806D0 ... 0x405806D2:
+		case 0x40580880 ... 0x405808C8:
+		case 0x405808FF:
 			return READ_WRITE;
+		case 0x40580011 ... 0x40580012:
+		case 0x40580035 ... 0x40580037:
+		case 0x4058009A ... 0x4058009B:
+		case 0x405800D4 ... 0x405800E9:
+		case 0x4058013D ... 0x40580144:
+		case 0x40580401 ... 0x40580405:
+		case 0x40580427 ... 0x40580429:
+		case 0x40580430 ... 0x40580432:
+		case 0x4058043A ... 0x4058043C:
+		case 0x40580452 ... 0x40580455:
+		case 0x4058045A ... 0x4058045F:
+		case 0x40580501:
+		case 0x40580509:
+		case 0x40580513:
+		case 0x40580521:
+		case 0x40580531:
+		case 0x40580533:
+		case 0x4058055D:
+		case 0x4058057D:
+		case 0x40580584 ... 0x40580586:
+		case 0x405805C1:
+		case 0x405805F0:
+		case 0x4058064:
+		case 0x40580657 ... 0x40580658:
+		case 0x40580666:
+		case 0x40580677 ... 0x40580678:
+		case 0x405806CF:
+			return READ_ONLY;
 	}
 
 	/* Now check if register falls in SDCA Controls */
@@ -688,7 +742,7 @@ static int simple_amp_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 				snd_soc_component_get_drvdata(component);
 
 
-	ucontrol->value.integer.value[0] = simple_amp->stereo_voldB;
+	ucontrol->value.integer.value[0] = simple_amp->stereo_voldB + 84;
 
 	return 0;
 }
