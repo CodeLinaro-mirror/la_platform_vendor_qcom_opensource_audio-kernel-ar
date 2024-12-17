@@ -18,10 +18,11 @@
 #include "qmp-dmic.h"
 #include "qmp-aggregator.h"
 
-#define QMP_MAX_REGISTER 0x40900070
-#define MCLK_12P288MHZ 12288000
-#define MCLK_9P6MHZ 9600000
-#define MAX_INIT_REGS 32
+#define QMP_MAX_REGISTER	0x40900070
+#define MCLK_12P288MHZ	12288000
+#define MCLK_9P6MHZ	9600000
+#define MAX_INIT_REGS	32
+#define MAX_RETRIES	3
 
 #define match_qmp_pdata(kobj) \
 	container_of((kobj), struct qmp_sdca_dmic_priv, qmp_kobj)
@@ -367,6 +368,7 @@ static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 	struct snd_soc_component *component = dai->component;
 	struct qmp_sdca_dmic_priv *qmp = snd_soc_component_get_drvdata(component);
 	int ret = 0;
+	uint8_t retry = MAX_RETRIES;
 	u8 dev_num;
 
 	if (!qmp->swr_slave)
@@ -391,11 +393,16 @@ static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 
 	/* Get logical address */
 	usleep_range(5000, 5500);
-	ret = swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num);
-	if (ret) {
+
+	while (swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num) && retry--) {
 		dev_err(qmp->dev, "error while getting logical device number\n");
-		goto err;
+		/* Retry after 1 msec delay */
+		usleep_range(1000, 1100);
+		if (retry == 0)
+			goto err;
 	}
+	dev_dbg(qmp->dev, "%s: devnum: %d\n", __func__, dev_num);
+
 	qmp->swr_slave->dev_num = dev_num;
 	qmp->swr_slave->g_scp1_val = 0;
 	qmp->swr_slave->g_scp2_val = 0;
