@@ -906,6 +906,9 @@ static int simple_amp_component_probe(struct snd_soc_component *component)
 	struct sdca_function *sdca_func_data = NULL;
 	struct sdca_entity *entity_data = NULL;
 	simple_amp = snd_soc_component_get_drvdata(component);
+	unsigned long int1_mask = SDCA_INT1_MASK;
+	unsigned long int2_mask = SDCA_INT2_MASK;
+	unsigned long int3_mask = SDCA_INT3_MASK;
 
 	if (!simple_amp)
 		return -EINVAL;
@@ -960,10 +963,15 @@ static int simple_amp_component_probe(struct snd_soc_component *component)
 				SIMPLE_AMP_CTL_FUNC_STATUS, 0), 0xFF);
 	}
 
+	regmap_update_bits(simple_amp->regmap, SIMPLE_AMP_IMPL_DEF_POWER_FSM,
+					0x04, 0x04); /* set FSM interrupt to LEVEL-trig */
 	/* Enable interrupts */
-	regmap_write(simple_amp->regmap, SDW_SCP_SDCA_INTMASK1, SDCA_INT1_MASK);
-	regmap_write(simple_amp->regmap, SDW_SCP_SDCA_INTMASK2, SDCA_INT2_MASK);
-	regmap_write(simple_amp->regmap, SDW_SCP_SDCA_INTMASK3, SDCA_INT3_MASK);
+	swr_write(simple_amp->swr_slave, simple_amp->swr_slave->dev_num,
+			SDW_SCP_SDCA_INTMASK1, &int1_mask);
+	swr_write(simple_amp->swr_slave, simple_amp->swr_slave->dev_num,
+			SDW_SCP_SDCA_INTMASK2, &int2_mask);
+	swr_write(simple_amp->swr_slave, simple_amp->swr_slave->dev_num,
+			SDW_SCP_SDCA_INTMASK3, &int3_mask);
 
 	return 0;
 }
