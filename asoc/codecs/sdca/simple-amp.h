@@ -30,7 +30,6 @@
 #define SWRS_DP_PREPARE_CONTROL(n)     (SWRS_BASE+0x5+0x100*n)
 #define SWRS_SCP_COMMIT  0x4c
 
-
 enum sdca_function_type {
 	FUNCTION_ZERO = 0,
 	FUNCTION_STEREO = 1,
@@ -115,6 +114,31 @@ enum sdca_function_type {
 #define SIMPLE_AMP_IMPL_DEF_PA0_FSM  0x4058042A
 #define SIMPLE_AMP_IMPL_DEF_PA1_FSM  0x40580434
 
+/* Get temperature for Speaker */
+#define T1_TEMP -10
+#define T2_TEMP 150
+#define LOW_TEMP_THRESHOLD 5
+#define HIGH_TEMP_THRESHOLD 45
+#define TEMP_INVALID	0xFFFF
+#define SIMPLE_AMP_TEMP_RETRY 3
+#define TEMP_READ_REG_MAX 6
+
+#define WSA8855_DIG_CTRL0_TEMP_DIN_MSB   0x40580452
+#define WSA8855_DIG_CTRL0_TEMP_DIN_LSB   0x40580453
+#define WSA8855_DIG_TRIM_OTP_REG_1       0x40580881
+#define WSA8855_DIG_TRIM_OTP_REG_2       0x40580882
+#define WSA8855_DIG_TRIM_OTP_REG_3       0x40580883
+#define WSA8855_DIG_TRIM_OTP_REG_4       0x40580884
+
+struct simple_amp_temp_register {
+	int d1_msb;
+	int d1_lsb;
+	int d2_msb;
+	int d2_lsb;
+	int dmeas_msb;
+	int dmeas_lsb;
+};
+
 struct port_config {
 	int num_ports;
 	u8 port_id[MAX_SWR_SLV_PORTS];
@@ -168,6 +192,7 @@ struct simple_amp_priv {
 	int ch1_voldB;
 	int rx_ch_sel;
 	bool debug_mode_enable;
+	bool trigger_die_temp_enable;
 
 	struct device_node *parent_np;
 	struct platform_device *parent_dev;
@@ -185,6 +210,9 @@ struct simple_amp_priv {
 	struct dentry *debugfs_reg_dump;
 	unsigned int read_data;
 #endif
+	struct work_struct temperature_work;
+	struct completion tmp_th_complete;
+	int curr_temp;
 };
 
 #endif /* SIMPLE_AMP_H */

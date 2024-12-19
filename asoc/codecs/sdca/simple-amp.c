@@ -762,6 +762,8 @@ static int simple_amp_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
 	}
 
 	simple_amp->stereo_voldB = (ucontrol->value.integer.value[0]) - 84;
+	dev_dbg(component->dev, "%s: Volume dB: %d\n",
+				__func__, simple_amp->stereo_voldB);
 
 	return 0;
 }
@@ -865,6 +867,98 @@ static const char *const debug_mode_text[] = {"Disable", "Enable"};
 static SOC_ENUM_SINGLE_EXT_DECL(debug_mode_enum,
 						debug_mode_text);
 
+static int simple_amp_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct simple_amp_priv *simple_amp =
+				snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.integer.value[0] = simple_amp->trigger_die_temp_enable;
+	return 0;
+}
+
+static int simple_amp_trigger_die_temp_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct simple_amp_priv *simple_amp =
+				snd_soc_component_get_drvdata(component);
+
+	simple_amp->trigger_die_temp_enable = ucontrol->value.integer.value[0];
+
+	dev_dbg(component->dev, "%s: Trigger Die Temp Enable: %d\n", __func__,
+			simple_amp->trigger_die_temp_enable);
+	return 0;
+}
+
+static int simple_amp_get_temp(struct snd_kcontrol *kcontrol,
+			       struct snd_ctl_elem_value *ucontrol)
+{
+
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	struct simple_amp_priv *simple_amp =
+				snd_soc_component_get_drvdata(component);
+	int ret = 0;
+	struct sdca_function *sdca_func_data = NULL;
+	int act_ps, i;
+
+	if (!simple_amp->trigger_die_temp_enable) {
+		dev_dbg(simple_amp->dev, "%s: Trigger Die Temp Disabled\n",
+				__func__);
+		ucontrol->value.integer.value[0] = simple_amp->curr_temp;
+		return 0;
+	}
+
+	simple_amp->trigger_die_temp_enable = false;
+
+	cancel_work_sync(&simple_amp->temperature_work);
+	reinit_completion(&simple_amp->tmp_th_complete);
+
+	for (i = FUNCTION_ZERO; i < MAX_FUNCTION; ++i) {
+		sdca_func_data = simple_amp->sdca_func_data[i];
+		if (!sdca_func_data)
+			continue;
+
+		struct sdca_entity *pde23_entity =
+			&sdca_func_data->entity_data[ENTITY_TYPE_PDE_23];
+
+		ret = regmap_read(simple_amp->regmap,
+				SDW_SDCA_CTL(i, pde23_entity->entity_num,
+					SIMPLE_AMP_CTL_PDE_ACT_PS, 0),
+					&act_ps);
+
+		if (ret != 0 || act_ps == 0) {
+			dev_err(simple_amp->dev,
+			"%s: PDE is already on!! Invalid request ps: %d\n",
+						__func__, act_ps);
+			return -EINVAL;
+		}
+	}
+
+	schedule_work(&simple_amp->temperature_work);
+
+	ret = wait_for_completion_timeout(&simple_amp->tmp_th_complete,
+					msecs_to_jiffies(500));
+	if (ret == 0) {
+		dev_err(component->dev,
+		"%s: Timeout occurred before work function completed\n", __func__);
+		return -EINVAL;
+	} else if (simple_amp->curr_temp <= LOW_TEMP_THRESHOLD ||
+			simple_amp->curr_temp >= HIGH_TEMP_THRESHOLD) {
+			dev_err(component->dev, "%s: Temp range Invalid\n", __func__);
+			return -EINVAL;
+	} else {
+		dev_dbg(component->dev, "%s: Temp Work function completed\n",
+				__func__);
+	}
+
+	ucontrol->value.integer.value[0] = simple_amp->curr_temp;
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new simple_amp_snd_controls[] = {
 	SOC_SINGLE_EXT("OT23 Usage Mode", SND_SOC_NOPM, 0, 8, 0,
 			simple_amp_usage_modes_get, simple_amp_usage_modes_put),
@@ -882,6 +976,12 @@ static const struct snd_kcontrol_new simple_amp_snd_controls[] = {
 	SOC_ENUM_EXT("Impl def Reg val", impl_def_reg_enum,
 			simple_amp_impl_def_reg_get,
 			simple_amp_impl_def_reg_put),
+
+	SOC_SINGLE_EXT("Trigger Die Temperature", SND_SOC_NOPM, 0, 1, 0,
+			simple_amp_trigger_die_temp_get, simple_amp_trigger_die_temp_put),
+
+	SOC_SINGLE_EXT("Die Temperature", SND_SOC_NOPM, 0, UINT_MAX, 0,
+		simple_amp_get_temp, NULL),
 };
 
 static int simple_amp_function_init(struct simple_amp_priv *simple_amp,
@@ -1005,9 +1105,12 @@ static int simple_amp_startup(struct snd_pcm_substream *substream,
 {
 	int i;
 	struct simple_amp_priv *simple_amp = snd_soc_dai_get_drvdata(dai);
+	dev_dbg(simple_amp->dev, "%s: Enter\n", __func__);
 
 	if (!simple_amp)
 		return -EINVAL;
+
+	cancel_work_sync(&simple_amp->temperature_work);
 
 	if (simple_amp->debug_mode_enable) {
 		for (i = 0; i < simple_amp->num_pairs; i++) {
@@ -1099,7 +1202,6 @@ static void prepare_channel(struct port_config *config, int func,
 {
 	u8 ch1 = 0x1, ch2 = 0x2, ch12 = ch1 | ch2, channels;
 	u16 prepare_reg;
-
 
 
 	if (func == FUNCTION_STEREO) {
@@ -1216,6 +1318,7 @@ static int simple_amp_hw_params(struct snd_pcm_substream *substream,
 	int num_channels = 0, channel_sel = GENMASK(1, 0);
 	unsigned int rx_sample_rate, tx_sample_rate;
 
+	dev_dbg(component->dev, "%s:Enter\n", __func__);
 	if (!simple_amp || !simple_amp->swr_slave)
 		return -EINVAL;
 
@@ -1276,8 +1379,8 @@ static int simple_amp_hw_params(struct snd_pcm_substream *substream,
 			goto exit;
 	}
 
-	dev_dbg(simple_amp->dev, "%s(): dai_name = %s, stream = %s channels: %d, rate: %u",
-			__func__, dai->name, substream->name, num_channels,
+	dev_dbg(simple_amp->dev, "%s(): dai_name = %s, bit_width = %d channels: %d, rate: %u",
+			__func__, dai->name, params_width(params), num_channels,
 			params_rate(params));
 
 	/* Limit bit-width to 16 for now. 24/32 to be added */
@@ -1368,6 +1471,7 @@ static int simple_amp_prepare(struct snd_pcm_substream *substream,
 	struct sdca_entity *fu21_entity = NULL;
 	struct port_config *pconfig_sel = NULL;
 
+	dev_dbg(component->dev, "%s:Enter\n", __func__);
 	simple_amp = snd_soc_component_get_drvdata(component);
 	if (!simple_amp)
 		return -EINVAL;
@@ -1434,6 +1538,7 @@ static void simple_amp_shutdown(struct snd_pcm_substream *substream,
 		simple_amp->sdca_func_data[dai->id];
 	struct port_config *pconfig_sel = NULL;
 
+	dev_dbg(component->dev, "%s:Enter\n", __func__);
 	pconfig_sel = snd_soc_dai_dma_data_get_playback(dai);
 
 	if (!pconfig_sel)
@@ -1471,6 +1576,7 @@ static int simple_amp_hw_free(struct snd_pcm_substream *substream,
 	struct simple_amp_priv *simple_amp =
 		snd_soc_component_get_drvdata(component);
 
+	dev_dbg(component->dev, "%s:Enter\n", __func__);
 	pconfig_sel = snd_soc_dai_dma_data_get_playback(dai);
 
 	if (!pconfig_sel)
@@ -1652,6 +1758,156 @@ static int simple_amp_event_notify(struct notifier_block *nb,
 	return 0;
 }
 
+static int32_t simple_amp_temp_reg_read(struct simple_amp_priv *simple_amp,
+				     struct simple_amp_temp_register *temp_reg)
+{
+
+	int rc, i, func_num;
+	unsigned char ps0 = 0x0, ps3 = 0x3;
+	struct sdca_function *sdca_func_data = NULL;
+	if (!simple_amp) {
+		dev_err_ratelimited(simple_amp->dev,
+				"%s: simple_amp is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	uint32_t reg[TEMP_READ_REG_MAX] = { WSA8855_DIG_CTRL0_TEMP_DIN_MSB,
+					    WSA8855_DIG_CTRL0_TEMP_DIN_LSB,
+					    WSA8855_DIG_TRIM_OTP_REG_1,
+					    WSA8855_DIG_TRIM_OTP_REG_2,
+					    WSA8855_DIG_TRIM_OTP_REG_3,
+					    WSA8855_DIG_TRIM_OTP_REG_4 };
+
+	int *val[] = { &temp_reg->dmeas_msb,
+			    &temp_reg->dmeas_lsb,
+			    &temp_reg->d1_msb,
+			    &temp_reg->d1_lsb,
+			    &temp_reg->d2_msb,
+			    &temp_reg->d2_lsb };
+
+	for (i = FUNCTION_ZERO; i < MAX_FUNCTION; ++i) {
+		sdca_func_data = simple_amp->sdca_func_data[i];
+		if (!sdca_func_data)
+			continue;
+		else
+			break;
+	}
+
+	func_num = i;
+
+	struct sdca_entity *pde23_entity =
+		&sdca_func_data->entity_data[ENTITY_TYPE_PDE_23];
+
+	regmap_write(simple_amp->regmap,
+			SDW_SDCA_CTL(func_num, pde23_entity->entity_num,
+				SIMPLE_AMP_PDE_REQ_PS, 0), ps0);
+
+	struct sdca_entity *cs21_entity =
+		&sdca_func_data->entity_data[ENTITY_TYPE_CS_21];
+
+	if (!wait_for_pde_state(simple_amp, pde23_entity->entity_num,
+			cs21_entity->entity_num, ps0, func_num)) {
+		dev_dbg(simple_amp->dev, "success! function %d, actual ps %d",
+				func_num, ps0);
+	} else {
+		dev_err(simple_amp->dev, "PS0 request failed\n");
+		return -EINVAL;
+	}
+
+	for (i = 0; i < TEMP_READ_REG_MAX; i++) {
+		rc = regmap_read(simple_amp->regmap , reg[i], val[i]);
+		if (rc) {
+			dev_err(simple_amp->dev,
+				"%s: Regmap read failed for reg %u: %d\n",
+				__func__, reg[i], rc);
+			goto exit;
+		}
+	}
+
+exit:
+	regmap_write(simple_amp->regmap,
+		SDW_SDCA_CTL(func_num, pde23_entity->entity_num,
+			SIMPLE_AMP_PDE_REQ_PS, 0), ps3);
+
+	if (!wait_for_pde_state(simple_amp,
+			pde23_entity->entity_num, cs21_entity->entity_num,
+		ps3, func_num)) {
+		dev_dbg(simple_amp->dev, "success! function %d, actual ps %d",
+				func_num, ps3);
+	} else {
+		dev_err(simple_amp->dev, "PS3 request failed\n");
+		rc = -EINVAL;
+	}
+	return rc;
+}
+
+static void simple_amp_temperature_work(struct work_struct *work)
+{
+	struct simple_amp_temp_register reg;
+	int dmeas, d1, d2;
+	int ret = 0;
+	int temp_val = 0;
+	int t1 = T1_TEMP;
+	int t2 = T2_TEMP;
+	u8 retry = SIMPLE_AMP_TEMP_RETRY;
+
+	struct simple_amp_priv *simple_amp =
+		container_of(work, struct simple_amp_priv, temperature_work);
+
+	do {
+		ret = simple_amp_temp_reg_read(simple_amp, &reg);
+		if (ret) {
+			dev_err_ratelimited(simple_amp->dev,
+				"%s: temp read failed: %d, current temp: %d\n",
+				__func__, ret, simple_amp->curr_temp);
+			complete(&simple_amp->tmp_th_complete);
+			return;
+		}
+		/*
+		 * Temperature register values are expected to be in the
+		 * following range.
+		 * d1_msb  = 68 - 92 and d1_lsb  = 0, 64, 128, 192
+		 * d2_msb  = 185 -218 and  d2_lsb  = 0, 64, 128, 192
+		 */
+		if ((reg.d1_msb < 68 || reg.d1_msb > 92) ||
+		    (!(reg.d1_lsb == 0 || reg.d1_lsb == 64 || reg.d1_lsb == 128 ||
+			reg.d1_lsb == 192)) ||
+		    (reg.d2_msb < 185 || reg.d2_msb > 218) ||
+		    (!(reg.d2_lsb == 0 || reg.d2_lsb == 64 || reg.d2_lsb == 128 ||
+			reg.d2_lsb == 192))) {
+			dev_err_ratelimited(simple_amp->dev,
+				"%s: Temperature registers[%d %d %d %d] are out of range\n",
+				 __func__, reg.d1_msb, reg.d1_lsb, reg.d2_msb, reg.d2_lsb);
+		}
+		dmeas = ((reg.dmeas_msb << 0x8) | reg.dmeas_lsb) >> 0x6;
+		d1 = ((reg.d1_msb << 0x8) | reg.d1_lsb) >> 0x6;
+		d2 = ((reg.d2_msb << 0x8) | reg.d2_lsb) >> 0x6;
+
+		if (d1 == d2)
+			temp_val = TEMP_INVALID;
+		else
+			temp_val = t1 + (((dmeas - d1) * (t2 - t1))/(d2 - d1));
+
+		if (temp_val <= LOW_TEMP_THRESHOLD ||
+			temp_val >= HIGH_TEMP_THRESHOLD) {
+			dev_err(simple_amp->dev,
+				"%s: T0: %d is out of range[%d, %d]\n", __func__,
+				temp_val, LOW_TEMP_THRESHOLD, HIGH_TEMP_THRESHOLD);
+			if (retry--)
+				msleep(10);
+		} else {
+			break;
+		}
+	} while (retry);
+
+	simple_amp->curr_temp = temp_val;
+	dev_dbg(simple_amp->dev,
+			"%s: t0 measured: %d dmeas = %d, d1 = %d, d2 = %d\n",
+			__func__, temp_val, dmeas, d1, d2);
+
+	complete(&simple_amp->tmp_th_complete);
+}
+
 static int simple_amp_init(struct device *dev, struct regmap *regmap,
 		struct swr_device *peripheral)
 {
@@ -1679,6 +1935,7 @@ static int simple_amp_init(struct device *dev, struct regmap *regmap,
 	simple_amp->dev = dev;
 	simple_amp->clk_freq = MCLK_9P6MHZ;
 	simple_amp->stereo_voldB = -84; /* default state */
+	simple_amp->curr_temp = 24; /* Set default as 24 degree celsius*/
 
 	for (i = 0; i < SUPPLIES_NUM; i++)
 		simple_amp->supplies[i].supply = supply_name[i];
@@ -1723,7 +1980,7 @@ static int simple_amp_init(struct device *dev, struct regmap *regmap,
 	usleep_range(5000, 5010);
 	ret = swr_get_logical_dev_num(peripheral, peripheral->addr, &dev_num);
 	if (ret) {
-		dev_dbg(dev,
+		dev_err(dev,
 				"%s get dev_num %d for dev addr %llx failed\n",
 				__func__, dev_num, peripheral->addr);
 		ret = -EPROBE_DEFER;
@@ -1811,6 +2068,8 @@ static int simple_amp_init(struct device *dev, struct regmap *regmap,
 	simple_amp_regdump_register(simple_amp, peripheral);
 #endif
 
+	INIT_WORK(&simple_amp->temperature_work, simple_amp_temperature_work);
+	init_completion(&simple_amp->tmp_th_complete);
 err:
 	return ret;
 
