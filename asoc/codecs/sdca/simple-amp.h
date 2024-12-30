@@ -16,6 +16,7 @@
 #define MAX_INIT_REGS 64
 #define MAX_CNTL_NUMBERS 4
 #define NUM_IMP_DEF_REG_VAL_PAIRS  16
+#define SIMPLE_AMP_NUM_RETRY 5
 
 #define MAX_SWR_SLV_PORTS 4
 #define PORT_1 1
