@@ -696,16 +696,26 @@ static struct snd_soc_dai_link msm_wcn_btfm_proxy_be_dai_links[] = {
                 .ignore_suspend = 1,
                 SND_SOC_DAILINK_REG(btfm_0_rx),
         },
-        {
-                .name = LPASS_BE_BTFM_PROXY_TX_0,
-                .stream_name = LPASS_BE_BTFM_PROXY_TX_0,
-                .capture_only = 1,
-                .trigger = {SND_SOC_DPCM_TRIGGER_POST,
-                        SND_SOC_DPCM_TRIGGER_POST},
-                .ops = &msm_common_be_ops,
-                .ignore_suspend = 1,
-                SND_SOC_DAILINK_REG(btfm_0_tx),
-        },
+	{
+		.name = LPASS_BE_BTFM_PROXY_TX_0,
+		.stream_name = LPASS_BE_BTFM_PROXY_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(btfm_0_tx),
+	},
+	{
+		.name = LPASS_BE_BTFM_AUD_TX_3,
+		.stream_name = LPASS_BE_BTFM_AUD_TX_3,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(fm_0_tx),
+	},
 };
 
 static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
