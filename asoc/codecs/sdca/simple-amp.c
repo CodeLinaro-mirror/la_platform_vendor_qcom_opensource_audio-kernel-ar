@@ -998,25 +998,14 @@ static int simple_amp_function_init(struct simple_amp_priv *simple_amp,
 	return ret;
 }
 
-static int simple_amp_component_probe(struct snd_soc_component *component)
+static int simple_amp_func_configuration(struct simple_amp_priv *simple_amp)
 {
 	int ret, i;
-	struct simple_amp_priv *simple_amp =
-		snd_soc_component_get_drvdata(component);
 	struct sdca_function *sdca_func_data = NULL;
 	struct sdca_entity *entity_data = NULL;
-	simple_amp = snd_soc_component_get_drvdata(component);
 	unsigned long int1_mask = SDCA_INT1_MASK;
 	unsigned long int2_mask = SDCA_INT2_MASK;
 	unsigned long int3_mask = SDCA_INT3_MASK;
-
-	if (!simple_amp)
-		return -EINVAL;
-
-	simple_amp->component = component;
-	snd_soc_component_init_regmap(component, simple_amp->regmap);
-
-	devm_regmap_qti_debugfs_register(simple_amp->dev, simple_amp->regmap);
 
 	for (i = FUNCTION_ZERO; i < MAX_FUNCTION; ++i) {
 		struct sdca_function *sdca_func_data =
@@ -1074,6 +1063,23 @@ static int simple_amp_component_probe(struct snd_soc_component *component)
 			SDW_SCP_SDCA_INTMASK3, &int3_mask);
 
 	return 0;
+}
+
+static int simple_amp_component_probe(struct snd_soc_component *component)
+{
+	struct simple_amp_priv *simple_amp =
+		snd_soc_component_get_drvdata(component);
+	simple_amp = snd_soc_component_get_drvdata(component);
+
+	if (!simple_amp)
+		return -EINVAL;
+
+	simple_amp->component = component;
+	snd_soc_component_init_regmap(component, simple_amp->regmap);
+
+	devm_regmap_qti_debugfs_register(simple_amp->dev, simple_amp->regmap);
+	return simple_amp_func_configuration(simple_amp);
+
 }
 
 static void simple_amp_component_remove(struct snd_soc_component *component)
@@ -1735,6 +1741,28 @@ static void simple_amp_gpio_powerdown(void *data)
 	gpiod_direction_output(data, 1);
 }
 
+static void simple_amp_swr_reset(struct simple_amp_priv *simple_amp)
+{
+	u8 retry = SIMPLE_AMP_NUM_RETRY;
+	u8 devnum = 0;
+	struct swr_device *pdev;
+
+	pdev = simple_amp->swr_slave;
+	while (swr_get_logical_dev_num(pdev, pdev->addr, &devnum) && retry--) {
+		/* Retry after 1 msec delay */
+		usleep_range(1000, 1100);
+	}
+
+	pdev->dev_num = devnum;
+
+	simple_amp->swr_slave->g_scp1_val = 0;
+	simple_amp->swr_slave->g_scp2_val = 0;
+
+	simple_amp_func_configuration(simple_amp);
+	regcache_mark_dirty(simple_amp->regmap);
+	regcache_sync(simple_amp->regmap);
+}
+
 static int simple_amp_event_notify(struct notifier_block *nb,
 		unsigned long val, void *ptr)
 {
@@ -1747,6 +1775,12 @@ static int simple_amp_event_notify(struct notifier_block *nb,
 
 	switch (event) {
 		case BOLERO_SLV_EVT_SSR_UP:
+			simple_amp_gpio_set(simple_amp, 1);
+			usleep_range(500, 510);
+			simple_amp_gpio_set(simple_amp, 0);
+			usleep_range(20000, 20010);
+
+			simple_amp_swr_reset(simple_amp);
 			break;
 
 		default:
