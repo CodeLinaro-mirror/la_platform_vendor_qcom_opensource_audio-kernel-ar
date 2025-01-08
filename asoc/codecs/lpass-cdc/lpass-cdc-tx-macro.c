@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1008,6 +1008,11 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 adc_mux_reg = 0;
 	u16 adc_mux0_reg = 0;
 	u16 dmic_clk_reg = 0;
+#ifdef CONFIG_BOLERO_VER_2P85
+	u16 adapt_ctrl = 0;
+	u16 adapt_pdm_ctl0 = 0;
+	u16 adapt_pdm_ctl1 = 0;
+#endif
 	int hpf_delay = LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS;
 	int unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
 	struct device *tx_dev = NULL;
@@ -1128,6 +1133,18 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 					LPASS_CDC_TX0_TX_PATH_SEC7, 0x40,
 					0x40);
 		}
+#ifdef CONFIG_BOLERO_VER_2P85
+		adapt_ctrl = LPASS_TX_CDC_ADPT0_ADPT_CTRL +
+				 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		adapt_pdm_ctl0 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_0 +
+				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		adapt_pdm_ctl1 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_1 +
+				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
+		snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
+		snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
+#endif
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		hpf_cut_off_freq =
@@ -1340,9 +1357,6 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 	struct device *tx_dev = NULL;
 	u16 tx_mute_ctl_reg = 0;
 	u16 adc_mux_reg = 0;
-#ifdef CONFIG_BOLERO_VER_2P85
-	u16 adpt_ctrl = 0;
-#endif
 
 	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
 		return -EINVAL;
@@ -1360,13 +1374,6 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 		if (mute) {
 			snd_soc_component_update_bits(component, tx_mute_ctl_reg, 0x10, 0x10);
 		} else {
-#ifdef CONFIG_BOLERO_VER_2P85
-			/*Disable Adapt Block */
-			adpt_ctrl = LPASS_CDC_TX_ADPT0_CTRL +
-			                        LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
-			snd_soc_component_update_bits(component, adpt_ctrl,
-								0xFF, 0x00);
-#endif
 			if (!is_msm_dmic_enabled(component, decimator)) {
 				snd_soc_component_update_bits(component, tx_mute_ctl_reg,
 							0x40, 0x40);
