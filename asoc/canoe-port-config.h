@@ -32,6 +32,22 @@ static struct port_params wsa_frame_params_default[SWR_MSTR_PORT_LEN] = {
 	{799,   0,    0xFF, 15,   15,   24,   0, 0xFF, 0xFF, 0x01, 0x01}, /* CPS */
 };
 
+static struct port_params wsa8855_frame_params_default[SWR_MSTR_PORT_LEN] = {
+	{7,     1,    0xFF, 0xFF, 0xFF, 0xFF, 0, 0xFF, 0xFF, 0x00, 0x00}, /* SPKR1 */
+	{31,    3,    7,    0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x00, 0x00}, /* CMP1 */
+	{63,    5,    31,   0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x00, 0x00}, /* SB1 */
+	{7,     2,    0xFF, 0xFF, 0xFF, 0xFF, 0, 0xFF, 0xFF, 0x00, 0x00}, /* SPKR2 */
+	{31,    4,    7,    0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x00, 0x00}, /* CMP2 */
+	{63,    21,   31,   0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x00, 0x00}, /* SB2 */
+	{399,   0,    0xFF, 8,    8,    8,    0, 0xFF, 0xFF, 0x00, 0x01}, /* PBR */
+	{0x18F, 0,    0xFF, 0x0E, 0x0E, 0x0F, 1, 0,    0,    0x00, 0x01}, /* HAPT */
+	{0x18F, 0,    0xFF, 0x1,  0x0F, 0x0F, 0, 0,    0,    0x00, 0x01}, /* OCPM */
+	{15,    6,    0xFF, 0xFF, 0xFF, 0x0,  1, 0xFF, 0xFF, 0x01, 0x00}, /* IVS1 */
+	{15,    13,   0xFF, 0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x01, 0x00}, /* IVS2 */
+	{399,   48,   0xFF, 0x01, 0x0F, 0x1F, 0, 0,    0,    0x01, 0x01}, /* ICPM */
+	{399,   112,  0xFF, 1,    15,   24,   0, 0,    0,    0x01, 0x01}, /* CPS */
+};
+
 static struct port_params wsa_frame_params_receiver[SWR_MSTR_PORT_LEN] = {
 	{3,     1,    0xFF, 0xFF, 0xFF, 0xFF, 0, 0xFF, 0xFF, 0x00, 0x00}, /* SPKR1 */
 	{31,    3,    7,    0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x00, 0x00}, /* CMP1 */
@@ -95,14 +111,23 @@ static struct port_params rx_frame_params_44p1KHz[SWR_MSTR_PORT_LEN] = {
 	{0xFF,  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, /* IPCM */
 };
 
-static struct swr_mstr_port_map sm_port_map[] = {
+static struct swr_mstr_port_map sm_rx_port_map[] = {
 	{RX_MACRO, SWR_UC0, rx_frame_params_default},
 	{RX_MACRO, SWR_UC1, rx_frame_params_dsd},
 	{RX_MACRO, SWR_UC2, rx_frame_params_44p1KHz},
+};
+
+static struct swr_mstr_port_map sm_wsa_port_map[] = {
 	{WSA_MACRO, SWR_UC0, wsa_frame_params_default},
 	{WSA_MACRO, SWR_UC1, wsa_frame_params_receiver},
 	{WSA2_MACRO, SWR_UC0, wsa_frame_params_default},
 	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
 };
 
+static struct swr_mstr_port_map sm_wsa8855_port_map[] = {
+	{WSA_MACRO, SWR_UC0, wsa8855_frame_params_default},
+	{WSA_MACRO, SWR_UC1, wsa_frame_params_receiver},
+	{WSA2_MACRO, SWR_UC0, wsa8855_frame_params_default},
+	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
+};
 #endif /* _CANOE_PORT_CONFIG */

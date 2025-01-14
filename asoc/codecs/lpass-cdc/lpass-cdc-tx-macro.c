@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1008,6 +1008,11 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 adc_mux_reg = 0;
 	u16 adc_mux0_reg = 0;
 	u16 dmic_clk_reg = 0;
+#ifdef CONFIG_BOLERO_VER_2P85
+	u16 adapt_ctrl = 0;
+	u16 adapt_pdm_ctl0 = 0;
+	u16 adapt_pdm_ctl1 = 0;
+#endif
 	int hpf_delay = LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS;
 	int unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
 	struct device *tx_dev = NULL;
@@ -1049,9 +1054,6 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		snd_soc_component_update_bits(component,
 			dec_cfg_reg, 0x06, tx_priv->dec_mode[decimator] <<
 			LPASS_CDC_TX_MACRO_ADC_MODE_CFG0_SHIFT);
-		/* Enable TX PGA Mute */
-		snd_soc_component_update_bits(component,
-			tx_vol_ctl_reg, 0x10, 0x10);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		/* if SWR DMIC is used, set SWR_MICn clk div */
@@ -1131,6 +1133,18 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 					LPASS_CDC_TX0_TX_PATH_SEC7, 0x40,
 					0x40);
 		}
+#ifdef CONFIG_BOLERO_VER_2P85
+		adapt_ctrl = LPASS_TX_CDC_ADPT0_ADPT_CTRL +
+				 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		adapt_pdm_ctl0 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_0 +
+				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		adapt_pdm_ctl1 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_1 +
+				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
+		snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
+		snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
+#endif
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		hpf_cut_off_freq =
@@ -1239,6 +1253,7 @@ static int lpass_cdc_tx_macro_hw_params(struct snd_pcm_substream *substream,
 	int tx_fs_rate = -EINVAL;
 	struct snd_soc_component *component = dai->component;
 	u32 decimator = 0;
+	u16 tx_vol_ctl_reg = 0;
 	u32 sample_rate = 0;
 	u16 tx_fs_reg = 0;
 	struct device *tx_dev = NULL;
@@ -1284,10 +1299,15 @@ static int lpass_cdc_tx_macro_hw_params(struct snd_pcm_substream *substream,
 		if (decimator >= 0) {
 			tx_fs_reg = LPASS_CDC_TX0_TX_PATH_CTL +
 				    LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+			tx_vol_ctl_reg = LPASS_CDC_TX0_TX_PATH_CTL +
+						LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 			dev_dbg(component->dev, "%s: set DEC%u rate to %u\n",
 				__func__, decimator, sample_rate);
 			snd_soc_component_update_bits(component, tx_fs_reg,
 						0x0F, tx_fs_rate);
+			/* Enable TX PGA Mute */
+			snd_soc_component_update_bits(component,
+				tx_vol_ctl_reg, 0x10, 0x10);
 		} else {
 			dev_err_ratelimited(component->dev,
 				"%s: ERROR: Invalid decimator: %d\n",

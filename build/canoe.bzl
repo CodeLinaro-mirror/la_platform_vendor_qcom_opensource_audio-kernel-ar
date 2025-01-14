@@ -41,7 +41,8 @@ def define_canoe():
             "wcd939x_dlkm",
 	    "wcd939x_slave_dlkm",
             "lpass_bt_swr_dlkm",
-            "qmp_dlkm"
+            "qmp_dlkm",
+            "simple_amp_dlkm"
         ],
         config_options = [
             "CONFIG_SND_SOC_CANOE",
@@ -50,6 +51,7 @@ def define_canoe():
             "CONFIG_DIGITAL_CDC_RSC_MGR",
             "CONFIG_SOUNDWIRE_MSTR_CTRL",
             "CONFIG_SWRM_VER_2P0",
+	    "CONFIG_BOLERO_VER_2P85",
             "CONFIG_WCD9XXX_CODEC_CORE_V2",
             "CONFIG_MSM_CDC_PINCTRL",
             "CONFIG_SND_SOC_WCD_IRQ",
@@ -59,5 +61,6 @@ def define_canoe():
             "CONFIG_AUDIO_BTFM_PROXY",
             "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
+            "CONFIG_SND_SOC_SIMPLE_AMP",
         ]
     )

@@ -672,6 +672,40 @@ static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	},
 };
 
+static struct snd_soc_dai_link msm_wsa8855_cdc_dma_be_dai_links[] = {
+	/* WSA8855 CDC DMA Backend DAI Links */
+	{
+		.name = LPASS_BE_WSA_CDC_DMA_RX_3,
+		.stream_name = LPASS_BE_WSA_CDC_DMA_RX_3,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(wsa_dma_rx3),
+		.init = &msm_int_wsa_init,
+	},
+	{
+		.name = LPASS_BE_WSA_CDC_DMA_TX_3,
+		.stream_name = LPASS_BE_WSA_CDC_DMA_TX_3,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(wsa_dma_tx3),
+	},
+	{
+		.name = LPASS_BE_WSA_CDC_DMA_TX_2,
+		.stream_name = LPASS_BE_WSA_CDC_DMA_TX_2,
+		.capture_only = 1,
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(cps_feedback),
+	},
+};
+
 static struct snd_soc_dai_link msm_wsa_cdc_dma_be_dai_links[] = {
 	/* WSA CDC DMA Backend DAI Links */
 	{
@@ -1325,6 +1359,7 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 
 static struct snd_soc_dai_link msm_canoe_dai_links[
 			ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links) +
+			ARRAY_SIZE(msm_wsa8855_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_wsa2_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_wsa_wsa2_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_rx_cdc_dma_be_dai_links) +
@@ -1574,10 +1609,20 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 		switch (wsa_max_devs) {
 		case MONO_SPEAKER:
 		case STEREO_SPEAKER:
+		if (of_find_property(dev->of_node,
+				"qcom,wsa8855-supported", NULL)) {
+			dev_dbg(dev, "%s(): WSA8855 support present\n",
+				__func__);
+			memcpy(msm_canoe_dai_links + total_links,
+			       msm_wsa8855_cdc_dma_be_dai_links,
+			       sizeof(msm_wsa8855_cdc_dma_be_dai_links));
+			total_links += ARRAY_SIZE(msm_wsa8855_cdc_dma_be_dai_links);
+		} else {
 			memcpy(msm_canoe_dai_links + total_links,
 			       msm_wsa_cdc_dma_be_dai_links,
 			       sizeof(msm_wsa_cdc_dma_be_dai_links));
 			total_links += ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links);
+		}
 			break;
 		case QUAD_SPEAKER:
 			if (of_find_property(dev->of_node,
@@ -1915,12 +1960,29 @@ static int msm_int_wsa884x_init(struct snd_soc_pcm_runtime *rtd)
 
 static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 {
-	if (strstr(rtd->card->name, "wsa883x"))
-		return msm_int_wsa883x_init(rtd);
-	else if(strstr(rtd->card->name, "wsa884x"))
-		return msm_int_wsa884x_init(rtd);
+	struct snd_soc_component *lpass_cdc_component = NULL;
+	int ret = 0;
 
-	return msm_int_wsa884x_init(rtd);
+	lpass_cdc_component = snd_soc_rtdcom_lookup(rtd, "lpass-cdc");
+	if (!lpass_cdc_component) {
+		pr_err("%s: could not find component for lpass-cdc\n",
+			__func__);
+		return ret;
+	}
+
+	if (strstr(rtd->card->name, "wsa883x")) {
+		lpass_cdc_set_port_map(lpass_cdc_component,
+			ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+		return msm_int_wsa883x_init(rtd);
+	} else if (strstr(rtd->card->name, "wsa884x")) {
+		lpass_cdc_set_port_map(lpass_cdc_component,
+			ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+		return msm_int_wsa884x_init(rtd);
+	}
+
+	lpass_cdc_set_port_map(lpass_cdc_component,
+		ARRAY_SIZE(sm_wsa8855_port_map), sm_wsa8855_port_map);
+	return msm_common_dai_link_init(rtd);
 }
 
 static int msm_int_wsa883x_2_init(struct snd_soc_pcm_runtime *rtd)
@@ -2077,7 +2139,9 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic4");
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic5");
 
-	lpass_cdc_set_port_map(lpass_cdc_component, ARRAY_SIZE(sm_port_map), sm_port_map);
+	if (!pdata->wcd_disabled)
+		lpass_cdc_set_port_map(lpass_cdc_component,
+				ARRAY_SIZE(sm_rx_port_map), sm_rx_port_map);
 
 	card = rtd->card->snd_card;
 	if (!pdata->codec_root) {
