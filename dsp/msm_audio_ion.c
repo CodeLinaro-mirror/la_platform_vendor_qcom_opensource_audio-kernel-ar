@@ -523,7 +523,7 @@ int msm_audio_get_handle_from_phy_addr(int *fd, dma_addr_t paddr, size_t pa_len)
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	int status = -EINVAL;
 
-	pr_debug("%s paddr %llu\n", __func__, paddr);
+	pr_debug("%s paddr %u\n", __func__, paddr);
 	mutex_lock(&(msm_audio_ion_fd_list.list_mutex));
 	list_for_each_entry(msm_audio_fd_data,
 			&msm_audio_ion_fd_list.fd_list, list) {
@@ -655,7 +655,7 @@ static int msm_audio_hyp_unassign(struct msm_audio_fd_data *msm_audio_fd_data)
 		ret = qcom_scm_assign_mem(msm_audio_fd_data->paddr, msm_audio_fd_data->plen,
 			&src_vmid_unmap_list, dst_vmids_unmap, ARRAY_SIZE(dst_vmids_unmap));
 		if (ret < 0) {
-			pr_err("%s: qcom assign unmap failed result = %d addr = 0x%llx size = %zu\n",
+			pr_err("%s: qcom assign unmap failed result = %d addr = %x size = %zu\n",
 			__func__, ret, msm_audio_fd_data->paddr, msm_audio_fd_data->plen);
 		}
 		msm_audio_fd_data->hyp_assign = false;
