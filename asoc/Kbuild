@@ -124,6 +124,11 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdxkovaautoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_SA510M), y)
+		include $(AUDIO_ROOT)/config/sa510mauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sa510mautoconf.h
+	endif
 endif
 endif
 
@@ -229,6 +234,10 @@ ifdef CONFIG_SND_SOC_SDX
 	MACHINE_OBJS += sdx-target.o
 endif
 
+ifdef CONFIG_SND_SOC_SA510M
+	MACHINE_OBJS += sdx-auto-target.o
+endif
+
 ifdef CONFIG_SND_SOC_GVM_AUTO_SPF
     SPF_MACHINE_OBJS += gvm_auto_spf_dummy.o
 endif
@@ -312,6 +321,9 @@ obj-$(CONFIG_SND_SOC_SA8155) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_SDX) += machine_dlkm.o
+machine_dlkm-y := $(MACHINE_OBJS)
+
+obj-$(CONFIG_SND_SOC_SA510M) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_GVM_AUTO_SPF) += spf_machine_dlkm.o

@@ -117,6 +117,11 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdxkovaautoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_SA510M), y)
+		include $(AUDIO_ROOT)/config/sa510mauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sa510mautoconf.h
+	endif
 endif
 endif
 
