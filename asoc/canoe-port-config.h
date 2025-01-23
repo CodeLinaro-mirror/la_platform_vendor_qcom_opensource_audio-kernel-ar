@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CANOE_PORT_CONFIG
@@ -127,7 +127,7 @@ static struct swr_mstr_port_map sm_wsa_port_map[] = {
 static struct swr_mstr_port_map sm_wsa8855_port_map[] = {
 	{WSA_MACRO, SWR_UC0, wsa8855_frame_params_default},
 	{WSA_MACRO, SWR_UC1, wsa_frame_params_receiver},
-	{WSA2_MACRO, SWR_UC0, wsa8855_frame_params_default},
+	{WSA2_MACRO, SWR_UC0, wsa_frame_params_default},
 	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
 };
 #endif /* _CANOE_PORT_CONFIG */
