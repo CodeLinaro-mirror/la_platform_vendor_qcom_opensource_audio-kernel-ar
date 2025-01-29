@@ -36,13 +36,17 @@ ifeq ($(call is-board-platform-in-list,vienna),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_VIENNA=m
 endif
 
+ifeq ($(call is-board-platform-in-list,lahaina),true)
+AUDIO_SELECT  := CONFIG_SND_SOC_LAHAINA=m
+endif
+
 ifeq ($(ENABLE_AUDIO_LEGACY_TECHPACK),true)
 include $(call all-subdir-makefiles)
 LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe vienna), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe vienna lahaina), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -67,7 +71,7 @@ KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
 
-ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4 vienna),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4 vienna lahaina),true)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 endif
 
@@ -259,11 +263,22 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
-ifneq ($(call is-board-platform-in-list, bengal holi blair),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair lahaina),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := swr_dmic_dlkm.ko
 LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/swr_dmic_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
+###########################################################
+ifeq ($(call is-board-platform-in-list, lahaina),true)
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := swr_dmic_legacy_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/swr_dmic_legacy_dlkm.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
@@ -300,6 +315,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ########################### ASOC MACHINE ################################
+ifneq ($(call is-board-platform-in-list, lahaina),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := machine_dlkm.ko
@@ -308,8 +324,20 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
+########################### ASOC MACHINE LAHAINA################################
+ifeq ($(call is-board-platform-in-list, lahaina),true)
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := machine_lahaina_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/machine_lahaina_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 ########################### LPASS-CDC CODEC  ###########################
-ifneq ($(call is-board-platform-in-list, bengal holi blair vienna),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair vienna lahaina),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := lpass_cdc_dlkm.ko
@@ -460,7 +488,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 
-ifeq ($(call is-board-platform-in-list, bengal holi blair),true)
+ifeq ($(call is-board-platform-in-list, bengal holi blair lahaina),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -526,7 +554,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 
-ifeq ($(call is-board-platform-in-list,holi blair),true)
+ifeq ($(call is-board-platform-in-list,holi blair lahaina),true)
 ########################### WCD938x CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -545,8 +573,18 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
 ##########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := wsa883x_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/wsa883x/wsa883x_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
+########################### WSA883x CODEC  ###########################
+
 endif # DLKM check
 endif # supported target check
 endif

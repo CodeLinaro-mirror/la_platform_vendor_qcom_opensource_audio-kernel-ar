@@ -157,6 +157,24 @@ audio_modules.register(
 
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
+    name = "machine_dlkm_lahaina",
+    path = ASOC_PATH,
+    srcs = [
+        "msm_common.c",
+    ],
+    conditional_srcs = {
+        "CONFIG_SND_SOC_LAHAINA": [
+            "lahaina.c"
+        ],
+    },
+    deps = [":%b_spf_core_dlkm",
+            ":%b_audio_prm_dlkm",
+            ":%b_wcd_core_dlkm",
+            ":%b_wsa883x_dlkm",
+            ":%b_snd_event_dlkm",
+    ],
+)
+audio_modules.register(
     name = "machine_dlkm",
     path = ASOC_PATH,
     srcs = [
@@ -179,9 +197,6 @@ audio_modules.register(
         ],
         "CONFIG_SND_SOC_KONA": [
             "kona.c"
-        ],
-        "CONFIG_SND_SOC_LAHAINA": [
-            "lahaina.c"
         ],
         "CONFIG_SND_SOC_WAIPIO": [
             "waipio.c"
@@ -279,6 +294,18 @@ audio_modules.register(
     config_option = "CONFIG_SND_SOC_SWR_DMIC",
     srcs = ["swr-dmic.c"],
     deps = [":%b_wcd939x_dlkm",
+            ":%b_swr_dlkm",
+	   ],
+
+)
+
+# >>>> SWR-DMIC LEGACY WCD938X <<<<
+audio_modules.register(
+    name = "swr_dmic_legacy_dlkm",
+    path = ASOC_CODECS_PATH,
+    config_option = "CONFIG_SND_SOC_SWR_DMIC",
+    srcs = ["swr-dmic.c"],
+    deps = [":%b_wcd938x_dlkm",
             ":%b_swr_dlkm",
 	   ],
 

@@ -113,6 +113,12 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdxlemurautoconf.h
 	endif
+        ifeq ($(CONFIG_ARCH_YUPIK), y)
+                include $(AUDIO_ROOT)/config/lahainaauto.conf
+                export
+                INCS    +=  -include $(AUDIO_ROOT)/config/lahainaautoconf.h
+        endif
+
 endif
 endif
 

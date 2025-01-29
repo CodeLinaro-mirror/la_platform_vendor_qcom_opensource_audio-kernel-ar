@@ -57,6 +57,11 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/qcs405autoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_YUPIK), y)
+		include $(AUDIO_ROOT)/config/lahainaauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/lahainaautoconf.h
+	endif
 endif
 
 # As per target team, build is done as follows:

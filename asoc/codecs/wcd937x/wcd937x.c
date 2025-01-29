@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -1756,7 +1756,7 @@ static int wcd937x_get_logical_addr(struct swr_device *swr_dev)
 		ret = swr_get_logical_dev_num(swr_dev, swr_dev->addr, &devnum);
 		if (ret) {
 			dev_err(&swr_dev->dev,
-				"%s get devnum %d for dev addr %lx failed\n",
+				"%s get devnum %d for dev addr %llx failed\n",
 				__func__, devnum, swr_dev->addr);
 			/* retry after 1ms */
 			usleep_range(1000, 1010);
@@ -2060,9 +2060,9 @@ static int wcd937x_get_compander(struct snd_kcontrol *kcontrol,
 				snd_soc_kcontrol_component(kcontrol);
 	struct wcd937x_priv *wcd937x = snd_soc_component_get_drvdata(component);
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 
 	ucontrol->value.integer.value[0] = hphr ? wcd937x->comp2_enable :
@@ -2078,9 +2078,9 @@ static int wcd937x_set_compander(struct snd_kcontrol *kcontrol,
 	struct wcd937x_priv *wcd937x = snd_soc_component_get_drvdata(component);
 	int value = ucontrol->value.integer.value[0];
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 	if (hphr)
 		wcd937x->comp2_enable = value;

@@ -109,6 +109,11 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/qcs405autoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_YUPIK), y)
+		include $(AUDIO_ROOT)/config/lahainaauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/lahainaautoconf.h
+	endif
 	ifeq ($(CONFIG_QTI_QUIN_GVM), y)
 		include $(AUDIO_ROOT)/config/gvmauto.conf
 		export
@@ -149,6 +154,7 @@ COMMON_INC :=	-I$(AUDIO_ROOT)/$(COMMON_DIR)
 ############ ASoC Drivers ############
 
 MACHINE_OBJS += msm_common.o
+MACHINE_LAHAINA_OBJS += msm_common.o
 
 # for SM8150 sound card driver
 ifdef CONFIG_SND_SOC_SM8150
@@ -179,7 +185,7 @@ endif
 
 # for LAHAINA sound card driver
 ifdef CONFIG_SND_SOC_LAHAINA
-	MACHINE_OBJS += lahaina.o
+	MACHINE_LAHAINA_OBJS += lahaina.o
 endif
 
 # for WAIPIO sound card driver
@@ -286,8 +292,8 @@ machine_dlkm-y := $(MACHINE_OBJS)
 obj-$(CONFIG_SND_SOC_KONA) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
-obj-$(CONFIG_SND_SOC_LAHAINA) += machine_dlkm.o
-machine_dlkm-y := $(MACHINE_OBJS)
+obj-$(CONFIG_SND_SOC_LAHAINA) += machine_lahaina_dlkm.o
+machine_lahaina_dlkm-y := $(MACHINE_LAHAINA_OBJS)
 
 obj-$(CONFIG_SND_SOC_WAIPIO) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
