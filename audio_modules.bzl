@@ -157,7 +157,7 @@ audio_modules.register(
 
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
-    name = "machine_dlkm_lahaina",
+    name = "machine_lahaina_dlkm",
     path = ASOC_PATH,
     srcs = [
         "msm_common.c",
@@ -169,9 +169,12 @@ audio_modules.register(
     },
     deps = [":%b_spf_core_dlkm",
             ":%b_audio_prm_dlkm",
+            ":%b_wcd938x_dlkm",
             ":%b_wcd_core_dlkm",
             ":%b_wsa883x_dlkm",
+            ":%b_wcd937x_dlkm",		
             ":%b_snd_event_dlkm",
+            ":%b_bolero_cdc_dlkm",
     ],
 )
 audio_modules.register(
@@ -298,7 +301,6 @@ audio_modules.register(
 	   ],
 
 )
-
 # >>>> SWR-DMIC LEGACY WCD938X <<<<
 audio_modules.register(
     name = "swr_dmic_legacy_dlkm",
@@ -443,25 +445,54 @@ audio_modules.register(
         "bolero-cdc-tables.c",
         "bolero-clk-rsc.c",
     ],
+     deps = [":%b_spf_core_dlkm",
+            ":%b_snd_event_dlkm",
+           ],
 )
 audio_modules.register(
     name = "va_macro_dlkm",
     path = ASOC_CODECS_BOLERO_PATH,
     config_option = "CONFIG_VA_MACRO",
-    srcs = ["va-macro.c"]
+    srcs = ["va-macro.c"],
+    deps = [":%b_bolero_cdc_dlkm",
+            ":%b_swr_ctrl_dlkm",
+            ":%b_wcd_core_dlkm",
+            ":%b_spf_core_dlkm",
+           ],
 )
 audio_modules.register(
     name = "rx_macro_dlkm",
     path = ASOC_CODECS_BOLERO_PATH,
     config_option = "CONFIG_RX_MACRO",
-    srcs = ["rx-macro.c"]
+    srcs = ["rx-macro.c"],
+    deps = [":%b_bolero_cdc_dlkm",
+            ":%b_swr_ctrl_dlkm",
+            ":%b_wcd_core_dlkm",
+           ],
+
 )
 audio_modules.register(
     name = "tx_macro_dlkm",
     path = ASOC_CODECS_BOLERO_PATH,
     config_option = "CONFIG_TX_MACRO",
-    srcs = ["tx-macro.c"]
+    srcs = ["tx-macro.c"],
+    deps = [":%b_bolero_cdc_dlkm",
+            ":%b_swr_ctrl_dlkm",
+            ":%b_wcd_core_dlkm",
+           ],
 )
+
+audio_modules.register(
+    name = "wsa_macro_dlkm",
+    path = ASOC_CODECS_BOLERO_PATH,
+    config_option = "CONFIG_WSA_MACRO",
+    srcs = ["wsa-macro.c"],
+    deps = [":%b_bolero_cdc_dlkm",
+            ":%b_swr_ctrl_dlkm",
+            ":%b_wcd_core_dlkm",
+           ],
+)
+
 # >>>> WSA881X-ANALOG MODULE <<<<
 audio_modules.register(
     name = "wsa881x_analog_dlkm",
@@ -519,12 +550,19 @@ audio_modules.register(
         "wcd937x-tables.c",
         "wcd937x-mbhc.c",
     ],
+    deps = [":%b_wcd9xxx_dlkm",
+            ":%b_mbhc_dlkm",
+            ":%b_wcd_core_dlkm",
+            ":%b_swr_dlkm",
+            ":%b_wcd937x_slave_dlkm",
+	   ],
 )
 audio_modules.register(
     name = "wcd937x_slave_dlkm",
     path = ASOC_CODECS_PATH + "/wcd937x",
     config_option = "CONFIG_SND_SOC_WCD937X_SLAVE",
-    srcs = ["wcd937x_slave.c"]
+    srcs = ["wcd937x_slave.c"],
+    deps = [":%b_swr_dlkm"],
 )
 # >>>> WCD938X MODULES <<<<
 audio_modules.register(
@@ -541,6 +579,7 @@ audio_modules.register(
             ":%b_mbhc_dlkm",
             ":%b_wcd_core_dlkm",
             ":%b_swr_dlkm",
+            ":%b_wcd938x_slave_dlkm",
 	   ],
 )
 audio_modules.register(
