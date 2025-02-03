@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -41,7 +41,7 @@ module_param_named(debug_mask, audio_pkt_debug_mask, int, 0664);
 
 #define APM_CMD_SHARED_MEM_MAP_REGIONS	0x0100100C
 #define APM_CMD_SHARED_SATELLITE_MEM_MAP_REGIONS	0x01001026
-#define APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE	0x00000004UL
+#define APM_MEMORY_MAP_BIT_MASK_PHYS_ADDRESS 0x000001C1UL
 
 enum {
 	AUDIO_PKT_INFO = 1U << 0,
@@ -382,8 +382,8 @@ int audpkt_chk_and_update_physical_addr(struct audio_gpr_pkt *gpr_pkt)
         size_t pa_len = 0;
 	dma_addr_t paddr;
 
-	if (gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
-				APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE) {
+	if ((gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
+		APM_MEMORY_MAP_BIT_MASK_PHYS_ADDRESS) == 0) {
 		ret = msm_audio_get_phy_addr(
 			(int) gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw,
 			&paddr, &pa_len);
@@ -410,8 +410,8 @@ int audpkt_chk_and_update_satellite_physical_addr(struct audio_satellite_gpr_pkt
 	size_t pa_len = 0;
 	dma_addr_t paddr;
 
-	if (gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
-				APM_MEMORY_MAP_BIT_MASK_IS_OFFSET_MODE) {
+	if ((gpr_pkt->audpkt_mem_map.mmap_header.property_flag &
+		APM_MEMORY_MAP_BIT_MASK_PHYS_ADDRESS) == 0) {
 		ret = msm_audio_get_phy_addr(
 			(int) gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw,
 			&paddr, &pa_len);
