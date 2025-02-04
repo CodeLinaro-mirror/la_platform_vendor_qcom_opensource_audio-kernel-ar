@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/clk.h>
@@ -133,7 +133,7 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 
 static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool active)
 {
-	bool ret = false;
+	int ret = 0;
 	struct snd_soc_card *card = component->card;
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(card);
@@ -148,8 +148,10 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	else if (wcd_mbhc_cfg.enable_usbc_analog)
 		ret = wcd_usbss_switch_update(WCD_USBSS_GND_MIC_SWAP_AATC,
 							WCD_USBSS_CABLE_CONNECT);
+	if (ret == 0)
+		return true;
 #endif
-	return ret;
+	return false;
 }
 
 static void msm_parse_upd_configuration(struct platform_device *pdev,
@@ -2438,6 +2440,15 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	/* parse upd configuration */
 	msm_parse_upd_configuration(pdev, pdata);
 
+	pdata->wcd_usbss_handle = of_parse_phandle(pdev->dev.of_node,
+					"wcd939x-i2c-handle", 0);
+	if (!pdata->wcd_usbss_handle)
+		dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
+			"wcd939x-i2c-handle", pdev->dev.of_node->full_name);
+
+	if (pdata->wcd_usbss_handle)
+		wcd_mbhc_cfg.swap_gnd_mic = msm_usbc_swap_gnd_mic;
+
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
 		if (codec_reg_done)
@@ -2450,16 +2461,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	}
 	dev_info(&pdev->dev, "%s: Sound card %s registered\n",
 		 __func__, card->name);
-
-	if (wcd_mbhc_cfg.enable_usbc_analog ||
-				wcd_mbhc_cfg.usbss_hsj_connect_enable)
-		wcd_mbhc_cfg.swap_gnd_mic = msm_usbc_swap_gnd_mic;
-
-	pdata->wcd_usbss_handle = of_parse_phandle(pdev->dev.of_node,
-					"wcd939x-i2c-handle", 0);
-	if (!pdata->wcd_usbss_handle)
-		dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
-			"wcd939x-i2c-handle", pdev->dev.of_node->full_name);
 
 	pdata->dmic01_gpio_p = of_parse_phandle(pdev->dev.of_node,
 					      "qcom,cdc-dmic01-gpios",
