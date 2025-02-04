@@ -1514,7 +1514,10 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->offset2 = 0x00;
 		port_req->hstart = 0xFF;
 		port_req->hstop = 0xFF;
-		port_req->word_length = 0xFF;
+		if (port_req->word_length == 0)
+			port_req->word_length = 0xFF; /* default, 1-bit PDM */
+		else
+			mport->word_length = port_req->word_length;
 		port_req->blk_pack_mode = 0xFF;
 		port_req->blk_grp_count = 0xFF;
 		port_req->lane_ctrl = swrm->pp[uc][port_id_offset].lane_ctrl;
@@ -1528,7 +1531,12 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->offset2 = 0x00;
 		port_req->hstart = 1;
 		port_req->hstop = 0xF;
-		port_req->word_length = 0xF;
+		if (port_req->word_length == 0) {
+			port_req->word_length = 0xF; /* PCM port, 16-bits */
+			mport->word_length = 0xF;
+		} else {
+			mport->word_length = port_req->word_length;
+		}
 		port_req->blk_pack_mode = 0xFF;
 		port_req->blk_grp_count = 0xFF;
 		port_req->lane_ctrl = 0;
@@ -1543,7 +1551,11 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->offset2 = mport->offset2;
 		port_req->hstart = mport->hstart;
 		port_req->hstop = mport->hstop;
-		port_req->word_length = mport->word_length;
+		if (port_req->word_length == 0 ) /* use from port-config.header */
+			port_req->word_length = mport->word_length;
+		else {
+			mport->word_length = port_req->word_length;
+		}
 		port_req->blk_pack_mode = mport->blk_pack_mode;
 		port_req->blk_grp_count = mport->blk_grp_count;
 		port_req->lane_ctrl = mport->lane_ctrl;
@@ -1809,7 +1821,6 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 		} else if (swrm->master_id == MASTER_ID_BT) {
 			mport->sinterval = sinterval;
 			mport->lane_ctrl = lane_ctrl;
-			mport->word_length = 0xF;
 			mport->hstart = 1;
 			mport->hstop = 0xF;
 		}
@@ -2185,6 +2196,9 @@ static int swrm_connect_port(struct swr_master *master,
 			port_req->num_ch = portinfo->num_ch[i];
 			port_req->ch_rate = portinfo->ch_rate[i];
 			port_req->req_ch_rate = portinfo->ch_rate[i];
+			port_req->word_length = portinfo->bit_width[i];
+			if (port_req->word_length != 0)
+				--port_req->word_length; /* subtract 1 to write to register */
 			if (swrm_is_fractional_sample_rate(port_req->ch_rate))
 				port_req->ch_rate = swrm_adjust_sample_rate(port_req->ch_rate);
 			port_req->ch_en = 0;
