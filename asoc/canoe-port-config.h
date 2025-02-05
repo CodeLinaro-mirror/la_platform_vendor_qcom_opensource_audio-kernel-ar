@@ -45,7 +45,7 @@ static struct port_params wsa8855_frame_params_default[SWR_MSTR_PORT_LEN] = {
 	{15,    6,    0xFF, 0xFF, 0xFF, 0x0,  1, 0xFF, 0xFF, 0x01, 0x00}, /* IVS1 */
 	{15,    13,   0xFF, 0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x01, 0x00}, /* IVS2 */
 	{399,   48,   0xFF, 0x01, 0x0F, 0x1F, 0, 0,    0,    0x01, 0x01}, /* ICPM */
-	{399,   112,  0xFF, 1,    15,   24,   0, 0,    0,    0x01, 0x01}, /* CPS */
+	{399,   112,  0xFF, 1,    15,   31,   0, 0,    0,    0x01, 0x01}, /* CPS */
 };
 
 static struct port_params wsa_frame_params_receiver[SWR_MSTR_PORT_LEN] = {
