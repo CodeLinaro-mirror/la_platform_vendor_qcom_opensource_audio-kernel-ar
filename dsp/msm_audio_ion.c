@@ -646,7 +646,8 @@ static int msm_audio_ion_free(struct dma_buf *dma_buf, struct msm_audio_ion_priv
 static int msm_audio_hyp_unassign(struct msm_audio_fd_data *msm_audio_fd_data)
 {
 	int ret = 0;
-	u64 src_vmid_unmap_list = BIT(VMID_LPASS) | BIT(VMID_ADSP_HEAP);
+	u64 mask_bit=1;
+	u64 src_vmid_unmap_list = (mask_bit << VMID_LPASS) | (mask_bit << VMID_ADSP_HEAP);
 	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
 		PERM_READ | PERM_WRITE | PERM_EXEC}};
 
