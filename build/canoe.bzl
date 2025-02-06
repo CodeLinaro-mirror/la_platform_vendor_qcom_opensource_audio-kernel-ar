@@ -42,6 +42,7 @@ def define_canoe():
 	    "wcd939x_slave_dlkm",
             "lpass_bt_swr_dlkm",
             "qmp_dlkm",
+            "wsa885x_i2c_dlkm",
             "simple_amp_dlkm"
         ],
         config_options = [
@@ -61,6 +62,7 @@ def define_canoe():
             "CONFIG_AUDIO_BTFM_PROXY",
             "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
+            "CONFIG_SND_SOC_WSA885X_I2C",
             "CONFIG_SND_SOC_SIMPLE_AMP",
         ]
     )
