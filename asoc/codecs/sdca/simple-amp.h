@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) 2024 - 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef SIMPLE_AMP_H
@@ -152,6 +152,7 @@ struct port_config {
 	u8 ch_mask[MAX_SWR_SLV_PORTS];
 	u8 port_type[MAX_SWR_SLV_PORTS];
 	u8 num_ch[MAX_SWR_SLV_PORTS];
+	unsigned int bitwidth[MAX_SWR_SLV_PORTS];
 	unsigned int ch_rate[MAX_SWR_SLV_PORTS];
 	struct swr_device *swr_slave;
 };

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) 2024 - 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1243,8 +1243,9 @@ static void deprepare_channel(struct port_config *config, int func)
 				prepare_reg, &ch);
 }
 
-static void simple_amp_get_port_param(struct port_config *config, int func,
-		int num_channels, unsigned int rate, int channel_sel)
+static void simple_amp_get_port_param(struct port_config *config,
+		int func, int num_channels, unsigned int rate,
+		int channel_sel, unsigned int bitwidth)
 {
 	if (!config || !config->swr_slave) {
 		pr_err("%s: Invalid input parameters\n", __func__);
@@ -1259,12 +1260,14 @@ static void simple_amp_get_port_param(struct port_config *config, int func,
 				u8 num_ch[] = {2, 2, 2};
 				u8 ch_mask[] = {3, 3, 0xc};
 				unsigned int ch_rate[] = {rate, rate, rate};
+				unsigned int bit_width[] = {bitwidth, 32, 32};
 
 				memcpy(config->port_id, port_id, sizeof(port_id));
 				memcpy(config->port_type, port_type, sizeof(port_type));
 				memcpy(config->num_ch, num_ch, sizeof(num_ch));
 				memcpy(config->ch_rate, ch_rate, sizeof(ch_rate));
 				memcpy(config->ch_mask, ch_mask, sizeof(ch_mask));
+				memcpy(config->bitwidth, bit_width, sizeof(bit_width));
 				config->num_ports = 3;
 			}
 			break;
@@ -1389,13 +1392,6 @@ static int simple_amp_hw_params(struct snd_pcm_substream *substream,
 			__func__, dai->name, params_width(params), num_channels,
 			params_rate(params));
 
-	/* Limit bit-width to 16 for now. 24/32 to be added */
-	if (params_width(params) != 16) {
-		dev_err(simple_amp->dev, "unsupported bit width %d\n",
-				params_width(params));
-		return -EINVAL;
-	}
-
 	sdca_func_data = simple_amp->sdca_func_data[dai->id];
 	if (!sdca_func_data)
 		return -EINVAL;
@@ -1458,7 +1454,7 @@ static int simple_amp_hw_params(struct snd_pcm_substream *substream,
 		channel_sel = simple_amp->rx_ch_sel;
 
 	simple_amp_get_port_param(pconfig_sel, dai->id, num_channels,
-			params_rate(params), channel_sel);
+			params_rate(params), channel_sel, params_width(params));
 
 	snd_soc_dai_dma_data_set_playback(dai, pconfig_sel);
 
@@ -1487,10 +1483,9 @@ static int simple_amp_prepare(struct snd_pcm_substream *substream,
 	if (!pconfig_sel)
 		return -EINVAL;
 
-	ret = swr_connect_port(simple_amp->swr_slave, pconfig_sel->port_id,
-			pconfig_sel->num_ports, pconfig_sel->ch_mask,
-			pconfig_sel->ch_rate, pconfig_sel->num_ch,
-			pconfig_sel->port_type);
+	ret = swr_connect_port_v2(simple_amp->swr_slave, pconfig_sel->port_id,
+			pconfig_sel->num_ports, pconfig_sel->ch_mask, pconfig_sel->ch_rate,
+			pconfig_sel->num_ch, pconfig_sel->port_type, pconfig_sel->bitwidth);
 	if (ret != 0) {
 		dev_err(component->dev, "%s: swr connect port failed: %d\n",
 				__func__, ret);
