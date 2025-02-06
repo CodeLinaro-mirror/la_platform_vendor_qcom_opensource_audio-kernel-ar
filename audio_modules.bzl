@@ -595,3 +595,13 @@ audio_modules.register(
     ],
     deps = [":%b_swr_dlkm"],
 )
+
+# >>>> WSA885X I2C MODULES <<<<
+audio_modules.register(
+    name = "wsa885x_i2c_dlkm",
+    path = ASOC_CODECS_PATH,
+    config_option = "CONFIG_SND_SOC_WSA885X_I2C",
+    srcs = [
+        "wsa885x-i2c.c",
+    ]
+)

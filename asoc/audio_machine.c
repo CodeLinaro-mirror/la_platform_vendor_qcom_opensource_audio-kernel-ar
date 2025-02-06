@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -1359,27 +1359,6 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 		SND_SOC_DAILINK_REG(quin_tdm_tx_0),
 	},
 	{
-		.name = LPASS_BE_SEN_TDM_RX_0,
-		.stream_name = LPASS_BE_SEN_TDM_RX_0,
-		.playback_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ops = &msm_common_be_ops,
-		.ignore_suspend = 1,
-		.ignore_pmdown_time = 1,
-		SND_SOC_DAILINK_REG(sen_tdm_rx_0),
-	},
-	{
-		.name = LPASS_BE_SEN_TDM_TX_0,
-		.stream_name = LPASS_BE_SEN_TDM_TX_0,
-		.capture_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ops = &msm_common_be_ops,
-		.ignore_suspend = 1,
-		SND_SOC_DAILINK_REG(sen_tdm_tx_0),
-	},
-	{
 		.name = LPASS_BE_SEP_TDM_RX_0,
 		.stream_name = LPASS_BE_SEP_TDM_RX_0,
 		.playback_only = 1,
@@ -1402,6 +1381,56 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 	},
 };
 
+
+static struct snd_soc_dai_link msm_tdm_sen_dai_links[] = {
+	{
+		.name = LPASS_BE_SEN_TDM_RX_0,
+		.stream_name = LPASS_BE_SEN_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_rx_0),
+	},
+	{
+		.name = LPASS_BE_SEN_TDM_TX_0,
+		.stream_name = LPASS_BE_SEN_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_tx_0),
+	},
+};
+
+
+static struct snd_soc_dai_link wsa885x_tdm_dai_links[] = {
+	{
+		.name = LPASS_BE_SEN_TDM_RX_0,
+		.stream_name = LPASS_BE_SEN_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_rx),
+	},
+	{
+		.name = LPASS_BE_SEN_TDM_TX_0,
+		.stream_name = LPASS_BE_SEN_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_tx),
+	},
+};
+
 static struct snd_soc_dai_link msm_canoe_dai_links[
 			ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_wsa8855_cdc_dma_be_dai_links) +
@@ -1418,7 +1447,9 @@ static struct snd_soc_dai_link msm_canoe_dai_links[
 			ARRAY_SIZE(msm_wcn_be_dai_links_ext) +
 			ARRAY_SIZE(msm_swr_haptics_be_dai_links) +
 			ARRAY_SIZE(msm_mi2s_dai_links) +
-			ARRAY_SIZE(msm_tdm_dai_links)];
+			ARRAY_SIZE(msm_tdm_dai_links) +
+			ARRAY_SIZE(msm_tdm_sen_dai_links) +
+			ARRAY_SIZE(wsa885x_tdm_dai_links)];
 
 
 static int msm_populate_dai_link_component_of_node(
@@ -1736,6 +1767,22 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 					msm_tdm_dai_links,
 					sizeof(msm_tdm_dai_links));
 			total_links += ARRAY_SIZE(msm_tdm_dai_links);
+		}
+
+		rc = of_property_read_u32(dev->of_node,
+				"qcom,wsa885x-tdm", &val);
+		if (!rc && val) {
+			memcpy(msm_canoe_dai_links + total_links,
+					wsa885x_tdm_dai_links,
+					sizeof(wsa885x_tdm_dai_links));
+			total_links += ARRAY_SIZE(wsa885x_tdm_dai_links);
+		}
+
+		if (rc) {
+			memcpy(msm_canoe_dai_links + total_links,
+					msm_tdm_sen_dai_links,
+					sizeof(msm_tdm_sen_dai_links));
+			total_links += ARRAY_SIZE(msm_tdm_sen_dai_links);
 		}
 
 		rc = of_property_read_u32(dev->of_node,
