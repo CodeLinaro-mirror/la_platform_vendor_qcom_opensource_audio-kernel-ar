@@ -3217,8 +3217,11 @@ static int swrm_probe(struct platform_device *pdev)
 		}
 		swrm->port_mapping[port_num][ch_iter].port_type = port_type;
 
-		if (swrm->master_id == MASTER_ID_BT)
+		if (swrm->master_id == MASTER_ID_BT) {
 			swrm->port_mapping[port_num][ch_iter++].ch_mask = 1;
+			if (port_type == FM_AUDIO_TX1)
+				swrm->port_mapping[port_num][ch_iter++].ch_mask = 3;
+		}
 		else
 			swrm->port_mapping[port_num][ch_iter++].ch_mask = ch_mask;
 		old_port_num = port_num;
