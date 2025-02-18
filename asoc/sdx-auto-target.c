@@ -186,33 +186,30 @@ static int sdx_mi2s_startup(struct snd_pcm_substream *substream)
 
 	pdata->prim_mi2s_mode = sdx_mi2s_mode;
 	if (atomic_inc_return(&mi2s_ref_count) == 1) {
-		if (pdata->lpaif_pri_muxsel_virt_addr != NULL) {
+		ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
+		if (ret < 0) {
+			dev_err(card->dev,
+			"%s:set lpass core clk failed ret: %d\n",
+			__func__, ret);
+			ret = -EINVAL;
+			goto done;
+		}
 
-			ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
-			if (ret < 0) {
-				dev_err(card->dev,
-				"%s:set lpass core clk failed ret: %d\n",
-				__func__, ret);
-				ret = -EINVAL;
-				goto done;
-			}
+		audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
+		I2S_SEL << I2S_PCM_SEL_OFFSET);
+		if (pdata->prim_mi2s_mode == 1)
+				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
+				0xffff,PRI_TLMM_CLKS_EN_MASTER);
+		else
+				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
+				0xffff,PRI_TLMM_CLKS_EN_SLAVE);
 
-			audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
-			I2S_SEL << I2S_PCM_SEL_OFFSET);
-			if (pdata->prim_mi2s_mode == 1)
-					ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
-					0xffff,PRI_TLMM_CLKS_EN_MASTER);
-			else
-					ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
-					0xffff,PRI_TLMM_CLKS_EN_SLAVE);
-
-			if (ret < 0) {
-				dev_err(card->dev,
-				"%s:set hw csr update failed ret: %d\n",
-				__func__, ret);
-				ret = -EINVAL;
-				goto done;
-			}
+		if (ret < 0) {
+			dev_err(card->dev,
+			"%s:set hw csr update failed ret: %d\n",
+			__func__, ret);
+			ret = -EINVAL;
+			goto done;
 		}
 		/*
 		 * This sets the CONFIG PARAMETER WS_SRC.
