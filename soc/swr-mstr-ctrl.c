@@ -531,6 +531,17 @@ exit:
 	return ret;
 }
 
+static bool swrm_first_after_clk_enabled(struct swr_mstr_ctrl *swrm)
+{
+	bool ret = false;
+
+	mutex_lock(&swrm->clklock);
+	ret = (swrm->clk_ref_count == 1) ? true:false;
+	mutex_unlock(&swrm->clklock);
+
+	return ret;
+}
+
 static int swrm_clk_request(struct swr_mstr_ctrl *swrm, bool enable)
 {
 	int ret = 0;
@@ -1514,21 +1525,26 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->offset2 = 0x00;
 		port_req->hstart = 0xFF;
 		port_req->hstop = 0xFF;
-		port_req->word_length = 0xFF;
+		if (port_req->word_length == 0)
+			port_req->word_length = 0xFF; /* default, 1-bit PDM */
+		else
+			mport->word_length = port_req->word_length;
 		port_req->blk_pack_mode = 0xFF;
 		port_req->blk_grp_count = 0xFF;
 		port_req->lane_ctrl = swrm->pp[uc][port_id_offset].lane_ctrl;
 	} else if (swrm->master_id == MASTER_ID_BT) {
 		port_req->sinterval =
 				((swrm->bus_clk * 2) / port_req->ch_rate) - 1;
-		if (mport->dir == 0)
-			port_req->offset1 = 0;
-		else
-			port_req->offset1 = 0x14;
+		port_req->offset1 = mport->offset1;
 		port_req->offset2 = 0x00;
 		port_req->hstart = 1;
 		port_req->hstop = 0xF;
-		port_req->word_length = 0xF;
+		if (port_req->word_length == 0) {
+			port_req->word_length = 0xF; /* PCM port, 16-bits */
+			mport->word_length = 0xF;
+		} else {
+			mport->word_length = port_req->word_length;
+		}
 		port_req->blk_pack_mode = 0xFF;
 		port_req->blk_grp_count = 0xFF;
 		port_req->lane_ctrl = 0;
@@ -1543,7 +1559,11 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->offset2 = mport->offset2;
 		port_req->hstart = mport->hstart;
 		port_req->hstop = mport->hstop;
-		port_req->word_length = mport->word_length;
+		if (port_req->word_length == 0 ) /* use from port-config.header */
+			port_req->word_length = mport->word_length;
+		else {
+			mport->word_length = port_req->word_length;
+		}
 		port_req->blk_pack_mode = mport->blk_pack_mode;
 		port_req->blk_grp_count = mport->blk_grp_count;
 		port_req->lane_ctrl = mport->lane_ctrl;
@@ -1809,7 +1829,6 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 		} else if (swrm->master_id == MASTER_ID_BT) {
 			mport->sinterval = sinterval;
 			mport->lane_ctrl = lane_ctrl;
-			mport->word_length = 0xF;
 			mport->hstart = 1;
 			mport->hstop = 0xF;
 		}
@@ -2185,6 +2204,9 @@ static int swrm_connect_port(struct swr_master *master,
 			port_req->num_ch = portinfo->num_ch[i];
 			port_req->ch_rate = portinfo->ch_rate[i];
 			port_req->req_ch_rate = portinfo->ch_rate[i];
+			port_req->word_length = portinfo->bit_width[i];
+			if (port_req->word_length != 0)
+				--port_req->word_length; /* subtract 1 to write to register */
 			if (swrm_is_fractional_sample_rate(port_req->ch_rate))
 				port_req->ch_rate = swrm_adjust_sample_rate(port_req->ch_rate);
 			port_req->ch_en = 0;
@@ -3390,8 +3412,8 @@ static int swrm_probe(struct platform_device *pdev)
 
 		if (swrm->master_id == MASTER_ID_TX || swrm->master_id == MASTER_ID_BT) {
 			swrm->mport_cfg[i].sinterval = 0xFFFF;
-			if (swrm->master_id == MASTER_ID_BT && i > 3)
-				swrm->mport_cfg[i].offset1 = 0x14;
+			if (swrm->master_id == MASTER_ID_BT)
+				swrm->mport_cfg[i].offset1 = i * 0x14;
 			else
 				swrm->mport_cfg[i].offset1 = 0x00;
 			swrm->mport_cfg[i].offset2 = 0x00;
@@ -3772,20 +3794,22 @@ static int swrm_runtime_resume(struct device *dev)
 					goto exit;
 				}
 			}
-			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
-			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
-			swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
-			swrm_master_init(swrm);
-			/* wait for hw enumeration to complete */
-			usleep_range(100, 105);
-			if (!swrm_check_link_status(swrm, 0x1))
-				dev_dbg(dev, "%s:failed in connecting, ssr?\n",
+
+			if (swrm_first_after_clk_enabled(swrm)) {
+				swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
+				swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
+				swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
+				swrm_master_init(swrm);
+
+				/* wait for hw enumeration to complete */
+				usleep_range(100, 105);
+				if (!swrm_check_link_status(swrm, 0x1))
+					dev_dbg(dev, "%s:failed in connecting, ssr?\n",
 					__func__);
 
-			mutex_lock(&enumeration_lock);
-			swrm_cmd_fifo_wr_cmd(swrm, 0x4, 0xF, get_cmd_id(swrm),
+				swrm_cmd_fifo_wr_cmd(swrm, 0x4, 0xF, get_cmd_id(swrm),
 						SWRS_SCP_INT_STATUS_MASK_1);
-			mutex_unlock(&enumeration_lock);
+			}
 
 			if (swrm->state == SWR_MSTR_SSR) {
 				mutex_unlock(&swrm->reslock);
@@ -3885,9 +3909,8 @@ static int swrm_runtime_suspend(struct device *dev)
 				goto chk_lnk_status;
 			mutex_unlock(&swrm->reslock);
 
-			mutex_lock(&enumeration_lock);
-			enable_bank_switch(swrm, 0, SWR_ROW_50, SWR_MIN_COL);
-			mutex_unlock(&enumeration_lock);
+			if (swrm->master_id != MASTER_ID_BT)
+				enable_bank_switch(swrm, 0, SWR_ROW_50, SWR_MIN_COL);
 
 			mutex_lock(&swrm->reslock);
 			swrm_clk_pause(swrm);

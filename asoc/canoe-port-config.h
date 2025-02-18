@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #ifndef _CANOE_PORT_CONFIG
@@ -45,7 +45,7 @@ static struct port_params wsa8855_frame_params_default[SWR_MSTR_PORT_LEN] = {
 	{15,    6,    0xFF, 0xFF, 0xFF, 0x0,  1, 0xFF, 0xFF, 0x01, 0x00}, /* IVS1 */
 	{15,    13,   0xFF, 0xFF, 0xFF, 0xFF, 1, 0xFF, 0xFF, 0x01, 0x00}, /* IVS2 */
 	{399,   48,   0xFF, 0x01, 0x0F, 0x1F, 0, 0,    0,    0x01, 0x01}, /* ICPM */
-	{399,   112,  0xFF, 1,    15,   24,   0, 0,    0,    0x01, 0x01}, /* CPS */
+	{399,   112,  0xFF, 1,    15,   31,   0, 0,    0,    0x01, 0x01}, /* CPS */
 };
 
 static struct port_params wsa_frame_params_receiver[SWR_MSTR_PORT_LEN] = {
@@ -127,7 +127,7 @@ static struct swr_mstr_port_map sm_wsa_port_map[] = {
 static struct swr_mstr_port_map sm_wsa8855_port_map[] = {
 	{WSA_MACRO, SWR_UC0, wsa8855_frame_params_default},
 	{WSA_MACRO, SWR_UC1, wsa_frame_params_receiver},
-	{WSA2_MACRO, SWR_UC0, wsa8855_frame_params_default},
+	{WSA2_MACRO, SWR_UC0, wsa_frame_params_default},
 	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
 };
 #endif /* _CANOE_PORT_CONFIG */
