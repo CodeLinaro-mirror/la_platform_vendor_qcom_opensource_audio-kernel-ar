@@ -1377,14 +1377,6 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 		if (mute) {
 			snd_soc_component_update_bits(component, tx_mute_ctl_reg, 0x10, 0x10);
-		} else {
-			if (!is_msm_dmic_enabled(component, decimator)) {
-				snd_soc_component_update_bits(component, tx_mute_ctl_reg,
-							0x40, 0x40);
-				usleep_range(2000, 2100);
-				snd_soc_component_update_bits(component, tx_mute_ctl_reg,
-							0x40, 0x00);
-			}
 		}
 		dev_dbg(component->dev, "capture: TX decimator %d %s\n", decimator,
 				(mute ? "muted" : "unmuted"));
