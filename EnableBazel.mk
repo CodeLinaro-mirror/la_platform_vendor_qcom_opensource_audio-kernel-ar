@@ -108,3 +108,21 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_slave_dlkm.ko
 endif
+
+ifeq ($(call is-board-platform-in-list,vienna),true)
+LOCAL_MODULE_DDK_BUILD := true
+
+LOCAL_MODULE_KO_DIRS := dsp/q6_notifier_dlkm.ko
+LOCAL_MODULE_KO_DIRS += dsp/spf_core_dlkm.ko
+LOCAL_MODULE_KO_DIRS += dsp/q6codec_core_dlkm.ko
+LOCAL_MODULE_KO_DIRS += dsp/audpkt_ion_dlkm.ko
+LOCAL_MODULE_KO_DIRS += dsp/q6_dlkm.ko
+LOCAL_MODULE_KO_DIRS += ipc/gpr_dlkm.ko
+LOCAL_MODULE_KO_DIRS += ipc/audio_pkt_dlkm.ko
+LOCAL_MODULE_KO_DIRS += dsp/adsp_loader_dlkm.ko
+LOCAL_MODULE_KO_DIRS += dsp/audio_prm_dlkm.ko
+LOCAL_MODULE_KO_DIRS += dsp/q6_pdr_dlkm.ko
+LOCAL_MODULE_KO_DIRS += soc/snd_event_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/stub_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/machine_dlkm.ko
+endif

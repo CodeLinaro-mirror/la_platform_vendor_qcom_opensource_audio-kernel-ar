@@ -44,6 +44,14 @@ audio_modules.register(
     },
     deps = [":%b_gpr_dlkm"],
 )
+
+audio_modules.register(
+    name = "q6codec_core_dlkm",
+    path = DSP_PATH,
+    config_option = "CONFIG_Q6CODEC_CORE",
+    srcs = ["q6codec-core.c"]
+)
+
 audio_modules.register(
     name = "audpkt_ion_dlkm",
     path = DSP_PATH,
@@ -146,6 +154,7 @@ audio_modules.register(
     config_option = "CONFIG_SND_EVENT",
     srcs = ["snd_event.c"]
 )
+
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
     name = "machine_dlkm",
@@ -201,10 +210,14 @@ audio_modules.register(
         "CONFIG_SND_SOC_SUN": [
             "sun.c"
         ],
+	"CONFIG_SND_SOC_VIENNA": [
+            "vienna.c"
+        ],
         "CONFIG_SND_SOC_CANOE": [
             "audio_machine.c"
         ]
     },
+
     deps = [":%b_spf_core_dlkm",
             ":%b_audio_prm_dlkm",
             ":%b_wcd_core_dlkm",
@@ -214,7 +227,7 @@ audio_modules.register(
             ":%b_wsa883x_dlkm",
             ":%b_wsa884x_dlkm",
             ":%b_snd_event_dlkm",
-	   ],
+           ],
 )
 # >>>> ASOC/CODEC MODULES <<<<
 audio_modules.register(
