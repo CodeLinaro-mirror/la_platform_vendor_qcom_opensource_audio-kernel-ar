@@ -1356,9 +1356,6 @@ static int simple_amp_hw_params(struct snd_pcm_substream *substream,
 			rx_sample_rate = SIMPLE_AMP_RX_RATE_16000HZ;
 			tx_sample_rate = SIMPLE_AMP_VI_RATE_16000HZ;
 			break;
-		case 32000:
-			rx_sample_rate = SIMPLE_AMP_RX_RATE_32000HZ;
-			break;
 		case 44100:
 			rx_sample_rate = SIMPLE_AMP_RX_RATE_44100HZ;
 			tx_sample_rate = SIMPLE_AMP_VI_RATE_44100HZ;
@@ -1374,12 +1371,6 @@ static int simple_amp_hw_params(struct snd_pcm_substream *substream,
 		case 192000:
 			rx_sample_rate = SIMPLE_AMP_RX_RATE_192000HZ;
 			tx_sample_rate = SIMPLE_AMP_VI_RATE_192000HZ;
-			break;
-		case 22050:
-			tx_sample_rate = SIMPLE_AMP_VI_RATE_22050HZ;
-			break;
-		case 24000:
-			tx_sample_rate = SIMPLE_AMP_VI_RATE_24000HZ;
 			break;
 		default:
 			dev_err(component->dev, "Rate %d is not supported\n",
