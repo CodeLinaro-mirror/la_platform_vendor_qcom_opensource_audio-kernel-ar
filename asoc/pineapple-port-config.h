@@ -159,4 +159,9 @@ static struct swr_mstr_port_map sm_port_map[] = {
 	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
 };
 
+/*Port configurations to support 3WSA HAC */
+static struct swr_mstr_port_map sm_port_map_hac_wsa[] = {
+	{WSA_MACRO, SWR_UC0, wsa_frame_params_default},
+	{WSA_MACRO, SWR_UC1, wsa_frame_params_receiver},
+};
 #endif /* _PINEAPPLE_PORT_CONFIG */
