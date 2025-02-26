@@ -1,9 +1,28 @@
-AUDIO_ROOT=$(PWD)
+#QTI_TECHPACK is used since kernel 5.15
+ifeq ($(QTI_TECHPACK), true)
+AUDIO_KERNEL_PATH=$(PWD)/../../../vendor/qcom/opensource/audio-kernel-ar/
+AUDIO_ROOT=$(AUDIO_KERNEL_PATH)
+# Use USERINCLUDE when you must reference the UAPI directories only.
+USERINCLUDE     += \
+                -I$(AUDIO_KERNEL_PATH)/include/uapi/audio
+
+# Use LINUXINCLUDE when you must reference the include/ directory.
+# Needed to be compatible with the O= option
+INCS    += \
+                -I$(AUDIO_KERNEL_PATH)/include/uapi \
+                -I$(AUDIO_KERNEL_PATH)/include/uapi/audio \
+                -I$(AUDIO_KERNEL_PATH)/include/asoc \
+                -I$(AUDIO_KERNEL_PATH)/include
+
+KBUILD_OPTIONS := AUDIO_ROOT=$(AUDIO_KERNEL_PATH)
+else
+AUDIO_ROOT=$(shell pwd)
 UAPI_OUT=$(PWD)
 HEADER_INSTALL_DIR=$(KERNEL_SRC)/scripts
-KERNEL_BINARY_DIR=$(KERNEL_SRC)/../kernel-build-artifacts
+KERNEL_BINARY_DIR=$(KERNEL_UAPI_HEADERS_DIR)
 
-KBUILD_OPTIONS := AUDIO_ROOT=$(PWD)
+KBUILD_OPTIONS := AUDIO_ROOT=$(shell pwd)
+endif
 KBUILD_OPTIONS += MODNAME=audio
 KBUILD_OPTIONS += UAPI_OUT=$(PWD)
 
@@ -20,8 +39,6 @@ endif
 ifeq ($(TARGET_SUPPORT), sdxlemur))
 KBUILD_OPTIONS += CONFIG_ARCH_SDXLEMUR=y
 endif
-
-subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
 
 subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
 
@@ -63,6 +80,7 @@ define PROCESS_HEADERS
 endef
 
 all:
+ifneq ($(QTI_TECHPACK), true)
 	$(shell rm -fr $(shell pwd)/soc/core.h)
 	$(shell ln -s $(KERNEL_SRC)/drivers/pinctrl/core.h $(shell pwd)/soc/core.h)
 	$(shell rm -fr $(shell pwd)/include/soc/internal.h)
@@ -75,21 +93,26 @@ all:
 	$(shell mkdir $(shell pwd)/sound)
 	$(shell mkdir $(shell pwd)/linux/mfd)
 	$(shell mkdir $(shell pwd)/linux/mfd/wcd9xxx)
-	$(call PROCESS_HEADERS, $(notdir $(shell ls $(AUDIO_ROOT)/include/uapi/audio/linux/*.h)), $(AUDIO_ROOT)/include/uapi/audio/linux/, $(UAPI_OUT)/linux/)
-	$(call PROCESS_HEADERS, $(notdir $(shell ls $(AUDIO_ROOT)/include/uapi/audio/linux/mfd/wcd9xxx/*.h)), $(AUDIO_ROOT)/include/uapi/audio/linux/mfd/wcd9xxx/, $(UAPI_OUT)/linux/mfd/wcd9xxx/)
-	$(call PROCESS_HEADERS, $(notdir $(shell ls $(AUDIO_ROOT)/include/uapi/audio/sound/*.h)), $(AUDIO_ROOT)/include/uapi/audio/sound/, $(UAPI_OUT)/sound/)
+	$(call PROCESS_HEADERS, $(notdir $(shell ls $(shell pwd)/include/uapi/audio/linux/*.h)), $(shell pwd)/include/uapi/audio/linux/, $(UAPI_OUT)/linux/)
+	$(call PROCESS_HEADERS, $(notdir $(shell ls $(shell pwd)/include/uapi/audio/linux/mfd/wcd9xxx/*.h)), $(shell pwd)/include/uapi/audio/linux/mfd/wcd9xxx/, $(UAPI_OUT)/linux/mfd/wcd9xxx/)
+	$(call PROCESS_HEADERS, $(notdir $(shell ls $(shell pwd)/include/uapi/audio/sound/*.h)), $(shell pwd)/include/uapi/audio/sound/, $(UAPI_OUT)/sound/)
 	$(shell mkdir $(KERNEL_BINARY_DIR)/usr/include/audio)
 	$(shell mkdir $(KERNEL_BINARY_DIR)/usr/include/audio/sound)
 	$(shell mkdir $(KERNEL_BINARY_DIR)/usr/include/audio/linux)
 	$(shell mkdir $(KERNEL_BINARY_DIR)/usr/include/audio/linux/mfd)
 	$(shell mkdir $(KERNEL_BINARY_DIR)/usr/include/audio/linux/mfd/wcd9xxx)
-	$(call PROCESS_HEADERS, $(notdir $(shell ls $(AUDIO_ROOT)/include/uapi/audio/linux/*.h)), $(AUDIO_ROOT)/include/uapi/audio/linux/, $(KERNEL_BINARY_DIR)/usr/include/audio/linux/)
-	$(call PROCESS_HEADERS, $(notdir $(shell ls $(AUDIO_ROOT)/include/uapi/audio/linux/mfd/wcd9xxx/*.h)), $(AUDIO_ROOT)/include/uapi/audio/linux/mfd/wcd9xxx/, $(KERNEL_BINARY_DIR)/usr/include/audio/linux/mfd/wcd9xxx/)
-	$(call PROCESS_HEADERS, $(notdir $(shell ls $(AUDIO_ROOT)/include/uapi/audio/sound/*.h)), $(AUDIO_ROOT)/include/uapi/audio/sound/, $(KERNEL_BINARY_DIR)/usr/include/audio/sound/)
+	$(call PROCESS_HEADERS, $(notdir $(shell ls $(shell pwd)/include/uapi/audio/linux/*.h)), $(AUDIO_ROOT)/include/uapi/audio/linux/, $(KERNEL_BINARY_DIR)/usr/include/audio/linux/)
+	$(call PROCESS_HEADERS, $(notdir $(shell ls $(shell pwd)/include/uapi/audio/linux/mfd/wcd9xxx/*.h)), $(AUDIO_ROOT)/include/uapi/audio/linux/mfd/wcd9xxx/, $(KERNEL_BINARY_DIR)/usr/include/audio/linux/mfd/wcd9xxx/)
+	$(call PROCESS_HEADERS, $(notdir $(shell ls $(shell pwd)/include/uapi/audio/sound/*.h)), $(AUDIO_ROOT)/include/uapi/audio/sound/, $(KERNEL_BINARY_DIR)/usr/include/audio/sound/)
+endif
 	$(MAKE) -C $(KERNEL_SRC) M=$(shell pwd) modules $(KBUILD_OPTIONS)
 
 modules_install:
 	$(MAKE) INSTALL_MOD_STRIP=1 -C $(KERNEL_SRC) M=$(shell pwd) modules_install
+ifeq ($(QTI_TECHPACK), true)
+%:
+	$(MAKE) -C $(KERNEL_SRC) M=$(M) $(KBUILD_OPTIONS)
+endif
 
 clean:
 	rm -f *.o *.ko *.mod.c *.mod.o *~ .*.cmd Module.symvers

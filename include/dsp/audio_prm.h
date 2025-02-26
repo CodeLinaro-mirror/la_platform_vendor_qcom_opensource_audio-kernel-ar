@@ -627,9 +627,10 @@ typedef struct prm_cmd_request_rsc_hw_csr_update {
 #define CLOCK_ROOT_SRC_RCO 0x2
 int audio_prm_set_lpass_clk_cfg(struct clk_cfg *cfg, uint8_t enable);
 int audio_prm_set_lpass_hw_core_req(struct clk_cfg *cfg, uint32_t hw_core_id, uint8_t enable);
+int audio_prm_set_lpass_core_clk_req(struct clk_cfg *cfg, uint32_t hw_core_id, uint8_t enable);
 int audio_prm_set_cdc_earpa_duty_cycling_req(struct prm_earpa_hw_intf_config *earpa_config,
 									uint32_t enable);
-int audio_prm_set_rsc_hw_csr_update(uint32_t phy_addr, uint32_t bit_mask, uint32_t final_value);
 void audio_prm_set_lpi_logging_status(int lpi_pcm_logging_enable);
 int audio_prm_set_vote_against_sleep(uint8_t enable);
+int audio_prm_set_rsc_hw_csr_update(uint32_t phy_addr, uint32_t bit_mask, uint32_t final_value);
 #endif
