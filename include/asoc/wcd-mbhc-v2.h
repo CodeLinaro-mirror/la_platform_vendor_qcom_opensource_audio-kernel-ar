@@ -529,6 +529,10 @@ struct wcd_mbhc_cb {
 	bool (*mbhc_get_moisture_status)(struct wcd_mbhc *mbhc);
 	void (*mbhc_moisture_polling_ctrl)(struct wcd_mbhc *mbhc, bool enable);
 	void (*mbhc_moisture_detect_en)(struct wcd_mbhc *mbhc, bool enable);
+
+	int (*mbhc_force_micbias_disable)(struct snd_soc_component *component,
+								int micb_num);
+
 };
 
 struct wcd_mbhc_fn {
