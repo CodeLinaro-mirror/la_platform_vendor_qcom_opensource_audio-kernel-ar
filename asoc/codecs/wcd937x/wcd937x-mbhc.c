@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
- * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -820,6 +820,22 @@ static void wcd937x_mbhc_bcs_enable(struct wcd_mbhc *mbhc,
 		wcd937x_disable_bcs_before_slow_insert(mbhc->component, true);
 }
 
+static int wcd937x_mbhc_force_micbias_disable(struct snd_soc_component *component,
+						int micb_num)
+{
+	struct wcd937x_priv *wcd937x =
+			snd_soc_component_get_drvdata(component);
+
+	if (wcd937x->micb_ref[micb_num - 1] > 1)
+		wcd937x->micb_ref[micb_num - 1] = 1;
+
+	if (wcd937x->pullup_ref[micb_num - 1] > 0)
+		wcd937x->pullup_ref[micb_num - 1] = 0;
+
+	return wcd937x_micbias_control(component, micb_num, MICB_DISABLE, false);
+}
+
+
 static const struct wcd_mbhc_cb mbhc_cb = {
 	.request_irq = wcd937x_mbhc_request_irq,
 	.irq_control = wcd937x_mbhc_irq_control,
@@ -845,6 +861,7 @@ static const struct wcd_mbhc_cb mbhc_cb = {
 	.mbhc_moisture_polling_ctrl = wcd937x_mbhc_moisture_polling_ctrl,
 	.mbhc_moisture_detect_en = wcd937x_mbhc_moisture_detect_en,
 	.bcs_enable = wcd937x_mbhc_bcs_enable,
+	.mbhc_force_micbias_disable = wcd937x_mbhc_force_micbias_disable,
 };
 
 static int wcd937x_get_hph_type(struct snd_kcontrol *kcontrol,
