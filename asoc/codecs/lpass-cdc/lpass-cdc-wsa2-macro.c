@@ -1283,6 +1283,11 @@ static int lpass_cdc_wsa2_macro_enable_vi_decimator(struct snd_soc_component *co
 			LPASS_CDC_WSA2_TX3_SPKR_PROT_PATH_CTL,
 			0x20, 0x00);
 	}
+
+	if (wsa2_priv->wsa2_hap_vi_dec_enable && wsa2_priv->pcm_rate_vi == 48000)
+		snd_soc_component_update_bits(component,
+			LPASS_CDC_WSA2_TOP_TOP_CFG1,
+			0x07, 0x07);
 	return 0;
 }
 
@@ -1352,6 +1357,10 @@ static int lpass_cdc_wsa2_macro_update_vi_feedback(struct snd_soc_dapm_widget *w
 			snd_soc_component_update_bits(component,
 				LPASS_CDC_WSA2_TX3_SPKR_PROT_PATH_CTL,
 				0x20, 0x00);
+			if (wsa2_priv->wsa2_hap_vi_dec_enable && wsa2_priv->pcm_rate_vi == 48000)
+				snd_soc_component_update_bits(component,
+					LPASS_CDC_WSA2_TOP_TOP_CFG1,
+					0x03, 0x03);
 			if (wsa2_priv->wsa2_hap_vi_dec_enable)
 				wsa2_priv->wsa2_hap_vi_dec_enable = false;
 		}
