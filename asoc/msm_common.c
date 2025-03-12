@@ -643,7 +643,7 @@ static void msm_audio_add_qos_request(void)
 	}
 
 	/* Pick the first cluster as it represents the Silver cluster. */
-	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
+	cluster_cpu_mask = (cpumask_t *)topology_core_cpumask(cluster_first_cpu[0]);
 
 	for_each_cpu(cpu, cluster_cpu_mask) {
 		ret = dev_pm_qos_add_request(get_cpu_device(cpu),
@@ -667,7 +667,7 @@ static void msm_audio_remove_qos_request(void)
 	int ret = 0;
 	cpumask_t *cluster_cpu_mask = NULL;
 
-	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
+	cluster_cpu_mask = (cpumask_t *)topology_core_cpumask(cluster_first_cpu[0]);
 
 	if (msm_audio_req) {
 		for_each_cpu(cpu, cluster_cpu_mask) {
@@ -963,7 +963,7 @@ static void msm_audio_update_qos_request(u32 latency)
 	int num_req = 0;
 	cpumask_t *cluster_cpu_mask = NULL;
 
-	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
+	cluster_cpu_mask = (cpumask_t *)topology_core_cpumask(cluster_first_cpu[0]);
 
 	if (msm_audio_req) {
 		for_each_cpu(cpu, cluster_cpu_mask) {
@@ -1016,7 +1016,7 @@ static int msm_qos_ctl_put(struct snd_kcontrol *kcontrol,
 	cpumask_t *cluster_cpu_mask = NULL;
 	qos_vote_status = ucontrol->value.enumerated.item[0];
 
-	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
+	cluster_cpu_mask = (cpumask_t *)topology_core_cpumask(cluster_first_cpu[0]);
 	pr_debug("%s: qos_vote_status = %d, qos_client_active_cnt = %d.\n",
 				__func__, qos_vote_status, qos_client_active_cnt);
 	if (qos_vote_status) {
