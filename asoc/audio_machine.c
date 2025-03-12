@@ -2129,6 +2129,21 @@ static int msm_int_wsa884x_2_init(struct snd_soc_pcm_runtime *rtd)
 
 static int msm_int_wsa2_init(struct snd_soc_pcm_runtime *rtd)
 {
+
+	struct snd_soc_component *lpass_cdc_component = NULL;
+	int ret = 0;
+
+	lpass_cdc_component = snd_soc_rtdcom_lookup(rtd, "lpass-cdc");
+	if (!lpass_cdc_component) {
+		pr_err("%s: could not find component for lpass-cdc\n",
+				__func__);
+		return ret;
+	}
+
+	/* update wsa2 swr port param */
+	lpass_cdc_set_port_map(lpass_cdc_component, ARRAY_SIZE(sm_wsa2_port_map),
+			sm_wsa2_port_map);
+
 	if (strstr(rtd->card->name, "wsa883x"))
 		return msm_int_wsa883x_2_init(rtd);
 
