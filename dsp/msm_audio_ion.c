@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/mutex.h>
 #include <linux/list.h>
-#include <linux/dma-mapping.h>
+#include <linux/dma-map-ops.h>
 #include <linux/dma-buf.h>
 #include <linux/iosys-map.h>
 #include <linux/platform_device.h>

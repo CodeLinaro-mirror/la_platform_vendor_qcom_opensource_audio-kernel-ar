@@ -79,7 +79,7 @@ static int spf_core_callback(struct gpr_device *adev, void *data)
 	struct gpr_hdr *hdr = data;
 
 
-	dev_info_ratelimited(&adev->dev, "%s: Payload %x", __func__, hdr->opcode);
+	dev_err(&adev->dev, "%s: Payload %x", __func__, hdr->opcode);
 	switch (hdr->opcode) {
 	case GPR_IBASIC_RSP_RESULT:
 		basic_rsp = GPR_PKT_GET_PAYLOAD(
@@ -142,7 +142,7 @@ static bool __spf_core_is_apm_ready(struct spf_core *core)
 
 	rc = wait_event_timeout(core->wait, (core->resp_received),
 				msecs_to_jiffies(Q6_READY_TIMEOUT_MS));
-	dev_dbg(spf_core_priv->dev, "%s: wait event unblocked \n", __func__);
+	dev_err(spf_core_priv->dev, "%s: wait event unblocked \n", __func__);
 
 	if (rc > 0 && core->resp_received) {
 		ret = core->status;

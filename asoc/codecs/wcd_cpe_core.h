@@ -6,7 +6,7 @@
 #define WCD_CPE_CORE_H
 
 #include <soc/qcom/ramdump.h>
-#include <linux/dma-mapping.h>
+#include <linux/dma-map-ops.h>
 #include "wcd_cpe_services.h"
 
 #define WCD_CPE_LAB_MAX_LATENCY 250

@@ -8,8 +8,8 @@
 #include <linux/kernel.h>
 #include <linux/device.h>
 #include <linux/regmap.h>
-#include "pdata.h"
-#include "core.h"
+#include "asoc/pdata.h"
+#include "asoc/core.h"
 
 struct wcd9xxx_pdata *wcd9xxx_populate_dt_data(struct device *dev);
 int wcd9xxx_bringup(struct device *dev);

@@ -211,7 +211,7 @@ static int audio_notifier_reg_service(int service, int domain)
 
 	pr_info("%s: service %s is in use\n",
 		__func__, service_data[service][domain].name);
-	pr_debug("%s: service %s has current state %d, handle 0x%pK\n",
+	pr_err("%s: service %s has current state %d, handle 0x%pK\n",
 		__func__, service_data[service][domain].name,
 		service_data[service][domain].state,
 		service_data[service][domain].handle);
@@ -290,7 +290,7 @@ static int audio_notifier_reg_client_service(struct client_data *client_data,
 		client_data->nb);
 	service_data[service][domain].num_of_clients++;
 
-	pr_debug("%s: registered client %s on service %s, current state 0x%x\n",
+	pr_err("%s: registered client %s on service %s, current state 0x%x\n",
 		__func__, client_data->client_name,
 		service_data[service][domain].name,
 		service_data[service][domain].state);
@@ -345,7 +345,7 @@ static int audio_notifier_reg_client(struct client_data *client_data)
 		 * they initialize correctly or will disable their service and
 		 * register clients on the next best avaialable service.
 		 */
-		pr_debug("%s: register client %s on service %s",
+		pr_err("%s: register client %s on service %s",
 				__func__, client_data->client_name,
 				service_data[service][domain].name);
 
@@ -637,7 +637,7 @@ bool audio_notifier_probe_status(void)
 		goto exit;
 	}
 	if (priv->notifier_probe_complete) {
-		dev_dbg(&pdev->dev, "%s: audio notify probe successfully completed\n",
+		dev_err(&pdev->dev, "%s: audio notify probe successfully completed\n",
 			__func__);
 		return true;
 	}

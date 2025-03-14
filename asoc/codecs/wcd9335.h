@@ -7,7 +7,7 @@
 
 #include <sound/soc.h>
 #include <sound/jack.h>
-#include <dsp/apr_audio-v2.h>
+//#include <dsp/apr_audio-v2.h>
 #include <asoc/wcd9xxx-slimslave.h>
 #include <asoc/wcd-mbhc-v2.h>
 

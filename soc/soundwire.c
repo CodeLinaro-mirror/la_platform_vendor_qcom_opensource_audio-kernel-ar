@@ -160,12 +160,12 @@ struct swr_device *swr_new_device(struct swr_master *master,
 			swr->name, result);
 		goto err_out;
 	}
-	dev_dbg(&master->dev, "Device [%s] registered with bus id %s\n",
+	dev_err(&master->dev, "Device [%s] registered with bus id %s\n",
 		swr->name, dev_name(&swr->dev));
 	return swr;
 
 err_out:
-	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%llx %d\n",
+	dev_err(&master->dev, "Failed to register swr device %s at 0x%llx %d\n",
 		swr->name, swr->addr, result);
 	swr_master_put(master);
 	list_del_init(&swr->dev_list);
@@ -209,11 +209,13 @@ int of_register_swr_devices(struct swr_master *master)
 		}
 		info.addr = addr;
 		info.of_node = of_node_get(node);
+		master->num_dev++;
 		swr = swr_new_device(master, &info);
 		if (!swr) {
 			dev_err_ratelimited(&master->dev, "of_swr: Register failed %s\n",
 				node->full_name);
 			of_node_put(node);
+			master->num_dev--;
 			continue;
 		}
 	}
@@ -993,7 +995,6 @@ int swr_register_master(struct swr_master *master)
 	mutex_unlock(&swr_lock);
 	if (id < 0)
 		return id;
-
 	master->bus_num = id;
 
 	dev_set_name(&master->dev, "swr%u", master->bus_num);
@@ -1005,12 +1006,14 @@ int swr_register_master(struct swr_master *master)
 		goto done;
 
 	INIT_LIST_HEAD(&master->devices);
-	pr_debug("%s: SWR master registered successfully %s\n",
+	pr_err("%s: SWR master registered successfully %s\n",
 		__func__, dev_name(&master->dev));
 	return 0;
 
 done:
 	idr_remove(&master_idr, master->bus_num);
+	pr_err("%s:  err=%d\n",__func__,status);
+
 	return status;
 }
 EXPORT_SYMBOL(swr_register_master);

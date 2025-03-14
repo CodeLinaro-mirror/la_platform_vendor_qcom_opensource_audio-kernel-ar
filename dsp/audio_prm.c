@@ -45,7 +45,7 @@ static int audio_prm_callback(struct gpr_device *adev, void *data)
 	struct gpr_hdr *hdr = (struct gpr_hdr *)data;
 	uint32_t *payload =  GPR_PKT_GET_PAYLOAD(uint32_t, data);
 
-	//dev_err(&adev->dev, "%s: Payload %x", __func__, hdr->opcode);
+	dev_dbg(&adev->dev, "%s: Payload %x", __func__, hdr->opcode);
 	switch (hdr->opcode) {
 	case GPR_IBASIC_RSP_RESULT:
 		pr_err("%s: Failed response received",__func__);
@@ -136,7 +136,7 @@ static int prm_gpr_send_pkt(struct gpr_pkt *pkt, wait_queue_head_t *wait)
 			ret = 0;
 		}
 	}
-	pr_debug("%s: exit",__func__);
+	pr_err("%s: exit",__func__);
 	mutex_unlock(&g_prm.lock);
 	return ret;
 }
@@ -253,10 +253,12 @@ int audio_prm_set_lpass_hw_core_req(struct clk_cfg *cfg, uint32_t hw_core_id, ui
 {
 
 	if (hw_core_id == HW_CORE_ID_LPASS) {
-		if (g_prm.prm_sleep_api_supported)
+		if (/*g_prm.prm_sleep_api_supported*/0)
 			return _audio_prm_set_lpass_cpu_lpr_req(enable);
-		else
+		else{
+                       pr_err("%s hw_core_id=%d ,  line=%d",__func__,hw_core_id,__LINE__);
 			return _audio_prm_set_lpass_hw_core_req(hw_core_id, enable);
+                    }
 	}
 
 	return _audio_prm_set_lpass_hw_core_req(hw_core_id, enable);
@@ -291,7 +293,7 @@ static int audio_prm_set_lpass_clk_cfg_req(struct clk_cfg *cfg)
 	pkt->hdr.token = 0; /* TBD */
 	pkt->hdr.opcode = PRM_CMD_REQUEST_HW_RSC;
 
-	//pr_err("%s: clk_id %d size of cmd_req %ld \n",__func__, cfg->clk_id, sizeof(prm_cmd_request_rsc_t));
+	pr_err("%s: clk_id %d size of cmd_req %ld \n",__func__, cfg->clk_id, sizeof(prm_cmd_request_rsc_t));
 
 	prm_rsc_request.payload_header.payload_address_lsw = 0;
 	prm_rsc_request.payload_header.payload_address_msw = 0;

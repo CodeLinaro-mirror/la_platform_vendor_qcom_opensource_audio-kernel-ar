@@ -1160,8 +1160,8 @@ static int tavil_vi_feed_mixer_put(struct snd_kcontrol *kcontrol,
 			snd_soc_dapm_to_component(widget->dapm);
 	struct tavil_priv *tavil_p = snd_soc_component_get_drvdata(component);
 	struct wcd9xxx *core = dev_get_drvdata(component->dev->parent);
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 port_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
@@ -1226,8 +1226,8 @@ static int slim_tx_mixer_put(struct snd_kcontrol *kcontrol,
 	struct tavil_priv *tavil_p = snd_soc_component_get_drvdata(component);
 	struct wcd9xxx *core = dev_get_drvdata(component->dev->parent);
 	struct snd_soc_dapm_update *update = NULL;
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 port_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
@@ -1320,8 +1320,8 @@ static int i2s_tx_mixer_put(struct snd_kcontrol *kcontrol,
 			snd_soc_dapm_to_component(widget->dapm);
 	struct tavil_priv *tavil_p = snd_soc_component_get_drvdata(component);
 	struct snd_soc_dapm_update *update = NULL;
-	struct soc_multi_mixer_control *mixer =
-		(struct soc_multi_mixer_control *)kcontrol->private_value;
+	struct soc_mixer_control *mixer =
+		(struct soc_mixer_control *)kcontrol->private_value;
 	u32 dai_id = widget->shift;
 	u32 port_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
@@ -5648,9 +5648,9 @@ static int tavil_iir_enable_audio_mixer_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	/* IIR filter band registers are at integer multiples of 16 */
 	u16 iir_reg = WCD934X_CDC_SIDETONE_IIR0_IIR_CTL + 16 * iir_idx;
@@ -5671,9 +5671,9 @@ static int tavil_iir_enable_audio_mixer_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
 	struct tavil_priv *tavil = snd_soc_component_get_drvdata(component);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	bool iir_band_en_status;
 	int value = ucontrol->value.integer.value[0];
@@ -5743,9 +5743,9 @@ static int tavil_iir_band_audio_mixer_get(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	ucontrol->value.integer.value[0] =
@@ -5805,9 +5805,9 @@ static int tavil_iir_band_audio_mixer_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
 	struct tavil_priv *tavil = snd_soc_component_get_drvdata(component);
-	int iir_idx = ((struct soc_multi_mixer_control *)
+	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
-	int band_idx = ((struct soc_multi_mixer_control *)
+	int band_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 	int coeff_idx, idx = 0;
 
@@ -5861,7 +5861,7 @@ static int tavil_compander_get(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct tavil_priv *tavil = snd_soc_component_get_drvdata(component);
 
@@ -5875,7 +5875,7 @@ static int tavil_compander_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component =
 			snd_soc_kcontrol_component(kcontrol);
 	struct tavil_priv *tavil = snd_soc_component_get_drvdata(component);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 
@@ -5991,7 +5991,7 @@ static int tavil_dmic_pin_mode_get(struct snd_kcontrol *kcontrol,
 	u16 dmic_pin;
 	u8 reg_val, pinctl_position;
 
-	pinctl_position = ((struct soc_multi_mixer_control *)
+	pinctl_position = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	dmic_pin = pinctl_position & 0x07;
@@ -6014,7 +6014,7 @@ static int tavil_dmic_pin_mode_put(struct snd_kcontrol *kcontrol,
 
 	/* 0- high or low; 1- high Z */
 	pinctl_mode = ucontrol->value.integer.value[0];
-	pinctl_position = ((struct soc_multi_mixer_control *)
+	pinctl_position = ((struct soc_mixer_control *)
 					kcontrol->private_value)->shift;
 
 	switch (pinctl_position >> 3) {

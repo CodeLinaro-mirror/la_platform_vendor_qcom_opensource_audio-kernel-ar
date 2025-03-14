@@ -11,7 +11,7 @@
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/pm_qos.h>
-#include <linux/dma-mapping.h>
+#include <linux/dma-map-ops.h>
 #include <sound/soc.h>
 #include <sound/info.h>
 #include <audio/sound/lsm_params.h>

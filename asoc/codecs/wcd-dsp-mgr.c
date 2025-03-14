@@ -9,8 +9,8 @@
 #include <linux/of.h>
 #include <linux/debugfs.h>
 #include <linux/component.h>
-#include <linux/dma-mapping.h>
-#include <soc/qcom/ramdump.h>
+#include <linux/dma-map-ops.h>
+#include <soc/qcom/qcom_ramdump.h>
 #include <sound/wcd-dsp-mgr.h>
 #include "wcd-dsp-utils.h"
 
@@ -632,7 +632,7 @@ static void wdsp_collect_ramdumps(struct wdsp_mgr_priv *wdsp)
 {
 	struct wdsp_img_section img_section;
 	struct wdsp_err_signal_arg *data = &wdsp->dump_data.err_data;
-	struct ramdump_segment rd_seg;
+	struct qcom_dump_segment rd_seg;
 	int ret = 0;
 
 	if (wdsp->ssr_type != WDSP_SSR_TYPE_WDSP_DOWN ||
@@ -685,13 +685,13 @@ static void wdsp_collect_ramdumps(struct wdsp_mgr_priv *wdsp)
 	 */
 	BUG_ON(wdsp->panic_on_error);
 
-	rd_seg.address = (unsigned long) wdsp->dump_data.rd_v_addr;
+	rd_seg.da = (unsigned long) wdsp->dump_data.rd_v_addr;
 	rd_seg.size = img_section.size;
-	rd_seg.v_address = wdsp->dump_data.rd_v_addr;
+	rd_seg.va = wdsp->dump_data.rd_v_addr;
 
-	ret = do_ramdump(wdsp->dump_data.rd_dev, &rd_seg, 1);
+	ret = qcom_elf_dump(wdsp->dump_data.rd_dev, wdsp->mdev, 1);
 	if (ret < 0)
-		WDSP_ERR(wdsp, "do_ramdump failed with error %d", ret);
+		WDSP_ERR(wdsp, "qcom_elf_dump failed with error %d", ret);
 
 err_read_dumps:
 	dma_free_coherent(wdsp->mdev, data->dump_size,
@@ -1074,7 +1074,7 @@ static int wdsp_mgr_bind(struct device *dev)
 	wdsp->ops = &wdsp_ops;
 
 	/* Setup ramdump device */
-	wdsp->dump_data.rd_dev = create_ramdump_device("wdsp", dev);
+	wdsp->dump_data.rd_dev = qcom_create_ramdump_device("wdsp", dev);
 	if (!wdsp->dump_data.rd_dev)
 		dev_info(dev, "%s: create_ramdump_device failed\n", __func__);
 
@@ -1118,7 +1118,7 @@ static void wdsp_mgr_unbind(struct device *dev)
 	wdsp_mgr_debugfs_remove(wdsp);
 
 	if (wdsp->dump_data.rd_dev) {
-		destroy_ramdump_device(wdsp->dump_data.rd_dev);
+		qcom_destroy_ramdump_device(wdsp->dump_data.rd_dev);
 		wdsp->dump_data.rd_dev = NULL;
 	}
 

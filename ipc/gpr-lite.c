@@ -177,7 +177,7 @@ static void gpr_modem_up(void)
 
 int gpr_set_q6_state(enum gpr_subsys_state state)
 {
-	dev_dbg(gpr_priv->dev,"%s: setting adsp state %d\n", __func__, state);
+	dev_err(gpr_priv->dev,"%s: setting adsp state %d\n", __func__, state);
 	if (state < GPR_SUBSYS_DOWN || state > GPR_SUBSYS_LOADED)
 		return -EINVAL;
 	atomic_set(&q6.q6_state, state);
@@ -218,7 +218,7 @@ static int gpr_notifier_service_cb(struct notifier_block *this,
 		goto done;
 	}
 
-	dev_dbg(gpr_priv->dev,"%s: Service opcode 0x%lx, domain %d\n",
+	dev_err(gpr_priv->dev,"%s: Service opcode 0x%lx, domain %d\n",
 		__func__, opcode, cb_data->domain);
 
 	switch (opcode) {

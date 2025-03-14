@@ -245,12 +245,12 @@ struct wcd9xxx_core_resource {
  * Some of fields are only used in smilbus mode
  */
 struct wcd9xxx_ch {
-	u32 sph;		/* share channel handle - slimbus only	*/
+
 	u32 ch_num;		/*
 				 * vitrual channel number, such as 128 -144.
 				 * apply for slimbus only
 				 */
-	u16 ch_h;		/* chanel handle - slimbus only */
+
 	u16 port;		/*
 				 * tabla port for RX and TX
 				 * such as 0-9 for TX and 10 -16 for RX
@@ -270,10 +270,11 @@ struct wcd9xxx_codec_dai_data {
 	u32 rate;				/* sample rate          */
 	u32 bit_width;				/* sit width 16,24,32   */
 	struct list_head wcd9xxx_ch_list;	/* channel list         */
-	u16 grph;				/* slimbus group handle */
+
 	unsigned long ch_mask;
 	wait_queue_head_t dai_wait;
 	bool bus_down_in_recovery;
+	u32 direction;             /* Direction of stream */
 };
 
 #define WCD9XXX_CH(xport, xshift) \
@@ -334,9 +335,9 @@ struct wcd9xxx {
 	struct device_node *wcd_rst_np;
 
 	int (*read_dev)(struct wcd9xxx *wcd9xxx, unsigned short reg,
-			int bytes, void *dest, bool interface_reg);
+			int bytes,u8 *dest, bool interface_reg);
 	int (*write_dev)(struct wcd9xxx *wcd9xxx, unsigned short reg,
-			int bytes, void *src, bool interface_reg);
+			int bytes, u8 *src, bool interface_reg);
 	int (*multi_reg_write)(struct wcd9xxx *wcd9xxx, const void *data,
 			       size_t count);
 	int (*dev_down)(struct wcd9xxx *wcd9xxx);
@@ -367,6 +368,8 @@ struct wcd9xxx {
 	u8 prev_pg;
 	u8 avoid_cdc_rstlow;
 	struct wcd9xxx_power_region *wcd9xxx_pwr[WCD9XXX_MAX_PWR_REGIONS];
+	struct slim_stream_runtime *sruntime_tx;
+	struct slim_stream_runtime *sruntime_rx;
 };
 
 struct wcd9xxx_reg_val {

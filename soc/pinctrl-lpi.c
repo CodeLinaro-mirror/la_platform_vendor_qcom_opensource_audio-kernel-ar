@@ -715,32 +715,32 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 	u32 reg, slew_reg;
 	struct clk *lpass_core_hw_vote = NULL;
 	struct clk *lpass_audio_hw_vote = NULL;
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	if (!audio_notifier_probe_status()) {
 		pr_err("%s: Audio notify probe not completed, defer lpi pinctrl probe\n",
 					__func__);
 		return -EPROBE_DEFER;
 	}
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	ret = of_property_read_u32(dev->of_node, "reg", &reg);
 	if (ret < 0) {
 		dev_err(dev, "missing base address\n");
 		return ret;
 	}
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	ret = of_property_read_u32(dev->of_node, "qcom,gpios-count", &npins);
 	if (ret < 0)
 		return ret;
 
 	WARN_ON(npins > ARRAY_SIZE(lpi_gpio_groups));
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	ret = of_property_read_u32_array(dev->of_node, "qcom,lpi-offset-tbl",
 					 lpi_offset, npins);
 	if (ret < 0) {
 		dev_err(dev, "error in reading lpi offset table: %d\n", ret);
 		return ret;
 	}
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	ret = of_property_read_u32_array(dev->of_node,
 					 "qcom,lpi-slew-offset-tbl",
 					 lpi_slew_offset, npins);
@@ -811,7 +811,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 		dev_err(dev, "%s devm_ioremap failed\n", __func__);
 		return -ENOMEM;
 	}
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	state->base = lpi_base;
 
 	for (i = 0; i < npins; i++, pindesc++) {
@@ -848,7 +848,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 	state->ctrl = devm_pinctrl_register(dev, pctrldesc, state);
 	if (IS_ERR(state->ctrl))
 		return PTR_ERR(state->ctrl);
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	ret = gpiochip_add_data(&state->chip, state);
 	if (ret) {
 		dev_err(state->dev, "can't add gpio chip\n");
@@ -864,7 +864,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 	lpi_dev = &pdev->dev;
 	lpi_dev_up = true;
 	initial_boot = true;
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	ret = snd_event_client_register(dev, &lpi_pinctrl_ssr_ops, NULL);
 	if (!ret) {
 		snd_event_notify(dev, SND_EVENT_UP);
@@ -881,7 +881,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 			__func__, ret);
 		goto err_range;
 	}
-
+	printk("%s line=%d\n",__func__,__LINE__);
 	/* Register LPASS core hw vote */
 	lpass_core_hw_vote = devm_clk_get(&pdev->dev, "lpass_core_hw_vote");
 	if (IS_ERR(lpass_core_hw_vote)) {
@@ -909,17 +909,19 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_runtime_set_suspended(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
-
 	return 0;
 
 //err_snd_evt:
 //	audio_notifier_deregister("lpi_tlmm");
 err_range:
+	printk("%s line=%d\n",__func__,__LINE__);
 	gpiochip_remove(&state->chip);
 err_chip:
+	printk("%s line=%d\n",__func__,__LINE__);
 	mutex_destroy(&state->core_hw_vote_lock);
 	mutex_destroy(&state->slew_access_lock);
 err_io:
+	printk("%s line=%d\n",__func__,__LINE__);
 	return ret;
 }
 

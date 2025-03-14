@@ -8,7 +8,7 @@
 #include <linux/of.h>
 #include <linux/debugfs.h>
 #include <linux/delay.h>
-#include <linux/dma-mapping.h>
+#include <linux/dma-map-ops.h>
 #include <linux/bitops.h>
 #include <linux/spi/spi.h>
 #include <linux/regmap.h>

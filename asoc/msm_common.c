@@ -834,9 +834,8 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 	uint32_t rx_ch_cnt = 0, tx_ch_cnt = 0;
 	uint32_t *chmap_data = NULL;
 	int ret = 0, len = 0, i = 0;
-
 	if (kctl_pdata == NULL) {
-		pr_debug("%s: chmap_pdata is not initialized\n", __func__);
+		pr_err("%s: chmap_pdata is not initialized\n", __func__);
 		return -EINVAL;
 	}
 
@@ -882,7 +881,6 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 	case CODEC_DMA: {
 		uint32_t cur_rx_ch = 0, cur_tx_ch = 0;
 		uint32_t cur_rx_ch_cnt = 0, cur_tx_ch_cnt = 0;
-
 		for (i = 0; i < kctl_pdata->num_codec_dai; ++i) {
 			codec_dai = kctl_pdata->dai[i];
 			if(!codec_dai) {
@@ -895,7 +893,6 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 			ret = snd_soc_dai_get_channel_map(codec_dai,
 					&cur_tx_ch_cnt, &cur_tx_ch,
 					&cur_rx_ch_cnt, &cur_rx_ch);
-
 			/* DAIs that not supports get_channel_map should pass */
 			if (ret && (ret != -ENOTSUPP)) {
 				pr_err("%s: get channel map failed for backend_id:%d,"
@@ -913,7 +910,7 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		/* reset return value from the loop above */
 		ret = 0;
 		if (rx_ch_cnt == 0 && tx_ch_cnt == 0) {
-			pr_debug("%s: incorrect ch map for backend_id:%d, RX Channel Cnt:%d, TX Channel Cnt:%d\n",
+			pr_err("%s: incorrect ch map for backend_id:%d, RX Channel Cnt:%d, TX Channel Cnt:%d\n",
 				__func__, backend_id, rx_ch_cnt, tx_ch_cnt);
 			return ret;
 		}
@@ -939,7 +936,6 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		break;
 	}
 	kfree(chmap_data);
-
 	return ret;
 }
 
@@ -1238,7 +1234,7 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 				mixer_ctl_name);
 		msm_common_channel_map[0].name = mixer_str;
 		msm_common_channel_map[0].private_value = 0;
-		pr_debug("Registering new mixer ctl %s\n", mixer_str);
+		pr_err("Registering new mixer ctl %s\n", mixer_str);
 		ret = snd_soc_add_component_controls(component,
 				msm_common_channel_map,
 				ARRAY_SIZE(msm_common_channel_map));
