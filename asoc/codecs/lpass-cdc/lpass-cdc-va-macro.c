@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1080,9 +1080,6 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		snd_soc_component_update_bits(component,
 			dec_cfg_reg, 0x06, va_priv->dec_mode[decimator] <<
 			LPASS_CDC_VA_MACRO_ADC_MODE_CFG0_SHIFT);
-		/* Enable TX PGA Mute */
-		snd_soc_component_update_bits(component,
-				tx_vol_ctl_reg, 0x10, 0x10);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		/* Enable TX CLK */
@@ -1453,6 +1450,9 @@ static int lpass_cdc_va_macro_hw_params(struct snd_pcm_substream *substream,
 				__func__, decimator, sample_rate);
 			snd_soc_component_update_bits(component, tx_fs_reg,
 						0x0F, tx_fs_rate);
+			/* Enable TX PGA Mute */
+			snd_soc_component_update_bits(component, tx_fs_reg,
+						0x10, 0x10);
 		} else {
 			dev_err_ratelimited(va_dev,
 				"%s: ERROR: Invalid decimator: %d\n",
