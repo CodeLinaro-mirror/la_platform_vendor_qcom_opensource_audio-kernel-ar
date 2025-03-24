@@ -97,6 +97,12 @@ audio_modules.register(
     srcs = ["pinctrl-lpi.c"],
 )
 audio_modules.register(
+    name = "pinctrl_wcd_dlkm",
+    path = SOC_PATH,
+    config_option = "CONFIG_PINCTRL_WCD",
+    srcs = ["pinctrl-wcd.c"],
+)
+audio_modules.register(
     name = "swr_dlkm",
     path = SOC_PATH,
     config_option = "CONFIG_SOUNDWIRE",
@@ -124,6 +130,15 @@ audio_modules.register(
     srcs = ["snd_event.c"]
 )
 # >>>> ASOC MODULES <<<<
+audio_modules.register(
+    name = "platform_dlkm",
+    path = ASOC_PATH,
+    conditional_srcs = {
+        "CONFIG_SND_SOC_QDSP6V2": [
+            "platform_init.c"
+        ]
+    }
+)
 audio_modules.register(
     name = "machine_dlkm",
     path = ASOC_PATH,
@@ -190,7 +205,6 @@ audio_modules.register(
             "wcd9xxx-core-init.c",
             "wcd9xxx-core.c",
             "wcd9xxx-irq.c",
-            "wcd9xxx-slimslave.c",
             "wcd9xxx-utils.c",
             "wcd9335-regmap.c",
             "wcd9335-tables.c",
@@ -206,6 +220,32 @@ audio_modules.register(
         ],
         "CONFIG_SND_SOC_WCD_IRQ": [
             "wcd-irq.c"
+        ],
+        "CONFIG_SND_SOC_SDX": {
+            False: [
+                "wcd9xxx-slimslave.c"
+            ]
+        }
+    }
+)
+audio_modules.register(
+    name = "wcd934x_dlkm",
+    path = ASOC_CODECS_PATH,
+    conditional_srcs = {
+        "CONFIG_SND_SOC_WCD934X" : ["wcd934x/wcd934x.c"],
+        "CONFIG_SND_SOC_WCD934X_MBHC": ["wcd934x/wcd934x-mbhc.c"],
+        "CONFIG_SND_SOC_WCD934X_DSD": ["wcd934x/wcd934x-dsd.c"]
+    }
+)
+audio_modules.register(
+    name = "wsa881x_dlkm",
+    path = ASOC_CODECS_PATH,
+    conditional_srcs = {
+        "CONFIG_SND_SOC_WSA881X": [
+            "wsa881x.c",
+            "wsa881x-regmap.c",
+            "wsa881x-tables.c",
+            "wsa881x-temp-sensor.c"
         ]
     }
 )
@@ -243,12 +283,13 @@ audio_modules.register(
             True: [
                 "wcd9xxx-common-v2.c",
                 "wcd9xxx-resmgr-v2.c",
-                "wcd-dsp-utils.c",
-                "wcd-dsp-mgr.c",
             ],
             False: [
                 "wcd-clsh.c"
-            ]
+            ],
+            "CONFIG_SND_SOC_SDX": {
+                False: ["wcd-dsp-utils.c", "wcd-dsp-mge.c"]
+            }
         }
     }
 )

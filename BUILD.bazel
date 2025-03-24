@@ -15,7 +15,13 @@ ddk_headers(
         "include/ipc/*.h",
         "include/soc/*.h"
     ]),
-    includes = ["include"]
+    includes = ["include",
+		"include/soc",
+		"include/asoc",
+		"include/dsp",
+		"include/ipc",
+		"include/bindings"
+		]
 )
 ddk_headers(
     name = "audio_uapi_headers",
@@ -49,8 +55,10 @@ load(":build/sun.bzl", "define_sun")
 load(":build/pineapple.bzl", "define_pineapple")
 load(":build/kalama.bzl", "define_kalama")
 load(":build/blair.bzl", "define_blair")
+load(":build/sdxkova.bzl", "define_sdxkova")
 
 define_sun()
 define_kalama()
 define_pineapple()
 define_blair()
+define_sdxkova()
