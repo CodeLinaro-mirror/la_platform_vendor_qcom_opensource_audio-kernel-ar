@@ -847,9 +847,9 @@ static long msm_audio_ion_compat_ioctl(struct file *file, unsigned int ioctl_num
 	return (long)msm_audio_ion_ioctl(file, ioctl_nr, ioctl_param);
 }
 
-static int __audio_mem_hyp_assign(struct device *dev, u64 *source_vms,
-				       struct qcom_scm_vmperm  *dest_vms,
-				       int dest_nelems)
+static int __audio_mem_hyp_assign(struct device *dev, int *source_vms,
+				       int source_nelems, int *dest_vms,
+				       int *dest_perms, int dest_nelems)
 {
 	struct device_node *mem_node;
 	struct reserved_mem *rmem;
@@ -867,44 +867,46 @@ static int __audio_mem_hyp_assign(struct device *dev, u64 *source_vms,
 		return -EINVAL;
 	}
 
-	pr_debug("%s: hyp_assign_phys addr = 0x%llu size = %llu.\n", __func__,
-		 (unsigned long long)rmem->base, (unsigned long long)rmem->size);
-
-	return qcom_scm_assign_mem(rmem->base, rmem->size, source_vms, dest_vms, dest_nelems);
-
+	return hyp_assign_phys(rmem->base, rmem->size, source_vms,
+			       source_nelems, dest_vms, dest_perms,
+			       dest_nelems);
 }
-
 
 static int audio_mem_hyp_assign(struct device *dev)
 {
-	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS);
+	int source_vm_map[1] = {VMID_HLOS};
 #ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
-	struct qcom_scm_vmperm dest_vmid_map[] = {{VMID_MSS_MSA, PERM_READ|PERM_WRITE},
-		{VMID_ADSP_HEAP, PERM_READ|PERM_WRITE},
-		{VMID_HLOS, PERM_READ|PERM_WRITE}};
+	int dest_vm_map[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
+	int dest_perms_map[4] = {
+		[0 ... 3] = PERM_READ | PERM_WRITE,
+	};
 #else
-	struct qcom_scm_vmperm dest_vmid_map[] = {{VMID_MSS_MSA, PERM_READ|PERM_WRITE },
-		{VMID_HLOS, PERM_READ|PERM_WRITE }};
+	int dest_vm_map[2] = {VMID_MSS_MSA, VMID_HLOS};
+	int dest_perms_map[2] = {PERM_READ | PERM_WRITE,
+							PERM_READ | PERM_WRITE};
 #endif
-	return __audio_mem_hyp_assign(dev, &src_vmid_map_list,
-					   dest_vmid_map, ARRAY_SIZE(dest_vmid_map));
+
+	return __audio_mem_hyp_assign(dev, source_vm_map,
+					   ARRAY_SIZE(source_vm_map),
+					   dest_vm_map, dest_perms_map,
+					   ARRAY_SIZE(dest_vm_map));
 }
 
 static int audio_mem_hyp_unassign(struct device *dev)
 {
 #ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
-	u64 src_vmid_map_list  = BIT(QCOM_SCM_VMID_HLOS) | BIT(QCOM_SCM_VMID_MSS_MSA) |
-		(QCOM_SCM_VMID_ADSP_HEAP) | (QCOM_SCM_VMID_LPASS);
+	int source_vm_unmap[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
 #else
-	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS) | BIT(QCOM_SCM_VMID_MSS_MSA);
+	int source_vm_unmap[2] = {VMID_MSS_MSA, VMID_HLOS};
 #endif
-
-	struct qcom_scm_vmperm dest_vmid_map[] = {{VMID_HLOS, PERM_READ|PERM_WRITE|PERM_EXEC }};
-
+	int dest_vm_unmap[1] = {VMID_HLOS};
+	int dest_perms_unmap[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
 
 	of_reserved_mem_device_release(dev);
-	return __audio_mem_hyp_assign(dev, &src_vmid_map_list,
-					   dest_vmid_map, ARRAY_SIZE(dest_vmid_map));
+	return __audio_mem_hyp_assign(dev, source_vm_unmap,
+					   ARRAY_SIZE(source_vm_unmap),
+					   dest_vm_unmap, dest_perms_unmap,
+					   ARRAY_SIZE(dest_vm_unmap));
 }
 
 static const struct of_device_id msm_audio_ion_dt_match[] = {
