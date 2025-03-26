@@ -787,39 +787,26 @@ static int sdx_sec_auxpcm_startup(struct snd_pcm_substream *substream)
 	int ret = 0;
 
 	pdata->sec_auxpcm_mode = sdx_sec_auxpcm_mode;
-	if (pdata->lpaif_sec_muxsel_virt_addr != NULL) {
 
-		ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
-		if (ret < 0) {
-			dev_err(card->dev,
-			"%s:set lpass core clk failed ret: %d\n",
-			__func__, ret);
-			ret = -EINVAL;
-			goto done;
-		}
-
-		audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x200c),  0xffff,
-                                                I2S_SEL << I2S_PCM_SEL_OFFSET);
-		if (pdata->lpass_sec_mux_spkr_ctl_virt_addr != NULL) {
-			if (pdata->sec_auxpcm_mode == 1)
-				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
-				0xffff,SEC_TLMM_CLKS_EN_MASTER);
-                        else
-				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
-				0xffff,SEC_TLMM_CLKS_EN_SLAVE);
-		} else {
-			dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
-				__func__);
-
-			ret = -EINVAL;
-			goto done;
-		}
-	} else {
-		dev_err(card->dev, "%s lpaif_sec_muxsel_virt_addr is NULL\n",
-			__func__);
+	ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
+	if (ret < 0) {
+		dev_err(card->dev,
+		"%s:set lpass core clk failed ret: %d\n",
+		__func__, ret);
 		ret = -EINVAL;
 		goto done;
 	}
+
+	audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x200c),  0xffff,
+                                            I2S_SEL << I2S_PCM_SEL_OFFSET);
+
+	if (pdata->sec_auxpcm_mode == 1)
+		ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
+		0xffff,SEC_TLMM_CLKS_EN_MASTER);
+                else
+		ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
+		0xffff,SEC_TLMM_CLKS_EN_SLAVE);
+
 	/*
 	 * This sets the CONFIG PARAMETER WS_SRC.
 	 * 1 means internal clock master mode.
