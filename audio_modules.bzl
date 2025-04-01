@@ -216,6 +216,12 @@ audio_modules.register(
             ":%b_snd_event_dlkm",
 	   ],
 )
+audio_modules.register(
+    name = "spf_machine_dlkm",
+    path = ASOC_PATH,
+    config_option = "CONFIG_SND_SOC_GVM_AUTO_SPF",
+    srcs = ["gvm_auto_spf_dummy.c"]
+)
 # >>>> ASOC/CODEC MODULES <<<<
 audio_modules.register(
     name = "wcd_core_dlkm",
