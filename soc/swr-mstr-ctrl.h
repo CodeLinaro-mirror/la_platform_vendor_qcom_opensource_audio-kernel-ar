@@ -11,6 +11,7 @@
 #include <linux/pm_qos.h>
 #include <linux/pm.h>
 #include <soc/swr-common.h>
+#include <bindings/audio-codec-port-types.h>
 
 #ifdef CONFIG_DEBUG_FS
 #include <linux/debugfs.h>
