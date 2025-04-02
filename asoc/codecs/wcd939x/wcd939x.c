@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -4553,6 +4553,15 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 	regcache_cache_bypass(map, true);
 	for (; i >= 0 && i <= endReg; i++) {
 
+		/*
+		 * Check not to overwrite the buffer, by ensuring we have
+		 * space for writing next register data
+		 *
+		 * this is scalable if we use proc or any other fs interface
+		 * as count would take the buf_size passed from userspace
+		 */
+		if ((pos + regdump_wr_len) >= count)
+			break;
 		scnprintf(buf+pos, count-pos, "%.*x: ", reg_len, i);
 		pos += reg_len + 2;
 		ret = regmap_read(map, i, &reg_val);
@@ -4564,16 +4573,6 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 		pos +=  reg_val_len;
 		buf[pos++] = '\n';
 		*ppos += 1;
-
-		/*
-		 * Check not to overwrite the buffer, by ensuring we have
-		 * space for writing next register data
-		 *
-		 * this is scalable if we use proc or any other fs interface
-		 * as count would take the buf_size passed from userspace
-		 */
-		if ((pos + regdump_wr_len) >= count)
-			break;
 	}
 	/* Enable reading/writing from regmap-cache */
 	regcache_cache_bypass(map, false);
