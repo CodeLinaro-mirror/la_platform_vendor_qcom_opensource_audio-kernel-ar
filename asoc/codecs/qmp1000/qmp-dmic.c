@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -1025,8 +1025,6 @@ static const struct snd_soc_dapm_route qmp_dmic_audio_map[] = {
 static int qmp_dmic_component_probe(struct snd_soc_component *component)
 {
 	struct qmp_sdca_dmic_priv *qmp_dmic = snd_soc_component_get_drvdata(component);
-	struct snd_soc_dapm_context *dapm =
-			snd_soc_component_get_dapm(component);
 
 	qmp_dmic = snd_soc_component_get_drvdata(component);
 
@@ -1038,20 +1036,10 @@ static int qmp_dmic_component_probe(struct snd_soc_component *component)
 
 	devm_regmap_qti_debugfs_register(qmp_dmic->dev, qmp_dmic->regmap);
 
-	snd_soc_dapm_ignore_suspend(dapm, qmp_dmic->dai_driver[0].capture.stream_name);
-	snd_soc_dapm_ignore_suspend(dapm, qmp_dmic->dai_driver[1].capture.stream_name);
-	snd_soc_dapm_ignore_suspend(dapm, qmp_dmic->dai_driver[2].capture.stream_name);
-
-	snd_soc_dapm_ignore_suspend(dapm, "QMP_DMIC VA Function1");
-	snd_soc_dapm_ignore_suspend(dapm, "QMP_DMIC Function1");
-	snd_soc_dapm_ignore_suspend(dapm, "QMP_DMIC Function2");
-	snd_soc_dapm_ignore_suspend(dapm, "NORMAL_OUTPUT");
-	snd_soc_dapm_ignore_suspend(dapm, "VA_NORMAL_OUTPUT");
-	snd_soc_dapm_ignore_suspend(dapm, "LP_OUTPUT");
-
-	snd_soc_dapm_ignore_suspend(dapm, "QMP Digital Mic");
-	snd_soc_dapm_ignore_suspend(dapm, "QMP VA Digital Mic");
-	snd_soc_dapm_sync(dapm);
+	/*
+	snd_soc_dapm_ignore_suspend(dapm, "QMP AIF1 Capture");
+	snd_soc_dapm_ignore_suspend(dapm, "QMP AIF2 Capture");
+	*/
 
 	return 0;
 }
