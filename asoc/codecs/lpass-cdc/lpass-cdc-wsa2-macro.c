@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -333,6 +333,7 @@ struct lpass_cdc_wsa2_macro_priv {
 	int pbr_clk_users;
 	char __iomem *wsa2_fs_reg_base;
 	bool wsa2_2ch_dma_enable;
+	bool wsa2_hap_vi_dec_enable;
 	bool wsa2_pcm_hapt_enable;
 };
 
@@ -965,7 +966,8 @@ static int lpass_cdc_wsa2_macro_mute_stream(struct snd_soc_dai *dai, int mute, i
 	case LPASS_CDC_WSA2_MACRO_AIF_MIX1_PB:
 		lpass_cdc_wsa_pa_on(wsa2_dev, adie_lb);
 		lpass_cdc_wsa2_unmute_interpolator(dai);
-		lpass_cdc_wsa2_macro_enable_vi_decimator(component);
+		if (!wsa2_priv->wsa2_hap_vi_dec_enable)
+			lpass_cdc_wsa2_macro_enable_vi_decimator(component);
 		break;
 	case LPASS_CDC_WSA2_MACRO_AIF1_PCM_PB:
 		regmap = dev_get_regmap(wsa2_priv->dev->parent, NULL);
@@ -981,7 +983,8 @@ static int lpass_cdc_wsa2_macro_mute_stream(struct snd_soc_dai *dai, int mute, i
 		regmap_update_bits(regmap,
 				LPASS_CDC_WSA2_TX3_SPKR_PROT_PATH_CFG0,
 				0x03, 0x00);
-		lpass_cdc_wsa2_macro_enable_vi_decimator(component);
+		if (!wsa2_priv->wsa2_hap_vi_dec_enable)
+			lpass_cdc_wsa2_macro_enable_vi_decimator(component);
 		break;
 	default:
 		break;
@@ -1280,10 +1283,15 @@ static int lpass_cdc_wsa2_macro_enable_vi_decimator(struct snd_soc_component *co
 			LPASS_CDC_WSA2_TX3_SPKR_PROT_PATH_CTL,
 			0x20, 0x00);
 	}
+
+	if (wsa2_priv->wsa2_hap_vi_dec_enable && wsa2_priv->pcm_rate_vi == 48000)
+		snd_soc_component_update_bits(component,
+			LPASS_CDC_WSA2_TOP_TOP_CFG1,
+			0x07, 0x07);
 	return 0;
 }
 
-static int lpass_cdc_wsa2_macro_disable_vi_feedback(struct snd_soc_dapm_widget *w,
+static int lpass_cdc_wsa2_macro_update_vi_feedback(struct snd_soc_dapm_widget *w,
 					struct snd_kcontrol *kcontrol,
 					int event)
 {
@@ -1296,6 +1304,13 @@ static int lpass_cdc_wsa2_macro_disable_vi_feedback(struct snd_soc_dapm_widget *
 		return -EINVAL;
 
 	switch (event) {
+
+	case SND_SOC_DAPM_PRE_PMU:
+		/* Enable V&I sensing */
+		if (wsa2_priv->wsa2_hap_vi_dec_enable)
+			lpass_cdc_wsa2_macro_enable_vi_decimator(component);
+		break;
+
 	case SND_SOC_DAPM_POST_PMD:
 		if (test_bit(LPASS_CDC_WSA2_MACRO_TX0,
 			&wsa2_priv->active_ch_mask[LPASS_CDC_WSA2_MACRO_AIF_VI])) {
@@ -1342,6 +1357,12 @@ static int lpass_cdc_wsa2_macro_disable_vi_feedback(struct snd_soc_dapm_widget *
 			snd_soc_component_update_bits(component,
 				LPASS_CDC_WSA2_TX3_SPKR_PROT_PATH_CTL,
 				0x20, 0x00);
+			if (wsa2_priv->wsa2_hap_vi_dec_enable && wsa2_priv->pcm_rate_vi == 48000)
+				snd_soc_component_update_bits(component,
+					LPASS_CDC_WSA2_TOP_TOP_CFG1,
+					0x03, 0x03);
+			if (wsa2_priv->wsa2_hap_vi_dec_enable)
+				wsa2_priv->wsa2_hap_vi_dec_enable = false;
 		}
 		break;
 	}
@@ -2795,6 +2816,36 @@ static int lpass_cdc_wsa2_macro_2ch_dma_enable_put(struct snd_kcontrol *kcontrol
 	return 0;
 }
 
+static int lpass_cdc_wsa2_macro_get_vi_decimator(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+		snd_soc_kcontrol_component(kcontrol);
+	struct device *wsa2_dev = NULL;
+	struct lpass_cdc_wsa2_macro_priv *wsa2_priv = NULL;
+
+	if (!lpass_cdc_wsa2_macro_get_data(component, &wsa2_dev, &wsa2_priv, __func__))
+		return -EINVAL;
+
+	ucontrol->value.integer.value[0] = wsa2_priv->wsa2_hap_vi_dec_enable;
+	return 0;
+}
+
+static int lpass_cdc_wsa2_macro_set_vi_decimator(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+		snd_soc_kcontrol_component(kcontrol);
+	struct device *wsa2_dev = NULL;
+	struct lpass_cdc_wsa2_macro_priv *wsa2_priv = NULL;
+
+	if (!lpass_cdc_wsa2_macro_get_data(component, &wsa2_dev, &wsa2_priv, __func__))
+		return -EINVAL;
+
+	wsa2_priv->wsa2_hap_vi_dec_enable = ucontrol->value.integer.value[0];
+	return 0;
+}
+
 static int lpass_cdc_wsa2_macro_hapt_pcm_enable_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
@@ -2881,6 +2932,9 @@ static const struct snd_kcontrol_new lpass_cdc_wsa2_macro_snd_controls[] = {
 	SOC_SINGLE_EXT("WSA2 2CH_DMA ENABLE", SND_SOC_NOPM, 0, 1,
 			0, lpass_cdc_wsa2_macro_2ch_dma_enable_get,
 			lpass_cdc_wsa2_macro_2ch_dma_enable_put),
+	SOC_SINGLE_EXT("WSA2_HAP_VI_DEC ENABLE", SND_SOC_NOPM, 0, 1,
+			0, lpass_cdc_wsa2_macro_get_vi_decimator,
+			lpass_cdc_wsa2_macro_set_vi_decimator),
 	SOC_SINGLE_EXT("WSA2 HAPT_PCM ENABLE", SND_SOC_NOPM, 0, 1,
 			0, lpass_cdc_wsa2_macro_hapt_pcm_enable_get,
 			lpass_cdc_wsa2_macro_hapt_pcm_enable_put),
@@ -3092,8 +3146,8 @@ static const struct snd_soc_dapm_widget lpass_cdc_wsa2_macro_dapm_widgets[] = {
 
 	SND_SOC_DAPM_AIF_OUT_E("WSA2 AIF_VI", "WSA2_AIF_VI Capture", 0,
 		SND_SOC_NOPM, LPASS_CDC_WSA2_MACRO_AIF_VI, 0,
-		lpass_cdc_wsa2_macro_disable_vi_feedback,
-		SND_SOC_DAPM_POST_PMD),
+		lpass_cdc_wsa2_macro_update_vi_feedback,
+		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_AIF_OUT("WSA2 AIF_ECHO", "WSA2_AIF_ECHO Capture", 0,
 		SND_SOC_NOPM, 0, 0),
