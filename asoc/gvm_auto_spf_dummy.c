@@ -22,7 +22,6 @@
 #include <sound/info.h>
 #include <dsp/audio_notifier.h>
 #include "msm_dailink.h"
-#include <soc/qcom/boot_stats.h>
 #include "msm_common.h"
 
 
@@ -764,14 +763,13 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int msm_asoc_machine_remove(struct platform_device *pdev)
+static void msm_asoc_machine_remove(struct platform_device *pdev)
 {
 	/* kobject_put decrease the kref count, once the count reaches 0.
 	 * Kobject core will automatically clean up the memory allocated by kobject.
 	 * The snd_card_sysfs_release release will help clean up memory allocated by us
 	 */
 	kobject_put(&snd_card_pdata->snd_card_kobj);
-	return 0;
 }
 
 static struct platform_driver gvm_asoc_machine_driver = {

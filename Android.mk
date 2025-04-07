@@ -3,7 +3,6 @@
 ifeq ($(AUDIO_DLKM_ENABLE), true)
 
 LOCAL_PATH := $(call my-dir)
-LOCAL_MODULE_DDK_BUILD := true
 
 ifeq ($(call is-board-platform-in-list,taro),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_WAIPIO=m
@@ -82,10 +81,11 @@ AUDIO_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*/*/*/*)
 
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm msmnile_gvmq))
+LOCAL_MODULE_DDK_BUILD := true
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := stub_dlkm.ko
-LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/stub_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := stub_dlkm.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
@@ -94,7 +94,7 @@ include $(DLKM_DIR)/Build_external_kernelmodule.mk
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := machine_dlkm.ko
-LOCAL_MODULE_KBUILD_NAME  := asoc/spf_machine_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := spf_machine_dlkm.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
