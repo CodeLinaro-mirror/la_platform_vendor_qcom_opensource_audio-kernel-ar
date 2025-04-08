@@ -8,10 +8,10 @@ def define_vienna():
         registry = audio_modules,
         modules = [
             "q6_dlkm",
-            "q6_notifier_dlkm",
             "spf_core_dlkm",
             "q6codec_core_dlkm",
             "audpkt_ion_dlkm",
+            "q6_notifier_dlkm",
             "adsp_loader_dlkm",
             "audio_prm_dlkm",
             "q6_pdr_dlkm",
@@ -28,9 +28,7 @@ def define_vienna():
             "pinctrl_lpi_dlkm",
             "mbhc_dlkm",
             "swr_dmic_dlkm",
-            "wcd9xxx_dlkm",
             "swr_haptics_dlkm",
-            "stub_dlkm",
             "lpass_cdc_dlkm",
             "wsa883x_dlkm",
             "wsa884x_dlkm",
@@ -38,7 +36,6 @@ def define_vienna():
             "wcd938x_slave_dlkm",
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
-            "wsa884x_dlkm"
         ],
         config_options = [
             "CONFIG_SND_SOC_VIENNA",
