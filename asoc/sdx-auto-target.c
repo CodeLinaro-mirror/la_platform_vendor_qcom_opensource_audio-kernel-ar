@@ -101,9 +101,6 @@ struct msm_asoc_mach_data {
 	struct device_node *prim_master_slave_p;
 	struct device_node *sec_master_slave_p;
 	struct device_node *tert_master_slave_p;
-	void __iomem *lpaif_pri_muxsel_virt_addr;
-	void __iomem *lpaif_sec_muxsel_virt_addr;
-	void __iomem *lpaif_tert_muxsel_virt_addr;
 	void __iomem *lpass_mux_spkr_ctl_virt_addr;
 	void __iomem *lpass_sec_mux_spkr_ctl_virt_addr;
 	void __iomem *lpass_tert_mux_spkr_ctl_virt_addr;
@@ -311,36 +308,29 @@ static int sdx_sec_mi2s_startup(struct snd_pcm_substream *substream)
 
 	pdata->sec_mi2s_mode = sdx_sec_mi2s_mode;
 	if (atomic_inc_return(&sec_mi2s_ref_count) == 1) {
-		if (pdata->lpaif_sec_muxsel_virt_addr != NULL) {
 
-			ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
-			if (ret < 0) {
-				dev_err(card->dev,
-				"%s:set lpass core clk failed ret: %d\n",
-				__func__, ret);
-				ret = -EINVAL;
-				goto done;
-			}
+		ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
+		if (ret < 0) {
+			dev_err(card->dev,
+			"%s:set lpass core clk failed ret: %d\n",
+			__func__, ret);
+			ret = -EINVAL;
+			goto done;
+		}
 
-			audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x200c),  0xffff,
-			I2S_SEL << I2S_PCM_SEL_OFFSET);
-			if (pdata->lpass_sec_mux_spkr_ctl_virt_addr != NULL) {
-				if (pdata->sec_mi2s_mode == 1)
-					ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
-					0xffff,SEC_TLMM_CLKS_EN_MASTER);
-                                else
-					ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
-					0xffff,SEC_TLMM_CLKS_EN_SLAVE);
-			} else {
-				dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
-					__func__);
-
-				ret = -EINVAL;
-				goto done;
-			}
+		audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x200c),  0xffff,
+		I2S_SEL << I2S_PCM_SEL_OFFSET);
+		if (pdata->lpass_sec_mux_spkr_ctl_virt_addr != NULL) {
+			if (pdata->sec_mi2s_mode == 1)
+				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
+				0xffff,SEC_TLMM_CLKS_EN_MASTER);
+                            else
+				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
+				0xffff,SEC_TLMM_CLKS_EN_SLAVE);
 		} else {
-			dev_err(card->dev, "%s lpaif_sec_muxsel_virt_addr is NULL\n",
+			dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
 				__func__);
+
 			ret = -EINVAL;
 			goto done;
 		}
@@ -595,36 +585,29 @@ static int sdx_tdm_startup(struct snd_pcm_substream *substream)
 
 	pdata->prim_mi2s_mode = sdx_mi2s_mode;
 	if (atomic_inc_return(&mi2s_ref_count) == 1) {
-		if (pdata->lpaif_pri_muxsel_virt_addr != NULL) {
 
-			ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
-			if (ret < 0) {
-				dev_err(card->dev,
-				"%s:set lpass core clk failed ret: %d\n",
-				__func__, ret);
-				ret = -EINVAL;
-				goto done;
-			}
+		ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
+		if (ret < 0) {
+			dev_err(card->dev,
+			"%s:set lpass core clk failed ret: %d\n",
+			__func__, ret);
+			ret = -EINVAL;
+			goto done;
+		}
 
-			audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
-			I2S_SEL << I2S_PCM_SEL_OFFSET);
-			if (pdata->lpass_mux_spkr_ctl_virt_addr != NULL) {
-				if (pdata->prim_mi2s_mode == 1)
-					ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
-					0xffff,PRI_TLMM_CLKS_EN_MASTER);
-                                else
-					ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
-					0xffff,PRI_TLMM_CLKS_EN_SLAVE);
-			} else {
-				dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
-					__func__);
-
-				ret = -EINVAL;
-				goto done;
-			}
+		audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
+		I2S_SEL << I2S_PCM_SEL_OFFSET);
+		if (pdata->lpass_mux_spkr_ctl_virt_addr != NULL) {
+			if (pdata->prim_mi2s_mode == 1)
+				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
+				0xffff,PRI_TLMM_CLKS_EN_MASTER);
+                            else
+				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
+				0xffff,PRI_TLMM_CLKS_EN_SLAVE);
 		} else {
-			dev_err(card->dev, "%s lpaif_pri_muxsel_virt_addr is NULL\n",
+			dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
 				__func__);
+
 			ret = -EINVAL;
 			goto done;
 		}
@@ -703,36 +686,29 @@ static int sdx_auxpcm_startup(struct snd_pcm_substream *substream)
 	int ret = 0;
 
 	pdata->prim_auxpcm_mode = sdx_auxpcm_mode;
-	if (pdata->lpaif_pri_muxsel_virt_addr != NULL) {
 
-		ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
-		if (ret < 0) {
-			dev_err(card->dev,
-			"%s:set lpass core clk failed ret: %d\n",
-			__func__, ret);
-			ret = -EINVAL;
-			goto done;
-		}
+	ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
+	if (ret < 0) {
+		dev_err(card->dev,
+		"%s:set lpass core clk failed ret: %d\n",
+		__func__, ret);
+		ret = -EINVAL;
+		goto done;
+	}
 
-		audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
-                                                I2S_SEL << I2S_PCM_SEL_OFFSET);
-		if (pdata->lpass_mux_spkr_ctl_virt_addr != NULL) {
-			if (pdata->prim_auxpcm_mode == 1)
-				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
-				0xffff,PRI_TLMM_CLKS_EN_MASTER);
-                        else
-				ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
-				0xffff,PRI_TLMM_CLKS_EN_SLAVE);
-		} else {
-			dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
-				__func__);
-
-			ret = -EINVAL;
-			goto done;
-		}
+	audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
+                                            I2S_SEL << I2S_PCM_SEL_OFFSET);
+	if (pdata->lpass_mux_spkr_ctl_virt_addr != NULL) {
+		if (pdata->prim_auxpcm_mode == 1)
+			ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
+			0xffff,PRI_TLMM_CLKS_EN_MASTER);
+                    else
+			ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
+			0xffff,PRI_TLMM_CLKS_EN_SLAVE);
 	} else {
-		dev_err(card->dev, "%s lpaif_pri_muxsel_virt_addr is NULL\n",
+		dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
 			__func__);
+
 		ret = -EINVAL;
 		goto done;
 	}
@@ -799,14 +775,20 @@ static int sdx_sec_auxpcm_startup(struct snd_pcm_substream *substream)
 
 	audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x200c),  0xffff,
                                             I2S_SEL << I2S_PCM_SEL_OFFSET);
+	if (pdata->lpass_sec_mux_spkr_ctl_virt_addr != NULL) {
+		if (pdata->sec_auxpcm_mode == 1)
+			ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
+			0xffff,SEC_TLMM_CLKS_EN_MASTER);
+                    else
+			ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
+			0xffff,SEC_TLMM_CLKS_EN_SLAVE);
+	} else {
+		dev_err(card->dev, "%s: mux spkr ctl virt addr is NULL\n",
+			__func__);
 
-	if (pdata->sec_auxpcm_mode == 1)
-		ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
-		0xffff,SEC_TLMM_CLKS_EN_MASTER);
-                else
-		ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
-		0xffff,SEC_TLMM_CLKS_EN_SLAVE);
-
+		ret = -EINVAL;
+		goto done;
+	}
 	/*
 	 * This sets the CONFIG PARAMETER WS_SRC.
 	 * 1 means internal clock master mode.
@@ -935,29 +917,6 @@ static struct snd_soc_dai_link msm_rx_tx_cdc_dma_be_dai_links[] = {
 		.ops = &sdx_mi2s_be_ops,
 		SND_SOC_DAILINK_REG(tlv320aic3x_codec),
 	},
-/* 	{
-		.name = LPASS_BE_TERT_MI2S_RX,
-		.stream_name = LPASS_BE_TERT_MI2S_RX,
-		.playback_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_pmdown_time = 1,
-		.ignore_suspend = 1,
-		.ops = &sdx_tert_mi2s_be_ops,
-		SND_SOC_DAILINK_REG(pcm_rx),
-		.init = &msm_aux_codec_init,
-	},
-	{
-		.name = LPASS_BE_TERT_MI2S_TX,
-		.stream_name = LPASS_BE_TERT_MI2S_TX,
-		.capture_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_pmdown_time = 1,
-		.ignore_suspend = 1,
-		.ops = &sdx_tert_mi2s_be_ops,
-		SND_SOC_DAILINK_REG(pcm_tx),
-	}, */
     {
 		.name = LPASS_BE_SEC_MI2S_RX,
 		.stream_name = LPASS_BE_SEC_MI2S_RX,
