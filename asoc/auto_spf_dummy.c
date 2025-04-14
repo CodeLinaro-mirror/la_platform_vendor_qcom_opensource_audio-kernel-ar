@@ -1173,7 +1173,7 @@ err:
 static const struct of_device_id asoc_machine_of_match[]  = {
 	{ .compatible = "qcom,sa8295-asoc-snd-adp-star",
 	  .data = "adp_star_codec"},
-	{ .compatible = "qcom,sa8155-asoc-snd-adp-star",
+	{ .compatible = "qcom,sa8155ar-asoc-snd-adp-star",
 	  .data = "adp_star_codec"},
 	{ .compatible = "qcom,sa8255-asoc-snd-adp-star",
 	  .data = "adp_star_codec"},
@@ -1204,7 +1204,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 		return NULL;
 	}
 
-	if (!strcmp(match->compatible, "qcom,sa8155-asoc-snd-adp-star"))
+	if (!strcmp(match->compatible, "qcom,sa8155ar-asoc-snd-adp-star"))
 		card = &sa8155_snd_soc_card_auto_msm;
 	else if (!strcmp(match->compatible, "qcom,sa8295-asoc-snd-adp-star"))
 		card = &sa8295_snd_soc_card_auto_msm;
