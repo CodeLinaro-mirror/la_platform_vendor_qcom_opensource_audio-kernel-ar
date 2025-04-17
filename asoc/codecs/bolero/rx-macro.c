@@ -10,6 +10,7 @@
 #include <linux/bitops.h>
 #include <linux/clk.h>
 #include <linux/pm_runtime.h>
+#include <linux/version.h>
 #include <sound/soc.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -375,9 +376,15 @@ static int rx_macro_core_vote(void *handle, bool enable);
 static int rx_macro_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params,
 			       struct snd_soc_dai *dai);
-static int rx_macro_get_channel_map(struct snd_soc_dai *dai,
-				unsigned int *tx_num, unsigned int *tx_slot,
-				unsigned int *rx_num, unsigned int *rx_slot);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int rx_macro_get_channel_map( const struct snd_soc_dai *dai,
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot);
+#else
+static int rx_macro_get_channel_map( struct snd_soc_dai *dai,
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot);
+#endif
 static int rx_macro_mute_stream(struct snd_soc_dai *dai, int mute, int stream);
 static int rx_macro_int_dem_inp_mux_put(struct snd_kcontrol *kcontrol,
 				     struct snd_ctl_elem_value *ucontrol);
@@ -1137,9 +1144,15 @@ static int rx_macro_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int rx_macro_get_channel_map(struct snd_soc_dai *dai,
-				unsigned int *tx_num, unsigned int *tx_slot,
-				unsigned int *rx_num, unsigned int *rx_slot)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int rx_macro_get_channel_map( const struct snd_soc_dai *dai,
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot)
+#else
+static int rx_macro_get_channel_map( struct snd_soc_dai *dai,
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct snd_soc_component *component = dai->component;
 	struct device *rx_dev = NULL;
@@ -4038,10 +4051,10 @@ static void rx_macro_add_child_devices(struct work_struct *work)
 			rx_swr_master_node = true;
 
 		if(rx_swr_master_node)
-			strlcpy(plat_dev_name, "rx_swr_ctrl",
+			strscpy(plat_dev_name, "rx_swr_ctrl",
 				(RX_SWR_STRING_LEN - 1));
 		else
-			strlcpy(plat_dev_name, node->name,
+			strscpy(plat_dev_name, node->name,
 				(RX_SWR_STRING_LEN - 1));
 
 		pdev = platform_device_alloc(plat_dev_name, -1);
@@ -4263,15 +4276,22 @@ err_reg_macro:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void rx_macro_remove(struct platform_device *pdev)
+#else
 static int rx_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct rx_macro_priv *rx_priv = NULL;
 	u16 count = 0;
 
 	rx_priv = dev_get_drvdata(&pdev->dev);
 
-	if (!rx_priv)
-		return -EINVAL;
+	if (!rx_priv) {
+                rc = -EINVAL;
+                goto exit;
+        }
 
 	for (count = 0; count < rx_priv->child_count &&
 		count < RX_MACRO_CHILD_DEVICES_MAX; count++)
@@ -4283,7 +4303,13 @@ static int rx_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&rx_priv->mclk_lock);
 	mutex_destroy(&rx_priv->swr_clk_lock);
 	kfree(rx_priv->swr_ctrl_data);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+        return;
+#else
+        return rc;
+#endif
+
 }
 
 static const struct of_device_id rx_macro_dt_match[] = {
