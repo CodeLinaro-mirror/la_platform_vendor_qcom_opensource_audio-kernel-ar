@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/of_platform.h>
@@ -9,6 +11,7 @@
 #include <linux/init.h>
 #include <linux/platform_device.h>
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
 #include <linux/ratelimit.h>
@@ -732,18 +735,30 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void bolero_clk_rsc_remove(struct platform_device *pdev)
+#else
 static int bolero_clk_rsc_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct bolero_clk_rsc *priv = dev_get_drvdata(&pdev->dev);
 
 	bolero_unregister_res_clk(&pdev->dev);
 	of_platform_depopulate(&pdev->dev);
-	if (!priv)
-		return -EINVAL;
+	if (!priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 	mutex_destroy(&priv->rsc_clk_lock);
 	mutex_destroy(&priv->fs_gen_lock);
 
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
+	return rc;
+#endif
 }
 
 static const struct of_device_id bolero_clk_rsc_dt_match[] = {

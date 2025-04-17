@@ -16,6 +16,7 @@
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
 #include <linux/pm_runtime.h>
+#include <linux/version.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include <soc/swr-common.h>
 #include <soc/swr-wcd.h>
@@ -183,6 +184,16 @@ struct va_macro_priv {
 	int pcm_rate[VA_MACRO_NUM_DECIMATORS];
 	bool dev_up;
 };
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int va_macro_get_channel_map( const struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot);
+#else
+static int va_macro_get_channel_map( struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot);
+#endif
 
 static bool va_macro_get_data(struct snd_soc_component *component,
 			      struct device **va_dev,
@@ -1615,9 +1626,15 @@ static int va_macro_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static int va_macro_get_channel_map(struct snd_soc_dai *dai,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int va_macro_get_channel_map( const struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot)
+#else
+static int va_macro_get_channel_map( struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct snd_soc_component *component = dai->component;
 	struct device *va_dev = NULL;
@@ -2960,10 +2977,10 @@ static void va_macro_add_child_devices(struct work_struct *work)
 			va_swr_master_node = true;
 
 		if (va_swr_master_node)
-			strlcpy(plat_dev_name, "va_swr_ctrl",
+			strscpy(plat_dev_name, "va_swr_ctrl",
 				(VA_MACRO_SWR_STRING_LEN - 1));
 		else
-			strlcpy(plat_dev_name, node->name,
+			strscpy(plat_dev_name, node->name,
 				(VA_MACRO_SWR_STRING_LEN - 1));
 
 		pdev = platform_device_alloc(plat_dev_name, -1);
@@ -3263,15 +3280,22 @@ reg_macro_fail:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void va_macro_remove(struct platform_device *pdev)
+#else
 static int va_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct va_macro_priv *va_priv;
 	int count = 0;
 
 	va_priv = dev_get_drvdata(&pdev->dev);
 
-	if (!va_priv)
-		return -EINVAL;
+	if (!va_priv) {
+		rc = -EINVAL;
+		goto exit;
+	}
 	if (va_priv->is_used_va_swr_gpio) {
 		if (va_priv->swr_ctrl_data)
 			kfree(va_priv->swr_ctrl_data);
@@ -3287,7 +3311,12 @@ static int va_macro_remove(struct platform_device *pdev)
 	mutex_destroy(&va_priv->mclk_lock);
 	if (va_priv->is_used_va_swr_gpio)
 		mutex_destroy(&va_priv->swr_clk_lock);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+	return;
+#else
+	return rc;
+#endif
 }
 
 
