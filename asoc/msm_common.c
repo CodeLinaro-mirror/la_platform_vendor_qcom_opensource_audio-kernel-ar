@@ -619,7 +619,7 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 		mutex_unlock(&pdata->lock[index]);
 	}
 }
-
+#ifndef CONFIG_ARCH_SA510M
 static void msm_audio_add_qos_request(void)
 {
 	int num_req = 0;
@@ -681,7 +681,7 @@ static void msm_audio_remove_qos_request(void)
 		kfree(msm_audio_req);
 	}
 }
-
+#endif
 int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 {
 	struct msm_common_pdata *common_pdata = NULL;
@@ -790,9 +790,10 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 
 	msm_common_set_pdata(card, common_pdata);
 
+#ifndef CONFIG_ARCH_SA510M
 	/* Add QoS request for audio tasks */
 	msm_audio_add_qos_request();
-
+#endif
 	mutex_init(&vote_against_sleep_lock);
 
 	return 0;
@@ -806,8 +807,9 @@ void msm_common_snd_deinit(struct msm_common_pdata *common_pdata)
 		return;
 
 	mutex_destroy(&vote_against_sleep_lock);
+#ifndef CONFIG_ARCH_SA510M
 	msm_audio_remove_qos_request();
-
+#endif
 	mutex_destroy(&common_pdata->aud_dev_lock);
 	for (count = 0; count < MI2S_TDM_AUXPCM_MAX; count++) {
 		mutex_destroy(&common_pdata->lock[count]);
