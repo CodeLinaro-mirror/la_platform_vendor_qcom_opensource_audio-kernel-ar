@@ -1791,7 +1791,7 @@ static int32_t simple_amp_temp_reg_read(struct simple_amp_priv *simple_amp,
 		return -EINVAL;
 	}
 
-	uint32_t reg[TEMP_READ_REG_MAX] = { WSA8855_DIG_CTRL0_TEMP_DIN_MSB,
+	uint32_t reg[READ_REG_MAX] = { WSA8855_DIG_CTRL0_TEMP_DIN_MSB,
 					    WSA8855_DIG_CTRL0_TEMP_DIN_LSB,
 					    WSA8855_DIG_TRIM_OTP_REG_1,
 					    WSA8855_DIG_TRIM_OTP_REG_2,
@@ -1834,7 +1834,7 @@ static int32_t simple_amp_temp_reg_read(struct simple_amp_priv *simple_amp,
 		return -EINVAL;
 	}
 
-	for (i = 0; i < TEMP_READ_REG_MAX; i++) {
+	for (i = 0; i < READ_REG_MAX; i++) {
 		rc = regmap_read(simple_amp->regmap , reg[i], val[i]);
 		if (rc) {
 			dev_err(simple_amp->dev,
@@ -2122,6 +2122,23 @@ static const char *simple_amp_interrupts[] = {
 	"mono_left_protection_Mode_Changed",
 };
 
+void simple_amp_read_print_registers(struct regmap *regmap, unsigned int *regs, size_t count)
+{
+	int ret;
+	unsigned int val;
+
+	for (size_t i = 0; i < count; i++) {
+		ret = regmap_read(regmap, regs[i], &val);
+		if (ret) {
+			pr_err("%s: Failed to read register 0x%x: %d\n",
+					 __func__, regs[i], ret);
+		} else {
+			pr_err_ratelimited("%s: Register 0x%x value: 0x%x\n",
+					__func__, regs[i], val);
+		}
+	}
+}
+
 static int simple_amp_interrupt_cb(struct swr_device *swr_dev, u8 devnum)
 {
 	unsigned long stat1 = 0, stat2 = 0, stat3 = 0;
@@ -2132,8 +2149,16 @@ static int simple_amp_interrupt_cb(struct swr_device *swr_dev, u8 devnum)
 		{.reg = SIMPLE_AMP_IMPL_DEF_PA0_FSM, .bit_pos = BIT(2)},
 		{.reg = SIMPLE_AMP_IMPL_DEF_PA1_FSM, .bit_pos = BIT(2)},
 	};
+	uint32_t regs[READ_REG_MAX] = { SIMPLE_AMP_IMPL_DEF_POWER_FSM_STATUS0,
+			    SIMPLE_AMP_IMPL_DEF_FSM_ERR_COND,
+			    SIMPLE_AMP_IMPL_DEF_PA0_STATUS0,
+			    SIMPLE_AMP_IMPL_DEF_ERR_COND,
+			    SIMPLE_AMP_IMPL_DEF_PA1_STATUS0,
+			    SIMPLE_AMP_IMPL_DEF_PA1_ERR_COND };
 	bool toggle_fsm =  false;
 	uint8_t bit = 0;
+
+	simple_amp_read_print_registers(simple_amp->regmap, regs, READ_REG_MAX);
 
 	do {
 		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT1 , &stat1, 1);
@@ -2172,13 +2197,6 @@ static int simple_amp_interrupt_cb(struct swr_device *swr_dev, u8 devnum)
 		if (stat3 & SDCA_INT3_MASK)
 			swr_write(swr_dev, devnum, SDW_SCP_SDCA_INT3, &stat3);
 
-#if 0
-		/* Read the register values again to check for new interrupts */
-		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT1 , &stat1, 1);
-		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT2 , &stat2, 1);
-		swr_read(swr_dev, devnum, SDW_SCP_SDCA_INT3 , &stat3, 1);
-#endif
-
 	} while (0);
 
 	if (!toggle_fsm)
@@ -2186,13 +2204,13 @@ static int simple_amp_interrupt_cb(struct swr_device *swr_dev, u8 devnum)
 
 	/* fsm:clr_error: 0-->1-->0 */
 	for (i = 0; i < ARRAY_SIZE(fsm_regs); ++i) {
-		swr_read(swr_dev, devnum, fsm_regs[i].reg, &fsm_status, 1);
+		regmap_read(simple_amp->regmap, fsm_regs[i].reg, &fsm_status);
 		fsm_status &= ~fsm_regs[i].bit_pos;
-		swr_write(swr_dev, devnum, fsm_regs[i].reg, &fsm_status); /* 0 */
+		regmap_write(simple_amp->regmap, fsm_regs[i].reg, fsm_status); /* 0 */
 		fsm_status |= fsm_regs[i].bit_pos;
-		swr_write(swr_dev, devnum, fsm_regs[i].reg, &fsm_status); /* 1 */
+		regmap_write(simple_amp->regmap, fsm_regs[i].reg, fsm_status); /* 1 */
 		fsm_status &= ~fsm_regs[i].bit_pos;
-		swr_write(swr_dev, devnum, fsm_regs[i].reg, &fsm_status); /* 0 */
+		regmap_write(simple_amp->regmap, fsm_regs[i].reg, fsm_status); /* 0 */
 	}
 exit:
 	return 0;
