@@ -443,13 +443,22 @@ static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 
 	/* Get logical address */
 	usleep_range(5000, 5500);
-
-	while (swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num) && retry--) {
+	ret = swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num);
+	while (ret && retry--) {
 		dev_err(qmp->dev, "error while getting logical device number\n");
 		/* Retry after 1 msec delay */
-		usleep_range(1000, 1100);
-		if (retry == 0)
-			goto err;
+		qmp_disable_regulator(qmp);
+		usleep_range(1000, 1500);
+		qmp_enable_regulator(qmp);
+		usleep_range(1000, 1500);
+		ret = swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num);
+	}
+	if (ret) {
+		dev_err(qmp->dev,
+			"%s get devnum %d for dev addr %llx failed\n",
+			__func__, dev_num, qmp->swr_slave->addr);
+		qmp_disable_regulator(qmp);
+		return -EINVAL;
 	}
 	dev_dbg(qmp->dev, "%s: devnum: %d\n", __func__, dev_num);
 
@@ -468,7 +477,6 @@ static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 	qmp->master_port_map_cached[dai->id] = qmp->tx_master_port_map[dai->id];
 	update_ch_per_substream(qmp->dai_status_mask, substream);
 
-err:
 	return 0;
 }
 
