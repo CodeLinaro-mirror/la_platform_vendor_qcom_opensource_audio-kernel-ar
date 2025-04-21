@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -429,6 +429,10 @@ static int wcd9378_init_reg(struct snd_soc_component *component)
 	/*HPH_DN_T0: 0.007*/
 	snd_soc_component_update_bits(component, WCD9378_HPH_DN_T0,
 			WCD9378_HPH_DN_T0_HPH_DN_T0_MASK, 0x06);
+
+	/*SHORT_PROT_EN ENABLE*/
+	snd_soc_component_update_bits(component, WCD9378_ANA_EAR,
+			WCD9378_ANA_EAR_SHORT_PROT_EN_MASK, 0x40);
 
 	/*SM0 MB SEL:MB1*/
 	snd_soc_component_update_bits(component, WCD9378_SM0_MB_SEL,
@@ -2082,9 +2086,6 @@ static int wcd9378_codec_ear_dac_event(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		/*SHORT_PROT_EN ENABLE*/
-		snd_soc_component_update_bits(component, WCD9378_ANA_EAR,
-				WCD9378_ANA_EAR_SHORT_PROT_EN_MASK, 0x40);
 		if (!ear_rx2) {
 			/*RX0 ENABLE*/
 			snd_soc_component_update_bits(component, WCD9378_CDC_HPH_GAIN_CTL,
@@ -2114,9 +2115,6 @@ static int wcd9378_codec_ear_dac_event(struct snd_soc_dapm_widget *w,
 		}
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		/*SHORT_PROT_EN DISABLE*/
-		snd_soc_component_update_bits(component, WCD9378_ANA_EAR,
-				WCD9378_ANA_EAR_SHORT_PROT_EN_MASK, 0x00);
 		if (test_bit(RX0_EAR_EN, &wcd9378->sys_usage_status)) {
 			/*RX0 DISABLE*/
 			snd_soc_component_update_bits(component, WCD9378_CDC_HPH_GAIN_CTL,
@@ -2201,6 +2199,8 @@ static int wcd9378_sa_sequencer_enable(struct snd_soc_dapm_widget *w,
 {
 	struct snd_soc_component *component =
 					snd_soc_dapm_to_component(w->dapm);
+	struct wcd9378_priv *wcd9378 =
+				snd_soc_component_get_drvdata(component);
 
 	dev_dbg(component->dev, "%s wname: %s event: %d\n", __func__,
 		w->name, event);
@@ -2216,6 +2216,11 @@ static int wcd9378_sa_sequencer_enable(struct snd_soc_dapm_widget *w,
 		/*FU23 UNMUTE*/
 		snd_soc_component_update_bits(component, WCD9378_FU23_MUTE,
 				WCD9378_FU23_MUTE_FU23_MUTE_MASK, 0x00);
+		if (wcd9378->sys_usage == SYS_USAGE_10) {
+			regmap_write(wcd9378->regmap, WCD9378_FU42_MUTE_CH1, 0x00);
+			regmap_write(wcd9378->regmap, WCD9378_FU42_MUTE_CH2, 0x00);
+		}
+
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		/*FU23 MUTE*/
