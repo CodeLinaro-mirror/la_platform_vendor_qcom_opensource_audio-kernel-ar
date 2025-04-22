@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -11,6 +11,7 @@
 #include <linux/platform_device.h>
 #include <linux/regmap.h>
 #include <linux/pm_runtime.h>
+#include <linux/version.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
 #include <sound/tlv.h>
@@ -59,9 +60,16 @@ static const DECLARE_TLV_DB_SCALE(digital_gain, 0, 1, 0);
 static int tx_macro_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params,
 			       struct snd_soc_dai *dai);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int tx_macro_get_channel_map(const struct snd_soc_dai *dai,
+                               unsigned int *tx_num, unsigned int *tx_slot,
+                               unsigned int *rx_num, unsigned int *rx_slot);
+#else
 static int tx_macro_get_channel_map(struct snd_soc_dai *dai,
-				unsigned int *tx_num, unsigned int *tx_slot,
-				unsigned int *rx_num, unsigned int *rx_slot);
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot);
+#endif
 
 #define TX_MACRO_SWR_STRING_LEN 80
 #define TX_MACRO_CHILD_DEVICES_MAX 3
@@ -782,8 +790,8 @@ static int tx_macro_tx_mixer_get(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_kcontrol_widget(kcontrol);
 	struct snd_soc_component *component =
 				snd_soc_dapm_to_component(widget->dapm);
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 dec_id = mixer->shift;
 	struct device *tx_dev = NULL;
@@ -807,8 +815,8 @@ static int tx_macro_tx_mixer_put(struct snd_kcontrol *kcontrol,
 	struct snd_soc_component *component =
 				snd_soc_dapm_to_component(widget->dapm);
 	struct snd_soc_dapm_update *update = NULL;
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 dec_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
@@ -1428,9 +1436,15 @@ static int tx_macro_hw_params(struct snd_pcm_substream *substream,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int tx_macro_get_channel_map(const struct snd_soc_dai *dai,
+                               unsigned int *tx_num, unsigned int *tx_slot,
+                               unsigned int *rx_num, unsigned int *rx_slot)
+#else
 static int tx_macro_get_channel_map(struct snd_soc_dai *dai,
-				unsigned int *tx_num, unsigned int *tx_slot,
-				unsigned int *rx_num, unsigned int *rx_slot)
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot)
+#endif
 {
 	struct snd_soc_component *component = dai->component;
 	struct device *tx_dev = NULL;
@@ -3503,10 +3517,10 @@ static void tx_macro_add_child_devices(struct work_struct *work)
 			tx_swr_master_node = true;
 
 		if (tx_swr_master_node)
-			strlcpy(plat_dev_name, "tx_swr_ctrl",
+			strscpy(plat_dev_name, "tx_swr_ctrl",
 				(TX_MACRO_SWR_STRING_LEN - 1));
 		else
-			strlcpy(plat_dev_name, node->name,
+			strscpy(plat_dev_name, node->name,
 				(TX_MACRO_SWR_STRING_LEN - 1));
 
 		pdev = platform_device_alloc(plat_dev_name, -1);
@@ -3743,16 +3757,22 @@ err_reg_macro:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void tx_macro_remove(struct platform_device *pdev)
+#else
 static int tx_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct tx_macro_priv *tx_priv = NULL;
 	u16 count = 0;
 
 	tx_priv = platform_get_drvdata(pdev);
 
-	if (!tx_priv)
-		return -EINVAL;
-
+	if (!tx_priv) {
+                rc = -EINVAL;
+                goto exit;
+        }
 	if (tx_priv->is_used_tx_swr_gpio) {
 		if (tx_priv->swr_ctrl_data)
 			kfree(tx_priv->swr_ctrl_data);
@@ -3768,7 +3788,12 @@ static int tx_macro_remove(struct platform_device *pdev)
 	if (tx_priv->is_used_tx_swr_gpio)
 		mutex_destroy(&tx_priv->swr_clk_lock);
 	bolero_unregister_macro(&pdev->dev, TX_MACRO);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+        return;
+#else
+        return rc;
+#endif
 }
 
 
