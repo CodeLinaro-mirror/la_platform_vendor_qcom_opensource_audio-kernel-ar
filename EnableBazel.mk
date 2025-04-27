@@ -125,6 +125,7 @@ LOCAL_MODULE_KO_DIRS += dsp/q6_pdr_dlkm.ko
 LOCAL_MODULE_KO_DIRS += soc/snd_event_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/stub_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/machine_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd_core_dlkm.ko
 endif
 
 ifeq ($(call is-board-platform-in-list,lahaina),true)
