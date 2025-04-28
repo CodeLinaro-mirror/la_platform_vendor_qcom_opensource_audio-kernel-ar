@@ -34,8 +34,6 @@
 #define SIMPLE_AMP_IMPL_DEF_VALID_REG_MASK 0x00339000
 #define IS_VALID_FUNCTION(func)  (((func) > FUNCTION_ZERO) && ((func) < MAX_FUNCTION))
 
-void get_reg_defaults(const struct reg_default **reg_def, size_t *num_defaults);
-
 #ifdef CONFIG_DEBUG_FS
 void simple_amp_regdump_register(struct simple_amp_priv *simple_amp,
 	struct swr_device *pdev);
@@ -145,6 +143,8 @@ struct sdca_function {
 	struct sdca_entity entity_data[ENTITY_TYPE_MAX];
 	u32 *init_table;
 	int init_table_size;
+	u32 *init_table_v2;
+	int init_table_size_v2;
 };
 
 static int get_id_by_label(const char *label)
@@ -529,15 +529,50 @@ static int parse_entity(struct device *dev, struct device_node *function_node,
 	return 0;
 }
 
+static int parse_initialization_table_v2(struct device *dev,
+		struct device_node *function_node, struct sdca_function *sdca_func)
+{
+	sdca_func->init_table_size_v2 = of_property_count_u32_elems(function_node,
+			"mipi-sdca-function-initialization-table-v2");
+	if (sdca_func->init_table_size_v2 <= 0) {
+		dev_err(dev, "%s: Failed to count elements from init table v2\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	if (sdca_func->init_table_size_v2 % 2 != 0) {
+		dev_err(dev, "%s: Invalid number of elements in init table v2\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	sdca_func->init_table_v2 = devm_kzalloc(dev,
+			sdca_func->init_table_size_v2 * sizeof(u32), GFP_KERNEL);
+	if (!sdca_func->init_table_v2)
+		return -ENOMEM;
+
+	if (of_property_read_u32_array(function_node,
+				"mipi-sdca-function-initialization-table-v2",
+				sdca_func->init_table_v2,
+				sdca_func->init_table_size_v2)) {
+		dev_err(dev,
+		"%s: Failed to read mipi-sdca-function-initialization-table-v2\n",
+				__func__);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static int parse_initialization_table(struct device *dev,
 		struct device_node *function_node, struct sdca_function *sdca_func)
 {
 	sdca_func->init_table_size = of_property_count_u32_elems(function_node,
 			"mipi-sdca-function-initialization-table");
-	if (sdca_func->init_table_size < 0) {
+	if (sdca_func->init_table_size <= 0) {
 		dev_err(dev, "%s: Failed to count elements from init table\n",
 				__func__);
-		return sdca_func->init_table_size;
+		return -EINVAL;
 	}
 
 	if (sdca_func->init_table_size % 2 != 0) {
@@ -572,10 +607,22 @@ static int parse_functions(struct device *dev, struct device_node *function_node
 	if (!sdca_func_data)
 		return -EINVAL;
 
-	ret = parse_initialization_table(dev, function_node, sdca_func_data);
-	if (ret) {
-		dev_err(dev, "init table parse failed\n");
-		return ret;
+	if (of_property_read_bool(function_node,
+			"mipi-sdca-function-initialization-table-v2")) {
+		ret = parse_initialization_table_v2(dev, function_node, sdca_func_data);
+		if (ret) {
+			dev_err(dev, "init table v2 parse failed\n");
+			return ret;
+		}
+	}
+
+	if (of_property_read_bool(function_node,
+				"mipi-sdca-function-initialization-table")) {
+		ret = parse_initialization_table(dev, function_node, sdca_func_data);
+		if (ret) {
+			dev_err(dev, "init table parse failed\n");
+			return ret;
+		}
 	}
 
 	ret = parse_entity(dev, function_node, sdca_func_data);
@@ -984,16 +1031,34 @@ static const struct snd_kcontrol_new simple_amp_snd_controls[] = {
 		simple_amp_get_temp, NULL),
 };
 
-static int simple_amp_function_init(struct simple_amp_priv *simple_amp,
-		struct sdca_function *sdca_func)
+static int simple_amp_init_update(struct simple_amp_priv *simple_amp,
+		int init_table_size, u32 *init_table)
 {
 	int i, ret = 0;
 
-	for (i = 0; i < sdca_func->init_table_size; i += 2) {
-		ret = regmap_write(simple_amp->regmap, sdca_func->init_table[i],
-				sdca_func->init_table[i + 1]);
+	for (i = 0; i < init_table_size; i += 2) {
+		ret = regmap_write(simple_amp->regmap, init_table[i], init_table[i + 1]);
 		if (ret)
 			break;
+	}
+	return ret;
+}
+
+static int simple_amp_function_init(struct simple_amp_priv *simple_amp,
+		struct sdca_function *sdca_func)
+{
+	int ret = 0;
+
+	if (simple_amp->chip_version == SIMPLE_CHIP_VERSION_V1) {
+		ret = simple_amp_init_update(simple_amp,
+			sdca_func->init_table_size, sdca_func->init_table);
+	} else if (simple_amp->chip_version == SIMPLE_CHIP_VERSION_V2) {
+		ret = simple_amp_init_update(simple_amp,
+			sdca_func->init_table_size_v2, sdca_func->init_table_v2);
+	} else {
+		ret = -EINVAL;
+		dev_err(simple_amp->dev, "Unsupported chip version: %d\n",
+			simple_amp->chip_version);
 	}
 	return ret;
 }
@@ -1928,8 +1993,7 @@ static void simple_amp_temperature_work(struct work_struct *work)
 	complete(&simple_amp->tmp_th_complete);
 }
 
-static int simple_amp_init(struct device *dev, struct regmap *regmap,
-		struct swr_device *peripheral)
+static int simple_amp_init(struct device *dev, struct swr_device *peripheral)
 {
 	struct simple_amp_priv *simple_amp = NULL;
 	int ret, i;
@@ -1938,6 +2002,9 @@ static int simple_amp_init(struct device *dev, struct regmap *regmap,
 	u8 dev_num;
 	struct  snd_soc_component_driver *component_drv = NULL;
 	struct amp_ctrl_platform_data *plat_data =NULL;
+	const struct reg_default *reg_def;
+	size_t num_reg_def = 0;
+	struct regmap *regmap;
 
 	simple_amp = devm_kzalloc(dev, sizeof(*simple_amp), GFP_KERNEL);
 	if (!simple_amp)
@@ -1951,7 +2018,6 @@ static int simple_amp_init(struct device *dev, struct regmap *regmap,
 
 	dev_set_drvdata(dev, simple_amp);
 	simple_amp->swr_slave = peripheral;
-	simple_amp->regmap = regmap;
 	simple_amp->dev = dev;
 	simple_amp->clk_freq = MCLK_9P6MHZ;
 	simple_amp->stereo_voldB = -84; /* default state */
@@ -2007,6 +2073,28 @@ static int simple_amp_init(struct device *dev, struct regmap *regmap,
 		goto err;
 	}
 	peripheral->dev_num = dev_num;
+
+	/* Regmap Initialization */
+	regmap = devm_regmap_init_swr(peripheral, &simple_amp_regmap);
+	if (IS_ERR(regmap))
+		return PTR_ERR(regmap);
+
+	simple_amp->regmap = regmap;
+
+	get_reg_defaults(&reg_def, &num_reg_def, simple_amp);
+	if (num_reg_def == 0) {
+		dev_err(dev, "Failed to get the num_reg_def\n");
+		return -EINVAL;
+	}
+
+	simple_amp_regmap.reg_defaults = reg_def;
+	simple_amp_regmap.num_reg_defaults = num_reg_def;
+
+	ret = regmap_reinit_cache(simple_amp->regmap, &simple_amp_regmap);
+	if (ret != 0) {
+		dev_err(dev, "Failed to reinit register cache: %d\n", ret);
+		goto err;
+	}
 
 	ret = of_property_read_string(dev->of_node, "qcom,codec-name",
 			&simple_amp_codec_name_of);
@@ -2218,23 +2306,10 @@ exit:
 
 static int simple_amp_probe(struct swr_device *peripheral)
 {
-	const struct reg_default *reg_def;
-	size_t num_reg_def;
-	struct regmap *regmap;
-
 	peripheral->paging_support = true;
 	peripheral->ignore_nested_irq = true;
 
-	get_reg_defaults(&reg_def, &num_reg_def);
-	simple_amp_regmap.reg_defaults = reg_def;
-	simple_amp_regmap.num_reg_defaults = num_reg_def;
-
-	/* Regmap Initialization */
-	regmap = devm_regmap_init_swr(peripheral, &simple_amp_regmap);
-	if (IS_ERR(regmap))
-		return PTR_ERR(regmap);
-
-	return simple_amp_init(&peripheral->dev, regmap, peripheral);
+	return simple_amp_init(&peripheral->dev, peripheral);
 }
 
 static int simple_amp_remove(struct swr_device *pdev)
