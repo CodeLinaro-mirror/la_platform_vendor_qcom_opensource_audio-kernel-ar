@@ -244,6 +244,43 @@ static void qmp_update_offset1(void *qmp_priv, u8 s_dp, u8 s_offset1)
 			qmp->swr_tx_port_params);
 }
 
+static int qmp_get_function_number(int slv_port_id)
+{
+	if (slv_port_id == QMP_SDCA_NORMAL_PORT)
+		return FUNC_NUM_SMP_MIC1;
+	else if (slv_port_id == QMP_SDCA_LP_PORT)
+		return FUNC_NUM_SMP_MIC2;
+
+	return FUNC_NUM_SMP_MIC1;
+}
+
+static int wait_for_pde_state(struct qmp_sdca_dmic_priv *qmp, int ps, int func_num)
+{
+	int act_ps, cnt = 0, clock_valid;
+	int rc = 0;
+
+	do {
+		usleep_range(1000, 1500);
+		/* wait and read actual_PS */
+		rc = regmap_read(qmp->regmap,
+				SDW_SDCA_CTL(func_num, QMP_SDCA_ENT_PDE11,
+					QMP_SDCA_CTL_PDE_ACT_PS, QMP_SDCA_CTL_NUM0),
+				&act_ps);
+
+		if (rc == 0 && act_ps == ps)
+			return rc;
+	} while (++cnt < 5);
+
+	regmap_read(qmp->regmap,
+		SDW_SDCA_CTL(func_num, QMP_SDCA_ENT_ITCS,
+		QMP_SDCA_CTL_CLOCK_VALID, QMP_SDCA_CTL_NUM0),
+			&clock_valid);
+	dev_err(qmp->dev, "qmp ps%d request failed, func num %d act_ps %d, cs_valid:%d\n",
+		ps, func_num, act_ps, clock_valid);
+
+	return -EINVAL;
+
+}
 
 static int qmp_enable_regulator(struct qmp_sdca_dmic_priv *qmp)
 {
@@ -362,6 +399,19 @@ static int qmp_init(struct qmp_sdca_dmic_priv *qmp)
 	return 0;
 }
 
+
+
+static int qmp_get_usage_mode(struct qmp_sdca_dmic_priv *qmp, int function_number)
+{
+	if (function_number == FUNC_NUM_SMP_MIC1)
+		return qmp->fu1_usage_mode;
+
+	if (function_number == FUNC_NUM_SMP_MIC2)
+		return qmp->fu2_usage_mode;
+
+	return qmp->fu1_usage_mode;
+}
+
 static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 		struct snd_soc_dai *dai)
 {
@@ -393,13 +443,22 @@ static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 
 	/* Get logical address */
 	usleep_range(5000, 5500);
-
-	while (swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num) && retry--) {
+	ret = swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num);
+	while (ret && retry--) {
 		dev_err(qmp->dev, "error while getting logical device number\n");
 		/* Retry after 1 msec delay */
-		usleep_range(1000, 1100);
-		if (retry == 0)
-			goto err;
+		qmp_disable_regulator(qmp);
+		usleep_range(1000, 1500);
+		qmp_enable_regulator(qmp);
+		usleep_range(1000, 1500);
+		ret = swr_get_logical_dev_num(qmp->swr_slave, qmp->swr_slave->addr, &dev_num);
+	}
+	if (ret) {
+		dev_err(qmp->dev,
+			"%s get devnum %d for dev addr %llx failed\n",
+			__func__, dev_num, qmp->swr_slave->addr);
+		qmp_disable_regulator(qmp);
+		return -EINVAL;
 	}
 	dev_dbg(qmp->dev, "%s: devnum: %d\n", __func__, dev_num);
 
@@ -418,7 +477,6 @@ static int qmp_sdca_dmic_startup(struct snd_pcm_substream *substream,
 	qmp->master_port_map_cached[dai->id] = qmp->tx_master_port_map[dai->id];
 	update_ch_per_substream(qmp->dai_status_mask, substream);
 
-err:
 	return 0;
 }
 
@@ -431,6 +489,9 @@ static int qmp_sdca_dmic_hw_params(struct snd_pcm_substream *substream,
 	u8 port_type = 0;
 	u32 ch_rate;
 	int rc;
+	u8 slv_port_id = dai_id_to_port_id(dai->id);
+	unsigned char ps0 = 0x0;
+	int function_number, usage_mode;
 
 	if (!qmp->swr_slave)
 		return -EINVAL;
@@ -455,6 +516,45 @@ static int qmp_sdca_dmic_hw_params(struct snd_pcm_substream *substream,
 	else
 		dev_dbg(qmp->dev, "dai_name:%s, add channel %s done\n", dai->name,
 			master_port_type_to_str(port_type));
+
+	function_number = qmp_get_function_number(slv_port_id);
+
+	qmp->fu1_pde11_en_ref_count++;
+	dev_dbg(component->dev, "(current) fu1 pde11 ref count:%d\n",
+		qmp->fu1_pde11_en_ref_count);
+
+	if (qmp->fu1_pde11_en_ref_count > 1)
+		return rc;
+
+	/* Set Usage mode for the Function */
+	usage_mode = qmp_get_usage_mode(qmp, function_number);
+
+	if (!qmp->reg_set.reg) {
+		regmap_write(qmp->regmap,
+			SDW_SDCA_CTL(function_number, QMP_SDCA_ENT_IT11,
+				QMP_SDCA_CTL_IT_USAGE, QMP_SDCA_CTL_NUM0),
+			usage_mode);
+	} else {
+		rc = regmap_write(qmp->regmap, qmp->reg_set.reg, qmp->reg_set.value);
+		if (rc)
+			dev_err(component->dev, "failed to set QMP usage mode\n");
+		qmp->reg_set.reg = 0;
+		qmp->reg_set.value = 0;
+	}
+
+	/* Set PDE11 control */
+	regmap_write(qmp->regmap,
+		SDW_SDCA_CTL(function_number, QMP_SDCA_ENT_PDE11,
+			QMP_SDCA_CTL_PDE_REQ_PS, QMP_SDCA_CTL_NUM0),
+		ps0);
+
+	rc = wait_for_pde_state(qmp, ps0, function_number);
+	if (!rc) {
+		dev_dbg(component->dev, "success! function %d, actual ps %d",
+				function_number, ps0);
+	} else {
+		return -EINVAL;
+	}
 	return rc;
 }
 
@@ -526,6 +626,9 @@ static int qmp_sdca_dmic_hw_free(struct snd_pcm_substream *substream,
 	struct qmp_sdca_dmic_priv *qmp = snd_soc_component_get_drvdata(component);
 	u8 port_type = 0;
 	int ret;
+	u8 slv_port_id = dai_id_to_port_id(dai->id);
+	unsigned char  ps3 = 0x3;
+	int function_number;
 
 	if (!qmp->swr_slave)
 		return -EINVAL;
@@ -541,6 +644,26 @@ static int qmp_sdca_dmic_hw_free(struct snd_pcm_substream *substream,
 	ret = stream_agg_remove_channel((void *)substream, port_type,
 				dai_id_to_port_id(dai->id), qmp->swr_slave->dev_num);
 
+	function_number = qmp_get_function_number(slv_port_id);
+
+	if (function_number == FUNC_NUM_SMP_MIC1) {
+		qmp->fu1_pde11_en_ref_count--;
+		if (qmp->fu1_pde11_en_ref_count < 0)
+			qmp->fu1_pde11_en_ref_count = 0;
+			dev_dbg(component->dev, "fu1 pde11 ref count:%d\n",
+				qmp->fu1_pde11_en_ref_count);
+		if (qmp->fu1_pde11_en_ref_count > 0)
+			return 0;
+	}
+	/* Set PDE11 control */
+	regmap_write(qmp->regmap,
+		SDW_SDCA_CTL(function_number, QMP_SDCA_ENT_PDE11,
+			QMP_SDCA_CTL_PDE_REQ_PS, QMP_SDCA_CTL_NUM0),
+		ps3);
+	ret = wait_for_pde_state(qmp, ps3, function_number);
+	if (!ret)
+		dev_dbg(component->dev, "success! function %d, actual ps %d",
+			function_number, ps3);
 	return 0;
 }
 
@@ -856,152 +979,10 @@ static const struct snd_kcontrol_new qmp_dmic_lp_switch[] = {
 	SOC_DAPM_SINGLE("Enable", SND_SOC_NOPM, 0, 1, 0)
 };
 
-
-static int qmp_get_function_number(int slv_port_id)
-{
-	if (slv_port_id == QMP_SDCA_NORMAL_PORT)
-		return FUNC_NUM_SMP_MIC1;
-	else if (slv_port_id == QMP_SDCA_LP_PORT)
-		return FUNC_NUM_SMP_MIC2;
-
-	return FUNC_NUM_SMP_MIC1;
-}
-
-static int qmp_get_usage_mode(struct qmp_sdca_dmic_priv *qmp, int function_number)
-{
-	if (function_number == FUNC_NUM_SMP_MIC1)
-		return qmp->fu1_usage_mode;
-
-	if (function_number == FUNC_NUM_SMP_MIC2)
-		return qmp->fu2_usage_mode;
-
-	return qmp->fu1_usage_mode;
-}
-
-
-static int wait_for_pde_state(struct qmp_sdca_dmic_priv *qmp, int ps, int func_num)
-{
-	int act_ps, cnt = 0, clock_valid;
-	int rc = 0;
-
-	do {
-		usleep_range(1000, 1500);
-		/* wait and read actual_PS */
-		rc = regmap_read(qmp->regmap,
-				SDW_SDCA_CTL(func_num, QMP_SDCA_ENT_PDE11,
-					QMP_SDCA_CTL_PDE_ACT_PS, QMP_SDCA_CTL_NUM0),
-				&act_ps);
-
-		if (rc == 0 && act_ps == ps)
-			return rc;
-	} while (++cnt < 5);
-
-	regmap_read(qmp->regmap,
-		SDW_SDCA_CTL(func_num, QMP_SDCA_ENT_ITCS,
-		QMP_SDCA_CTL_CLOCK_VALID, QMP_SDCA_CTL_NUM0),
-			&clock_valid);
-	dev_err(qmp->dev, "qmp ps%d request failed, func num %d act_ps %d, cs_valid:%d\n",
-		ps, func_num, act_ps, clock_valid);
-
-	return -EINVAL;
-
-}
-
-static int qmp_dmic_pde11_event(struct snd_soc_dapm_widget *w,
-		struct snd_kcontrol *kcontrol, int event)
-{
-	struct snd_soc_component *component = snd_soc_dapm_to_component(w->dapm);
-	struct qmp_sdca_dmic_priv *qmp = snd_soc_component_get_drvdata(component);
-	int ret = 0;
-	u8 slv_port_id = w->shift;
-	unsigned char ps0 = 0x0, ps3 = 0x3;
-	int function_number, usage_mode;
-
-	if (slv_port_id >= QMP_SDCA_DMIC_MAX_PORTS) {
-		dev_err_ratelimited(component->dev, "invalid slv port id: %d\n", slv_port_id);
-		return -EINVAL;
-	}
-	function_number = qmp_get_function_number(slv_port_id);
-
-	dev_dbg(component->dev, "pde11 event for slv port id %d, func %d event: %d\n",
-			(slv_port_id + 1), function_number, event);
-
-	switch (event) {
-	case SND_SOC_DAPM_PRE_PMU:
-		if (function_number == FUNC_NUM_SMP_MIC1) {
-			qmp->fu1_pde11_en_ref_count++;
-			dev_dbg(component->dev, "(current) fu1 pde11 ref count:%d\n",
-					qmp->fu1_pde11_en_ref_count);
-			if (qmp->fu1_pde11_en_ref_count > 1)
-				goto exit;
-		}
-		/* Set Usage mode for the Function */
-		usage_mode = qmp_get_usage_mode(qmp, function_number);
-		if (!qmp->reg_set.reg) {
-			regmap_write(qmp->regmap,
-				SDW_SDCA_CTL(function_number, QMP_SDCA_ENT_IT11,
-					QMP_SDCA_CTL_IT_USAGE, QMP_SDCA_CTL_NUM0),
-				usage_mode);
-		} else {
-			ret = regmap_write(qmp->regmap, qmp->reg_set.reg, qmp->reg_set.value);
-			if (ret)
-				dev_err(component->dev, "failed to set QMP usage mode\n");
-			qmp->reg_set.reg = 0;
-			qmp->reg_set.value = 0;
-		}
-
-		/* Set PDE11 control */
-		regmap_write(qmp->regmap,
-			SDW_SDCA_CTL(function_number, QMP_SDCA_ENT_PDE11,
-				QMP_SDCA_CTL_PDE_REQ_PS, QMP_SDCA_CTL_NUM0),
-			ps0);
-
-		ret = wait_for_pde_state(qmp, ps0, function_number);
-		if (!ret)
-			dev_dbg(component->dev, "success! function %d, actual ps %d",
-					function_number, ps0);
-		break;
-	case SND_SOC_DAPM_POST_PMD:
-		if (function_number == FUNC_NUM_SMP_MIC1) {
-			qmp->fu1_pde11_en_ref_count--;
-			if (qmp->fu1_pde11_en_ref_count < 0)
-				qmp->fu1_pde11_en_ref_count = 0;
-
-			dev_dbg(component->dev, "fu1 pde11 ref count:%d\n",
-					qmp->fu1_pde11_en_ref_count);
-			if (qmp->fu1_pde11_en_ref_count > 0)
-				goto exit;
-		}
-		/* Set PDE11 control */
-		regmap_write(qmp->regmap,
-			SDW_SDCA_CTL(function_number, QMP_SDCA_ENT_PDE11,
-				QMP_SDCA_CTL_PDE_REQ_PS, QMP_SDCA_CTL_NUM0),
-			ps3);
-		ret = wait_for_pde_state(qmp, ps3, function_number);
-		if (!ret)
-			dev_dbg(component->dev, "success! function %d, actual ps %d",
-					function_number, ps3);
-		break;
-	}
-exit:
-	return ret;
-}
-
 static const struct snd_soc_dapm_widget qmp_dmic_dapm_widgets[] = {
 	SND_SOC_DAPM_INPUT("QMP_DMIC VA Function1"),
 	SND_SOC_DAPM_INPUT("QMP_DMIC Function1"),
 	SND_SOC_DAPM_INPUT("QMP_DMIC Function2"),
-
-	SND_SOC_DAPM_MIXER_E("FU1 PDE11", SND_SOC_NOPM, QMP_SDCA_NORMAL_PORT, 0,
-			qmp_dmic_normal_switch, ARRAY_SIZE(qmp_dmic_normal_switch),
-			qmp_dmic_pde11_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-
-	SND_SOC_DAPM_MIXER_E("FU1 PDE11 VA", SND_SOC_NOPM, QMP_SDCA_NORMAL_PORT, 0,
-			qmp_dmic_va_normal_switch, ARRAY_SIZE(qmp_dmic_va_normal_switch),
-			qmp_dmic_pde11_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_MIXER_E("FU2 PDE11", SND_SOC_NOPM, QMP_SDCA_LP_PORT, 0,
-			qmp_dmic_lp_switch, ARRAY_SIZE(qmp_dmic_lp_switch),
-			qmp_dmic_pde11_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_OUTPUT("NORMAL_OUTPUT"),
 	SND_SOC_DAPM_OUTPUT("VA_NORMAL_OUTPUT"),
@@ -1014,12 +995,9 @@ static const struct snd_soc_dapm_route qmp_dmic_audio_map[] = {
 	{"QMP_DMIC VA Function1", NULL, "QMP VA Digital Mic"},
 	{"QMP_DMIC Function1", NULL, "QMP Digital Mic"},
 	{"QMP_DMIC Function2", NULL, "QMP Digital Mic"},
-	{"FU1 PDE11", "Enable", "QMP_DMIC Function1"},
-	{"FU1 PDE11 VA", "Enable", "QMP_DMIC VA Function1"},
-	{"NORMAL_OUTPUT", NULL, "FU1 PDE11"},
-	{"VA_NORMAL_OUTPUT", NULL, "FU1 PDE11 VA"},
-	{"FU2 PDE11", "Enable", "QMP_DMIC Function2"},
-	{"LP_OUTPUT", NULL, "FU2 PDE11"},
+	{"NORMAL_OUTPUT", NULL, "QMP_DMIC Function1"},
+	{"VA_NORMAL_OUTPUT", NULL, "QMP_DMIC VA Function1"},
+	{"LP_OUTPUT", NULL, "QMP_DMIC Function2"},
 };
 
 static int qmp_dmic_component_probe(struct snd_soc_component *component)

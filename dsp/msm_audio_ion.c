@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -33,7 +33,11 @@
 #include <soc/qcom/secure_buffer.h>
 #include <linux/of.h>
 
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
+MODULE_IMPORT_NS("DMA_BUF");
+#else
 MODULE_IMPORT_NS(DMA_BUF);
+#endif
 
 #define MSM_AUDIO_ION_PROBED (1 << 0)
 

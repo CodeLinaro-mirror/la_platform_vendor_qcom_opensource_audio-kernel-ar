@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -1051,7 +1051,8 @@ void swr_unregister_master(struct swr_master *master)
 		return;
 
 	mutex_lock(&board_lock);
-	list_del(&master->list);
+	if (!list_empty(&master->list)) // Check if the list is non-empty
+		list_del(&master->list);
 	mutex_unlock(&board_lock);
 
 	/* free bus id */
