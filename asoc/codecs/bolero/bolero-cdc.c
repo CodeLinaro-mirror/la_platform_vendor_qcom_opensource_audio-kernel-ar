@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/of_platform.h>
@@ -11,6 +11,7 @@
 #include <linux/printk.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/clk.h>
 #include <soc/snd_event.h>
 #include <linux/pm_runtime.h>
@@ -1325,7 +1326,7 @@ static void bolero_add_child_devices(struct work_struct *work)
 				__func__);
 		}
 
-		strlcpy(plat_dev_name, node->name,
+		strscpy(plat_dev_name, node->name,
 				(BOLERO_CDC_STRING_LEN - 1));
 
 		pdev = platform_device_alloc(plat_dev_name, -1);
@@ -1466,18 +1467,30 @@ static int bolero_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void bolero_remove(struct platform_device *pdev)
+#else
 static int bolero_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct bolero_priv *priv = dev_get_drvdata(&pdev->dev);
 
-	if (!priv)
-		return -EINVAL;
+	if (!priv) {
+                rc = -EINVAL;
+                goto exit;
+        }
 
 	of_platform_depopulate(&pdev->dev);
 	mutex_destroy(&priv->io_lock);
 	mutex_destroy(&priv->clk_lock);
 	mutex_destroy(&priv->vote_lock);
-	return 0;
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+        return;
+#else
+        return rc;
+#endif
 }
 
 #ifdef CONFIG_PM

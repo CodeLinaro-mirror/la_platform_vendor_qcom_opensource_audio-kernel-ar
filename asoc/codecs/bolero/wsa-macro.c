@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -8,6 +8,7 @@
 #include <linux/io.h>
 #include <linux/platform_device.h>
 #include <linux/clk.h>
+#include <linux/version.h>
 #include <linux/pm_runtime.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -147,9 +148,16 @@ static int wsa_macro_core_vote(void *handle, bool enable);
 static int wsa_macro_hw_params(struct snd_pcm_substream *substream,
 			       struct snd_pcm_hw_params *params,
 			       struct snd_soc_dai *dai);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int wsa_macro_get_channel_map( const struct snd_soc_dai *dai,
+				unsigned int *tx_num, unsigned int *tx_slot,
+				unsigned int *rx_num, unsigned int *rx_slot);
+#else
 static int wsa_macro_get_channel_map(struct snd_soc_dai *dai,
 				unsigned int *tx_num, unsigned int *tx_slot,
 				unsigned int *rx_num, unsigned int *rx_slot);
+#endif
+
 static int wsa_macro_mute_stream(struct snd_soc_dai *dai, int mute, int stream);
 /* Hold instance to soundwire platform device */
 struct wsa_macro_swr_ctrl_data {
@@ -782,15 +790,23 @@ static int wsa_macro_hw_params(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_STREAM_CAPTURE:
 		if (dai->id == WSA_MACRO_AIF_VI)
 			wsa_priv->pcm_rate_vi = params_rate(params);
+		break;
 	default:
 		break;
 	}
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int wsa_macro_get_channel_map( const struct snd_soc_dai *dai,
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot)
+#else
 static int wsa_macro_get_channel_map(struct snd_soc_dai *dai,
-				unsigned int *tx_num, unsigned int *tx_slot,
-				unsigned int *rx_num, unsigned int *rx_slot)
+                                unsigned int *tx_num, unsigned int *tx_slot,
+                                unsigned int *rx_num, unsigned int *rx_slot)
+#endif
+
 {
 	struct snd_soc_component *component = dai->component;
 	struct device *wsa_dev = NULL;
@@ -1969,7 +1985,7 @@ static int wsa_macro_get_ec_hq(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int ec_tx = ((struct soc_multi_mixer_control *)
+	int ec_tx = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct device *wsa_dev = NULL;
 	struct wsa_macro_priv *wsa_priv = NULL;
@@ -1986,7 +2002,7 @@ static int wsa_macro_set_ec_hq(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int ec_tx = ((struct soc_multi_mixer_control *)
+	int ec_tx = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 	struct device *wsa_dev = NULL;
@@ -2010,7 +2026,7 @@ static int wsa_macro_get_rx_mute_status(struct snd_kcontrol *kcontrol,
 				snd_soc_kcontrol_component(kcontrol);
 	struct device *wsa_dev = NULL;
 	struct wsa_macro_priv *wsa_priv = NULL;
-	int wsa_rx_shift = ((struct soc_multi_mixer_control *)
+	int wsa_rx_shift = ((struct soc_mixer_control *)
 		       kcontrol->private_value)->shift;
 
 	if (!wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
@@ -2029,7 +2045,7 @@ static int wsa_macro_set_rx_mute_status(struct snd_kcontrol *kcontrol,
 	struct device *wsa_dev = NULL;
 	struct wsa_macro_priv *wsa_priv = NULL;
 	int value = ucontrol->value.integer.value[0];
-	int wsa_rx_shift = ((struct soc_multi_mixer_control *)
+	int wsa_rx_shift = ((struct soc_mixer_control *)
 			kcontrol->private_value)->shift;
 	int ret = 0;
 
@@ -2079,7 +2095,7 @@ static int wsa_macro_get_compander(struct snd_kcontrol *kcontrol,
 
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct device *wsa_dev = NULL;
 	struct wsa_macro_priv *wsa_priv = NULL;
@@ -2096,7 +2112,7 @@ static int wsa_macro_set_compander(struct snd_kcontrol *kcontrol,
 {
 	struct snd_soc_component *component =
 				snd_soc_kcontrol_component(kcontrol);
-	int comp = ((struct soc_multi_mixer_control *)
+	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
 	struct device *wsa_dev = NULL;
@@ -2374,7 +2390,7 @@ static int wsa_macro_soft_clip_enable_get(struct snd_kcontrol *kcontrol,
 			snd_soc_kcontrol_component(kcontrol);
 	struct device *wsa_dev = NULL;
 	struct wsa_macro_priv *wsa_priv = NULL;
-	int path = ((struct soc_multi_mixer_control *)
+	int path = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 
 	if (!wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
@@ -2395,7 +2411,7 @@ static int wsa_macro_soft_clip_enable_put(struct snd_kcontrol *kcontrol,
 			snd_soc_kcontrol_component(kcontrol);
 	struct device *wsa_dev = NULL;
 	struct wsa_macro_priv *wsa_priv = NULL;
-	int path = ((struct soc_multi_mixer_control *)
+	int path = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 
 	if (!wsa_macro_get_data(component, &wsa_dev, &wsa_priv, __func__))
@@ -2484,8 +2500,8 @@ static int wsa_macro_vi_feed_mixer_get(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_kcontrol_widget(kcontrol);
 	struct snd_soc_component *component =
 				snd_soc_dapm_to_component(widget->dapm);
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 dai_id = widget->shift;
 	u32 spk_tx_id = mixer->shift;
 	struct device *wsa_dev = NULL;
@@ -2509,8 +2525,8 @@ static int wsa_macro_vi_feed_mixer_put(struct snd_kcontrol *kcontrol,
 		snd_soc_dapm_kcontrol_widget(kcontrol);
 	struct snd_soc_component *component =
 				snd_soc_dapm_to_component(widget->dapm);
-	struct soc_multi_mixer_control *mixer =
-		((struct soc_multi_mixer_control *)kcontrol->private_value);
+	struct soc_mixer_control *mixer =
+		((struct soc_mixer_control *)kcontrol->private_value);
 	u32 spk_tx_id = mixer->shift;
 	u32 enable = ucontrol->value.integer.value[0];
 	struct device *wsa_dev = NULL;
@@ -3100,11 +3116,11 @@ static void wsa_macro_add_child_devices(struct work_struct *work)
 	for_each_available_child_of_node(wsa_priv->dev->of_node, node) {
 		if (strnstr(node->name, "wsa_swr_master",
 				strlen("wsa_swr_master")) != NULL)
-			strlcpy(plat_dev_name, "wsa_swr_ctrl",
+			strscpy(plat_dev_name, "wsa_swr_ctrl",
 				(WSA_MACRO_SWR_STRING_LEN - 1));
 		else if (strnstr(node->name, "msm_cdc_pinctrl",
 				 strlen("msm_cdc_pinctrl")) != NULL)
-			strlcpy(plat_dev_name, node->name,
+			strscpy(plat_dev_name, node->name,
 				(WSA_MACRO_SWR_STRING_LEN - 1));
 		else
 			continue;
@@ -3305,15 +3321,22 @@ reg_macro_fail:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void wsa_macro_remove(struct platform_device *pdev)
+#else
 static int wsa_macro_remove(struct platform_device *pdev)
+#endif
 {
+	int rc = 0;
 	struct wsa_macro_priv *wsa_priv;
 	u16 count = 0;
 
 	wsa_priv = dev_get_drvdata(&pdev->dev);
 
-	if (!wsa_priv)
-		return -EINVAL;
+	if (!wsa_priv) {
+                rc = -EINVAL;
+                goto exit;
+        }
 
 	for (count = 0; count < wsa_priv->child_count &&
 		count < WSA_MACRO_CHILD_DEVICES_MAX; count++)
@@ -3324,7 +3347,13 @@ static int wsa_macro_remove(struct platform_device *pdev)
 	bolero_unregister_macro(&pdev->dev, WSA_MACRO);
 	mutex_destroy(&wsa_priv->mclk_lock);
 	mutex_destroy(&wsa_priv->swr_clk_lock);
-	return 0;
+
+exit:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+        return;
+#else
+        return rc;
+#endif
 }
 
 static const struct of_device_id wsa_macro_dt_match[] = {

@@ -102,6 +102,11 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/qcs405autoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_YUPIK), y)
+                include $(AUDIO_ROOT)/config/lahainaauto.conf
+                export
+                INCS    +=  -include $(AUDIO_ROOT)/config/lahainaautoconf.h
+        endif
 	ifeq ($(CONFIG_QTI_QUIN_GVM), y)
 		include $(AUDIO_ROOT)/config/gvmauto.conf
 		export
@@ -188,6 +193,10 @@ endif
 
 ifdef CONFIG_SND_SOC_SWR_DMIC
        SWR_DMIC_OBJS += swr-dmic.o
+endif
+
+ifdef CONFIG_SND_SOC_SWR_DMIC_LEGACY
+       SWR_DMIC_LEGACY_OBJS += swr-dmic.o
 endif
 
 ifdef CONFIG_SND_SOC_WSA881X_ANALOG
@@ -301,6 +310,9 @@ wsa881x_dlkm-y := $(WSA881X_OBJS)
 
 obj-$(CONFIG_SND_SOC_SWR_DMIC) += swr_dmic_dlkm.o
 swr_dmic_dlkm-y := $(SWR_DMIC_OBJS)
+
+obj-$(CONFIG_SND_SOC_SWR_DMIC_LEGACY) += swr_dmic_legacy_dlkm.o
+swr_dmic_legacy_dlkm-y := $(SWR_DMIC_LEGACY_OBJS)
 
 obj-$(CONFIG_SND_SOC_WSA881X_ANALOG) += wsa881x_analog_dlkm.o
 wsa881x_analog_dlkm-y := $(WSA881X_ANALOG_OBJS)
