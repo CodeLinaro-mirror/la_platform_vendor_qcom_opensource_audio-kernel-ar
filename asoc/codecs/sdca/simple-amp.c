@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024 - 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -2264,11 +2264,13 @@ static const struct dev_pm_ops simple_amp_pm_ops = {
 
 static const struct of_device_id simple_amp_dt_match[] = {
 	{ .compatible = "qcom,simple-sdca-amp", },
+	{ .compatible = "qcom,simple-sdca-amp-2", },
 	{ /* sentinel */ }
 };
 
 static const struct swr_device_id simple_amp_id[] = {
 	{"simple-sdca-amp", 0},
+	{"simple-sdca-amp-2", 0},
 	{}
 };
 
