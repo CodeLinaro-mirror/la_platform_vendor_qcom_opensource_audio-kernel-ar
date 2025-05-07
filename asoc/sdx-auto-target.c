@@ -303,6 +303,8 @@ static int sdx_sec_mi2s_startup(struct snd_pcm_substream *substream)
 	int ret = 0;
 
 	pdata->sec_mi2s_mode = sdx_sec_mi2s_mode;
+	if (!rtd->dai_link->no_pcm)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
 	if (atomic_inc_return(&sec_mi2s_ref_count) == 1) {
 
 		ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
@@ -668,6 +670,9 @@ static int sdx_auxpcm_startup(struct snd_pcm_substream *substream)
 
 	pdata->prim_auxpcm_mode = sdx_auxpcm_mode;
 
+	if (!rtd->dai_link->no_pcm)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
+
 	ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
 	if (ret < 0) {
 		dev_err(card->dev,
@@ -737,7 +742,8 @@ static int sdx_sec_auxpcm_startup(struct snd_pcm_substream *substream)
 	int ret = 0;
 
 	pdata->sec_auxpcm_mode = sdx_sec_auxpcm_mode;
-
+	if (!rtd->dai_link->no_pcm)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
 	ret = audio_prm_set_lpass_core_clk_req( NULL, 1, 1);
 	if (ret < 0) {
 		dev_err(card->dev,
