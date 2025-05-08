@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -46,7 +46,7 @@ struct snd_card_pdata {
 #define DIR_SZ 10
 
 #define MAX_CODEC_DAI 8
-#define TDM_SLOT_WIDTH_BITS 32
+#define TDM_SLOT_WIDTH_BITS 16
 #define TDM_MAX_SLOTS 8
 #define MI2S_NUM_CHANNELS 2
 
