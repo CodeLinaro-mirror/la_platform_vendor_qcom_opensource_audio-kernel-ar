@@ -30,6 +30,8 @@
 #include <linux/msm_audio.h>
 #include <linux/qcom_scm.h>
 #include <soc/qcom/secure_buffer.h>
+#include <bindings/qcom,gpr.h>
+#include <linux/of_reserved_mem.h>
 
 MODULE_IMPORT_NS(DMA_BUF);
 
@@ -86,8 +88,24 @@ struct msm_audio_fd_data {
 	dma_addr_t paddr;
 	struct device *dev;
 	struct list_head list;
+	u64 ss_masks;
 	bool hyp_assign;
 };
+
+static enum vmid msm_audio_map_mdf_domain(int domain) {
+	switch (domain) {
+		case GPR_DOMAIN_ADSP:
+			return VMID_ADSP_Q6;
+		case GPR_DOMAIN_MODEM:
+			return VMID_MSS_MSA;
+		case GPR_DOMAIN_SDSP:
+			return VMID_SSC_Q6;
+		case GPR_DOMAIN_APPS:
+			return VMID_HLOS;
+		default:
+			return VMID_INVAL;
+	}
+}
 
 static void msm_audio_ion_add_allocation(
 	struct msm_audio_ion_private *msm_audio_ion_data,
@@ -452,6 +470,26 @@ int msm_audio_get_phy_addr(int fd, dma_addr_t *paddr, size_t *pa_len)
 }
 EXPORT_SYMBOL(msm_audio_get_phy_addr);
 
+int msm_audio_set_ss_masks(int fd, u64 ss_masks)
+{
+	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
+	int status = -EINVAL;
+	pr_debug("%s, fd %d\n", __func__, fd);
+	mutex_lock(&(msm_audio_ion_fd_list.list_mutex));
+	list_for_each_entry(msm_audio_fd_data,
+			&msm_audio_ion_fd_list.fd_list, list) {
+		if (msm_audio_fd_data->fd == fd) {
+			status = 0;
+			pr_debug("%s Found fd %d\n", __func__, fd);
+			msm_audio_fd_data->ss_masks = ss_masks;
+			mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
+			return status;
+		}
+	}
+	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
+	return status;
+}
+
 static int msm_audio_set_hyp_assign(int fd, bool assign)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
@@ -635,8 +673,17 @@ void msm_audio_ion_crash_handler(void)
 			handle = msm_audio_fd_data->handle;
 			ion_data = dev_get_drvdata(msm_audio_fd_data->dev);
 			/*  clean if CMA was used*/
-			if (msm_audio_fd_data->hyp_assign)
+			/*
+			 * TODO: assigned memory to adsp, mdsp & sdsp cannot be reclaimed,
+			 * caused  by a known issue from TZ.
+			 * After TZ fixes the issue, the memory can have the common handling
+			 */
+			if (msm_audio_fd_data->hyp_assign) {
+				if (msm_audio_fd_data->ss_masks == (0x1|0x2|0x8)) {
+					continue;
+				}
 				msm_audio_hyp_unassign(msm_audio_fd_data);
+			}
 			if(handle)
 				msm_audio_ion_free(handle, ion_data);
 		}
@@ -681,6 +728,90 @@ static int msm_audio_ion_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+
+static int msm_audio_hyp_assign_for_subsystems(int fd, u64 ss_masks)
+{
+	int i = 0 , count = 0;
+	int ret = 0;
+	dma_addr_t paddr;
+	size_t pa_len = 0;
+
+	u64 mdf_src_vmid_list = BIT(VMID_HLOS);
+	struct qcom_scm_vmperm dst_vmids[GPR_DOMAIN_MAX] = {0};
+
+	ret = msm_audio_get_phy_addr(fd, &paddr, &pa_len);
+	if (ret < 0) {
+		pr_err("%s get phys addr failed %d\n", __func__, ret);
+		return ret;
+	}
+
+	for (i = GPR_DOMAIN_MODEM; i < GPR_DOMAIN_MAX; i++) {
+		if (ss_masks & (1 << (i - 1))) {
+			dst_vmids[count].vmid = msm_audio_map_mdf_domain(i);
+			dst_vmids[count].perm = PERM_READ | PERM_WRITE | PERM_EXEC;
+			count++;
+		}
+	}
+
+	ret = qcom_scm_assign_mem(paddr, pa_len, &mdf_src_vmid_list, dst_vmids, count);
+
+	if (ret < 0) {
+		pr_err("%s: hyp assign failed result = %d addr = 0x%lld size = %ld\n",
+				__func__, ret, paddr, pa_len);
+		return ret;
+	}
+	pr_debug("%s: mdf hyp assign success\n", __func__);
+	msm_audio_set_ss_masks(fd, ss_masks);
+	msm_audio_set_hyp_assign(fd, true);
+	return ret;
+}
+
+static int msm_audio_hyp_unassign_for_subsystems(int fd, u64 ss_masks)
+{
+	int i = 0;
+	int ret = 0;
+	dma_addr_t paddr;
+	size_t pa_len = 0;
+
+	u64 mdf_src_vmid_list = 0;
+	struct qcom_scm_vmperm dst_vmids[1] =
+		{{VMID_HLOS, PERM_READ | PERM_WRITE | PERM_EXEC}};
+
+	/*
+	* TODO: assigned memory to adsp, mdsp & sdsp cannot be reclaimed,
+	* caused  by a known issue from TZ.
+	* After TZ fixes the issue, the memory can have the common handling
+	*/
+	if (ss_masks == (0x1|0x2|0x8)) {
+		pr_err("%s hyp unassign is not support from adsp, mdsp and sdsp\n", __func__);
+		return ret;
+	}
+
+	ret = msm_audio_get_phy_addr(fd, &paddr, &pa_len);
+	if (ret < 0) {
+		pr_err("%s get phys addr failed %d\n", __func__, ret);
+		return ret;
+	}
+
+	for (i = GPR_DOMAIN_MODEM; i < GPR_DOMAIN_MAX; i++) {
+		if (ss_masks & (1 << (i - 1))) {
+			mdf_src_vmid_list |= BIT(msm_audio_map_mdf_domain(i));
+		}
+	}
+
+	ret = qcom_scm_assign_mem(paddr, pa_len, &mdf_src_vmid_list, dst_vmids, 1);
+
+	if (ret < 0) {
+		pr_err("%s: hyp assign failed result = %d addr = 0x%lld size = %ld\n",
+				__func__, ret, paddr, pa_len);
+		return ret;
+	}
+	pr_debug("%s: mdf hyp assign success\n", __func__);
+	msm_audio_set_ss_masks(fd, 0);
+	msm_audio_set_hyp_assign(fd, false);
+	return ret;
+}
+
 static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 				unsigned long __user ioctl_param)
 {
@@ -695,6 +826,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	u64 src_vmid_unmap_list = BIT(VMID_LPASS) | BIT(VMID_ADSP_HEAP);
 	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
 		PERM_READ | PERM_WRITE | PERM_EXEC}};
+	struct msm_mdf_data mdf_data = {0};
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	struct msm_audio_ion_private *ion_data =
 			container_of(file->f_inode->i_cdev, struct msm_audio_ion_private, cdev);
@@ -723,6 +855,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		msm_audio_fd_data->handle = mem_handle;
 		msm_audio_fd_data->paddr = paddr;
 		msm_audio_fd_data->plen = pa_len;
+		msm_audio_fd_data->ss_masks = 0;
 		msm_audio_fd_data->dev = ion_data->cb_dev;
 		msm_audio_update_fd_list(msm_audio_fd_data);
 		break;
@@ -769,6 +902,22 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		pr_debug("%s: qcom scm unassign success\n", __func__);
 		msm_audio_set_hyp_assign((int)ioctl_param, false);
 	    break;
+	case IOCTL_MAP_HYP_ASSIGN_V2:
+		if (copy_from_user(&mdf_data,
+				(void*)ioctl_param,
+				sizeof(struct msm_mdf_data))) {
+			return -EFAULT;
+		}
+		msm_audio_hyp_assign_for_subsystems(mdf_data.mem_fd, mdf_data.ss_masks);
+		break;
+	case IOCTL_UNMAP_HYP_ASSIGN_V2:
+		if (copy_from_user(&mdf_data,
+				(void*)ioctl_param,
+				sizeof(struct msm_mdf_data))) {
+			return -EFAULT;
+		}
+		msm_audio_hyp_unassign_for_subsystems(mdf_data.mem_fd, mdf_data.ss_masks);
+		break;
 	default:
 		pr_err("%s Entered default. Invalid ioctl num %u",
 			__func__, ioctl_num);
@@ -786,6 +935,93 @@ static long msm_audio_ion_ioctl_compat(struct file *file, unsigned int cmd,
 	return msm_audio_ion_ioctl(file, cmd, (unsigned long)compat_ptr(arg));
 }
 #endif
+
+static int __audio_mem_hyp_assign(struct device *dev, int *source_vms,
+				       int source_nelems, int *dest_vms,
+				       int *dest_perms, int dest_nelems)
+{
+	struct device_node *mem_node;
+	struct reserved_mem *rmem;
+	u64 src_vmid_list = 0;
+	struct qcom_scm_vmperm *dst_vmids = NULL;
+	// {{QCOM_SCM_VMID_HLOS, PERM_READ | PERM_WRITE | PERM_EXEC}};
+	int idx = 0;
+
+	dst_vmids = kzalloc(sizeof(struct qcom_scm_vmperm)*dest_nelems, GFP_KERNEL);
+
+	if (!dst_vmids)
+		return -ENOMEM;
+
+	for(idx = 0; idx < source_nelems; idx++) {
+		src_vmid_list |= BIT(source_vms[idx]);
+	}
+
+	for(idx = 0; idx < dest_nelems; idx++) {
+		dst_vmids[idx].vmid = dest_vms[idx];
+		dst_vmids[idx].perm = dest_perms[idx];
+	}
+
+	mem_node = of_parse_phandle(dev->of_node, "memory-region", 0);
+	if (!mem_node) {
+		pr_err("%s: Could not parse memory region\n", __func__);
+		return -EINVAL;
+	}
+
+	rmem = of_reserved_mem_lookup(mem_node);
+	of_node_put(mem_node);
+	if (!rmem) {
+		pr_err("%s: Failed to get rmem\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("%s: hyp_assign_phys addr = 0x%pK size = %pa\n", __func__,
+		 rmem->base, rmem->size);
+
+	return qcom_scm_assign_mem(rmem->base, rmem->size, &src_vmid_list, dst_vmids, dest_nelems);
+
+/*	return hyp_assign_phys(rmem->base, rmem->size, source_vms,
+			       source_nelems, dest_vms, dest_perms,
+			       dest_nelems);
+*/
+}
+
+
+static int audio_mem_hyp_assign(struct device *dev)
+{
+	int source_vm_map[1] = {VMID_HLOS};
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+	int dest_vm_map[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
+	int dest_perms_map[4] = {
+		[0 ... 3] = PERM_READ | PERM_WRITE,
+	};
+#else
+	int dest_vm_map[2] = {VMID_MSS_MSA, VMID_HLOS};
+	int dest_perms_map[2] = {PERM_READ | PERM_WRITE,
+							PERM_READ | PERM_WRITE};
+#endif
+
+	return __audio_mem_hyp_assign(dev, source_vm_map,
+					   ARRAY_SIZE(source_vm_map),
+					   dest_vm_map, dest_perms_map,
+					   ARRAY_SIZE(dest_vm_map));
+}
+
+static int audio_mem_hyp_unassign(struct device *dev)
+{
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+	int source_vm_unmap[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
+#else
+	int source_vm_unmap[2] = {VMID_MSS_MSA, VMID_HLOS};
+#endif
+	int dest_vm_unmap[1] = {VMID_HLOS};
+	int dest_perms_unmap[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
+
+	of_reserved_mem_device_release(dev);
+	return __audio_mem_hyp_assign(dev, source_vm_unmap,
+					   ARRAY_SIZE(source_vm_unmap),
+					   dest_vm_unmap, dest_perms_unmap,
+					   ARRAY_SIZE(dest_vm_unmap));
+}
 
 static const struct of_device_id msm_audio_ion_dt_match[] = {
 	{ .compatible = "qcom,msm-audio-ion" },
@@ -865,7 +1101,9 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	const char *msm_audio_ion_non_hyp = "qcom,non-hyp-assign";
 	const char *msm_audio_ion_smmu = "qcom,smmu-version";
 	const char *msm_audio_ion_smmu_sid_mask = "qcom,smmu-sid-mask";
+	const char *mdm_audio_ion_scm = "qcom,scm-mp-enabled";
 	bool smmu_enabled;
+	bool scm_mp_enabled;
 	bool is_non_hypervisor_en;
 	struct device *dev = &pdev->dev;
 	struct of_phandle_args iommuspec;
@@ -896,8 +1134,20 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 					     msm_audio_ion_dt);
 	msm_audio_ion_data->smmu_enabled = smmu_enabled;
 
-	if (!smmu_enabled)
+	if (!smmu_enabled) {
 		dev_dbg(dev, "%s: SMMU is Disabled\n", __func__);
+
+		scm_mp_enabled = of_property_read_bool(dev->of_node,
+						mdm_audio_ion_scm);
+
+		if (scm_mp_enabled) {
+			dev_dbg(dev, "%s: Calling CMA HYP Assign\n", __func__);
+			rc = audio_mem_hyp_assign(dev);
+			if (rc) {
+				dev_err(dev, "%s: CMA HYP ASSIGN Failed\n", __func__);
+			}
+		}
+	}
 
 #ifndef CONFIG_SPF_CORE
 	q6_state = apr_get_q6_state();
@@ -969,7 +1219,27 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 
 static int msm_audio_ion_remove(struct platform_device *pdev)
 {
+	struct device *dev = &pdev->dev;
+	const char *mdm_audio_ion_scm = "qcom,scm-mp-enabled";
+	bool scm_mp_enabled;
+	int rc = 0;
 	struct msm_audio_ion_private *ion_data = dev_get_drvdata(&pdev->dev);
+
+	if (!ion_data->smmu_enabled) {
+		dev_err(dev, "%s: SMMU is Disabled\n", __func__);
+
+		scm_mp_enabled = of_property_read_bool(dev->of_node,
+						mdm_audio_ion_scm);
+
+		if (scm_mp_enabled) {
+			dev_dbg(dev, "%s: Calling CMA HYP UnAssign\n", __func__);
+			rc = audio_mem_hyp_unassign(dev);
+			if (rc) {
+				dev_err(dev, "%s: CMA HYP ASSIGN Failed\n", __func__);
+			}
+		}
+	}
+
 	ion_data->smmu_enabled = 0;
 	ion_data->device_status = 0;
 	msm_audio_ion_unreg_chrdev(ion_data);
