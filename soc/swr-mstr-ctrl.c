@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/irq.h>
@@ -3218,9 +3218,10 @@ static int swrm_probe(struct platform_device *pdev)
 		swrm->port_mapping[port_num][ch_iter].port_type = port_type;
 
 		if (swrm->master_id == MASTER_ID_BT) {
-			swrm->port_mapping[port_num][ch_iter++].ch_mask = 1;
+			swrm->port_mapping[port_num][ch_iter].ch_mask = 1;
 			if (port_type == FM_AUDIO_TX1)
-				swrm->port_mapping[port_num][ch_iter++].ch_mask = 3;
+				swrm->port_mapping[port_num][ch_iter].ch_mask = 3;
+			ch_iter++;
 		}
 		else
 			swrm->port_mapping[port_num][ch_iter++].ch_mask = ch_mask;
