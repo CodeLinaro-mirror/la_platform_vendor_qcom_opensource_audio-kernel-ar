@@ -203,6 +203,9 @@ audio_modules.register(
         ],
         "CONFIG_SND_SOC_CANOE": [
             "audio_machine.c"
+        ],
+	"CONFIG_SND_SOC_ALOR": [
+            "audio_machine.c"
         ]
     },
     deps = [":%b_spf_core_dlkm",
@@ -214,7 +217,8 @@ audio_modules.register(
             ":%b_wsa883x_dlkm",
             ":%b_wsa884x_dlkm",
             ":%b_snd_event_dlkm",
-	   ],
+            ":%b_wcd9378_dlkm",
+	],
 )
 # >>>> ASOC/CODEC MODULES <<<<
 audio_modules.register(
@@ -259,6 +263,12 @@ audio_modules.register(
             "wcd-mbhc-legacy.c"
         ]
     },
+)
+audio_modules.register(
+    name = "sdca_registers_dlkm",
+    path = ASOC_CODECS_PATH,
+    config_option = "CONFIG_SND_SOC_SDCA_REGISTERS",
+    srcs = ["sdca-registers-api.c"]
 )
 audio_modules.register(
     name = "swr_dmic_dlkm",
@@ -535,6 +545,32 @@ audio_modules.register(
     config_option = "CONFIG_SND_SOC_WCD939X_SLAVE",
     srcs = ["wcd939x-slave.c"],
     deps = [":%b_swr_dlkm"],
+)
+# >>>> WCD9378 MODULES <<<<
+audio_modules.register(
+    name = "wcd9378_dlkm",
+    path = ASOC_CODECS_PATH + "/wcd9378",
+    config_option = "CONFIG_SND_SOC_WCD9378",
+    srcs = [
+        "wcd9378.c",
+        "wcd9378-regmap.c",
+        "wcd9378-tables.c",
+        "wcd9378-mbhc.c",
+    ],
+    deps = [":%b_mbhc_dlkm",
+            ":%b_wcd_core_dlkm",
+            ":%b_wcd9xxx_dlkm",
+            ":%b_swr_dlkm",
+	    ":%b_sdca_registers_dlkm",
+	],
+)
+audio_modules.register(
+    name = "wcd9378_slave_dlkm",
+    path = ASOC_CODECS_PATH + "/wcd9378",
+    config_option = "CONFIG_SND_SOC_WCD9378_SLAVE",
+    srcs = ["wcd9378-slave.c"],
+    deps = [":%b_swr_dlkm",
+	],
 )
 # >>>> QMP1000 MODULES <<<<
 audio_modules.register(

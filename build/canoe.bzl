@@ -26,6 +26,7 @@ def define_canoe():
             "swr_dmic_dlkm",
             "wcd9xxx_dlkm",
             "swr_haptics_dlkm",
+	    "sdca_registers_dlkm",
             "stub_dlkm",
             "hdmi_dlkm",
             "lpass_cdc_dlkm",
@@ -39,7 +40,9 @@ def define_canoe():
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
             "wcd939x_dlkm",
-	    "wcd939x_slave_dlkm",
+            "wcd939x_slave_dlkm",
+            "wcd9378_dlkm",
+            "wcd9378_slave_dlkm",
             "lpass_bt_swr_dlkm",
             "qmp_dlkm",
             "simple_amp_dlkm"
