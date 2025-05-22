@@ -28,7 +28,7 @@ ifeq ($(call is-board-platform-in-list,sun),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_SUN=m
 endif
 
-ifeq ($(call is-board-platform-in-list,canoe),true)
+ifeq ($(call is-board-platform-in-list,canoe alor),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_CANOE=m
 endif
 
@@ -38,7 +38,7 @@ LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe alor), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
