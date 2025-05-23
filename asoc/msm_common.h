@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef _MSM_COMMON_H_
 #define _MSM_COMMON_H_
@@ -28,8 +28,10 @@ enum {
 };
 
 typedef enum snd_card_status_t {
-	SND_CARD_STATUS_OFFLINE = 0,
-	SND_CARD_STATUS_ONLINE  = 1,
+	SND_CARD_STATUS_INVALID = -1,
+	SND_CARD_STATUS_OFFLINE,
+	SND_CARD_STATUS_ONLINE,
+	SND_CARD_STATUS_STANDBY,
 } snd_card_status_t;
 
 struct msm_common_pdata {

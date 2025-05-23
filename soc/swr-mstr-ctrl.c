@@ -2659,6 +2659,7 @@ handle_irq:
 				swrm->clk_stop_wakeup = false;
 			}
 			break;
+#ifndef CONFIG_SWRM_VER_1P7
 		case SWRM_INTERRUPT_STATUS_CMD_IGNORED_AND_EXEC_CONTINUED:
 			value = swr_master_read(swrm, SWRM_CMD_FIFO_STATUS(swrm->ee_val));
 			dev_err_ratelimited(swrm->dev,
@@ -2667,6 +2668,7 @@ handle_irq:
 			/* Wait 3.5ms to clear */
 			usleep_range(3500, 3505);
 			break;
+#endif
 		default:
 			dev_err_ratelimited(swrm->dev,
 					"%s: SWR unknown interrupt value: %d\n",
