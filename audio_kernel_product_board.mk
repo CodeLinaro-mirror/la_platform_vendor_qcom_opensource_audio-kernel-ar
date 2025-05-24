@@ -65,6 +65,8 @@ ifeq ($(call is-board-platform-in-list, gen4 msmnile), true)
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm msmnile_gvmq))
 PRODUCT_PACKAGES  += $(KERNEL_MODULES_OUT)/machine_dlkm.ko \
         $(KERNEL_MODULES_OUT)/stub_dlkm.ko
+else
+        PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/coupled_ssr_dlkm.ko
 endif   #msmnile
 endif
 ifeq ($(call is-board-platform-in-list,msmnile), true)
