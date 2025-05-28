@@ -310,6 +310,7 @@ def define_volcano(t, v, lt=None):
             "swr_haptics_dlkm",
             "stub_dlkm",
             "hdmi_dlkm",
+            "lpass_bt_swr_dlkm",
             "lpass_cdc_dlkm",
             "lpass_cdc_wsa_macro_dlkm",
             "lpass_cdc_wsa2_macro_dlkm",
