@@ -586,7 +586,7 @@ static int sdx_tdm_startup(struct snd_pcm_substream *substream)
 		}
 
 		audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
-		I2S_SEL << I2S_PCM_SEL_OFFSET);
+		PCM_SEL << I2S_PCM_SEL_OFFSET);
 		if (pdata->prim_mi2s_mode == 1)
 			ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
 			0xffff,PRI_TLMM_CLKS_EN_MASTER);
@@ -683,7 +683,7 @@ static int sdx_auxpcm_startup(struct snd_pcm_substream *substream)
 	}
 
 	audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2008),  0xffff,
-                                            I2S_SEL << I2S_PCM_SEL_OFFSET);
+                                            PCM_SEL << I2S_PCM_SEL_OFFSET);
 	if (pdata->prim_auxpcm_mode == 1)
 		ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2004),
 		0xffff,PRI_TLMM_CLKS_EN_MASTER);
@@ -754,7 +754,7 @@ static int sdx_sec_auxpcm_startup(struct snd_pcm_substream *substream)
 	}
 
 	audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x200c),  0xffff,
-                                            I2S_SEL << I2S_PCM_SEL_OFFSET);
+                                            PCM_SEL << I2S_PCM_SEL_OFFSET);
 	if (pdata->sec_auxpcm_mode == 1)
 			ret = audio_prm_set_rsc_hw_csr_update((LPAIF_OFFSET + 0x2000),
 			0xffff,SEC_TLMM_CLKS_EN_MASTER);
