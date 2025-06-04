@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/kernel.h>
@@ -596,10 +596,10 @@ int stream_agg_remove_channel(void *substream, u8 mport_type,
 			}
 		}
 		pr_debug("all channels in stream %pK removed\n", substream);
-		agg->private_data = NULL;
-		agg->channel_rate = 0;
 		agg->num_channels = 0;
 		update_ch_per_substream(agg->num_channels, substream);
+		agg->private_data = NULL;
+		agg->channel_rate = 0;
 		agg->links = 0;
 	}
 
