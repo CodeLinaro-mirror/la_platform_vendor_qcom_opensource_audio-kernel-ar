@@ -588,6 +588,18 @@ static struct snd_soc_dai_driver haptics_dai[] = {
 			.channels_max = 1,
 		},
 	},
+	{
+		.name = "rx_swr_haptics",
+		.playback = {
+			.stream_name = "HAPTICS_AIF Playback",
+			.rates = HAPTICS_RATES,
+			.formats = HAPTICS_FORMATS,
+			.rate_max = 192000,
+			.rate_min = 8000,
+			.channels_min = 1,
+			.channels_max = 1,
+		},
+	},
 };
 
 static int swr_haptics_parse_port_mapping(struct swr_device *sdev)
