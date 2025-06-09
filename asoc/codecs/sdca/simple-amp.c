@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024 - 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -1851,8 +1851,7 @@ static int32_t simple_amp_temp_reg_read(struct simple_amp_priv *simple_amp,
 	unsigned char ps0 = 0x0, ps3 = 0x3;
 	struct sdca_function *sdca_func_data = NULL;
 	if (!simple_amp) {
-		dev_err_ratelimited(simple_amp->dev,
-				"%s: simple_amp is NULL\n", __func__);
+		pr_err_ratelimited("%s: simple_amp is NULL\n", __func__);
 		return -EINVAL;
 	}
 
@@ -1876,6 +1875,12 @@ static int32_t simple_amp_temp_reg_read(struct simple_amp_priv *simple_amp,
 			continue;
 		else
 			break;
+	}
+
+	if ((i >= MAX_FUNCTION) || !sdca_func_data) {
+		pr_err_ratelimited("%s: Invalid function number: %d\n",
+			__func__, i);
+		return -EINVAL;
 	}
 
 	func_num = i;
@@ -1928,7 +1933,7 @@ exit:
 
 static void simple_amp_temperature_work(struct work_struct *work)
 {
-	struct simple_amp_temp_register reg;
+	struct simple_amp_temp_register reg = {0};
 	int dmeas, d1, d2;
 	int ret = 0;
 	int temp_val = 0;
