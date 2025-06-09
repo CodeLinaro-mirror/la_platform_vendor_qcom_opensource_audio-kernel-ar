@@ -27,6 +27,7 @@ def define_sun():
             "wcd9xxx_dlkm",
             "swr_haptics_dlkm",
             "stub_dlkm",
+            "sdca_registers_dlkm",
             "hdmi_dlkm",
             "lpass_cdc_dlkm",
             "lpass_cdc_wsa_macro_dlkm",
