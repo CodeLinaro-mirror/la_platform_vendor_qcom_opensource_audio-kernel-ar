@@ -1529,6 +1529,9 @@ static bool wcd9378_check_irq_status(struct wcd_irq_info *irq_info, int irq)
 	struct irq_desc *desc =
 		irq_to_desc(regmap_irq_get_virq(irq_info->irq_chip, irq));
 
+	if (!desc)
+		return false;
+
 	/*If the value of depth is 0, means the irq has been enabled*/
 	if (desc->depth == 0)
 		return true;
@@ -4139,10 +4142,14 @@ static int wcd9378_soc_codec_probe(struct snd_soc_component *component)
 	wcd9378->debugfs_info = devm_kzalloc(component->dev,
 				sizeof(struct sdca_debugfs_info),
 				GFP_KERNEL);
+	if (!wcd9378->debugfs_info)
+		return -ENOMEM;
 
 	wcd9378->regdump_info = devm_kzalloc(component->dev,
 				sizeof(struct sdca_regdump_info),
 				GFP_KERNEL);
+	if (!wcd9378->regdump_info)
+		return -ENOMEM;
 
 	wcd9378->regdump_info->reg_array = wcd9378_reg_array;
 	wcd9378->regdump_info->reg_num = WCD9378_REGISTERS_ARRAY_NUM;

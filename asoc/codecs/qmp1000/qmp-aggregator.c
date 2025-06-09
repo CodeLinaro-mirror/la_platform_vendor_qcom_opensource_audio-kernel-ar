@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -157,6 +157,11 @@ exit:
 void update_ch_per_substream(int ch, void *substream)
 {
 	int sidx = get_matching_stream_index_or_first_available(substream);
+
+	if (sidx < 0 || sidx >= NUM_AGG_STREAMS) {
+		pr_err("%s: Invalid stream ID: %d\n", __func__, sidx);
+		return;
+	}
 
 	if (ch) {
 		num_chs[sidx]++;
