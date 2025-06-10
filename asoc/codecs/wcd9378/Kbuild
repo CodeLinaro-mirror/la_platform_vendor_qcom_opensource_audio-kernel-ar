@@ -39,6 +39,10 @@ ifeq ($(KERNEL_BUILD), 0)
 		include $(AUDIO_ROOT)/config/pittiauto.conf
 		INCS    +=  -include $(AUDIO_ROOT)/config/pittiautoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_KERA), y)
+		include $(AUDIO_ROOT)/config/keraauto.conf
+		INCS    +=  -include $(AUDIO_ROOT)/config/keraautoconf.h
+	endif
 
 endif
 
