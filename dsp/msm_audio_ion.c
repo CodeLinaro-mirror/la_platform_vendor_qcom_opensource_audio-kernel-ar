@@ -20,6 +20,7 @@
 #include <linux/of_device.h>
 #include <linux/export.h>
 #include <linux/ioctl.h>
+#include <linux/compat.h>
 #include <linux/cdev.h>
 #include <linux/fs.h>
 #include <linux/device.h>
@@ -825,6 +826,13 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	return ret;
 }
 
+static long msm_audio_ion_ioctl_compat(struct file *file, unsigned int cmd,
+					unsigned long arg)
+{
+	pr_debug("%s:  Entered compat IOCTL ioctl num %u",__func__, cmd);
+	return msm_audio_ion_ioctl(file, cmd, (unsigned long)compat_ptr(arg));
+}
+
 static const struct of_device_id msm_audio_ion_dt_match[] = {
 	{ .compatible = "qcom,msm-audio-ion" },
 	{ .compatible = "qcom,msm-audio-ion-cma"},
@@ -837,6 +845,7 @@ static const struct file_operations msm_audio_ion_fops = {
 	.open = msm_audio_ion_open,
 	.release = msm_audio_ion_release,
 	.unlocked_ioctl = msm_audio_ion_ioctl,
+	.compat_ioctl = msm_audio_ion_ioctl_compat,
 };
 
 static int msm_audio_ion_reg_chrdev(struct msm_audio_ion_private *ion_data)

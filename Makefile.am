@@ -45,6 +45,11 @@ obj-m += asoc/codecs/bolero/
 obj-m += asoc/codecs/wcd937x/
 endif
 
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sun))
+KBUILD_OPTIONS += CONFIG_SND_SOC_SUN=m
+KBUILD_OPTIONS += CONFIG_ARCH_SUN=y
+endif
+
 ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa8155 sa8155ivi sa6155 sa8195 qtiquingvm))
 KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
 obj-m := ipc/

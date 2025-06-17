@@ -74,6 +74,10 @@ ifeq ($(KERNEL_BUILD), 0)
 		include $(AUDIO_ROOT)/config/pineappleauto.conf
 		INCS    +=  -include $(AUDIO_ROOT)/config/pineappleautoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_SUN), y)
+		include $(AUDIO_ROOT)/config/sunauto.conf
+		INCS    +=  -include $(AUDIO_ROOT)/config/sunautoconf.h
+	endif
 	ifeq ($(CONFIG_ARCH_LITO), y)
 		include $(AUDIO_ROOT)/config/litoauto.conf
 		export
@@ -143,6 +147,10 @@ UAPI_INC :=	-I$(AUDIO_ROOT)/include/$(UAPI_DIR)
 ############ COMMON ############
 COMMON_DIR :=	include
 COMMON_INC :=	-I$(AUDIO_ROOT)/$(COMMON_DIR)
+
+############ DISPLAY ############
+DISPLAY_DIR :=	display/vendor/qcom/opensource/mm-drivers/msm_ext_display/include
+DISPLAY_INC :=	-I$(AUDIO_ROOT)/../../../../$(DISPLAY_DIR)
 
 ############ ASoC Codecs ############
 ifdef CONFIG_WCD9XXX_CODEC_CORE
@@ -252,6 +260,7 @@ endif
 LINUX_INC +=	-Iinclude/linux
 
 INCS +=		$(COMMON_INC) \
+		$(DISPLAY_INC) \
 		$(UAPI_INC)
 
 

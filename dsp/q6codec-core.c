@@ -238,10 +238,10 @@ static void q6codec_core_add_child_devices(struct work_struct *work)
         pr_err("%s:enumarate machine driver\n", __func__);
 
 	if (q6codec_core_is_q6_ready(ADD_CHILD_DEVICES_Q6_TIMEOUT_MS)) {
-		dev_err(q6codec_core_priv->dev, "%s: haren: q6 codec is up\n",
+		dev_err(q6codec_core_priv->dev, "%s: q6 codec is up\n",
 			__func__);
 	} else {
-		dev_err(q6codec_core_priv->dev, "%s: haren: q6 codec is not up\n",
+		dev_err(q6codec_core_priv->dev, "%s: q6 codec is not up\n",
 			__func__);
 		return;
 	}
@@ -253,7 +253,7 @@ static void q6codec_core_add_child_devices(struct work_struct *work)
 		dev_err(q6codec_core_priv->dev, "%s: failed to add child nodes, ret=%d\n",
 			__func__, ret);
 
-	dev_err(q6codec_core_priv->dev, "%s: haren: add child nodes, done\n",
+	dev_err(q6codec_core_priv->dev, "%s: add child nodes, done\n",
 			__func__);
 	q6codec_core_priv->is_initial_boot = false;
 
