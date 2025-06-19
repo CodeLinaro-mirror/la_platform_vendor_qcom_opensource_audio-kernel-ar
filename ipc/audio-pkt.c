@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -27,6 +27,7 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/termios.h>
+#include <linux/kdev_t.h>
 #include <ipc/gpr-lite.h>
 #include <dsp/spf-core.h>
 #include <dsp/msm_audio_ion.h>
@@ -68,8 +69,13 @@ do {									      \
 
 #define MODULE_NAME "audio-pkt"
 #define MINOR_NUMBER_COUNT 1
+#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+#define AUDPKT_DRIVER_NAME "aud_pasthru_modem"
+#define CHANNEL_NAME "modem_apps"
+#else
 #define AUDPKT_DRIVER_NAME "aud_pasthru_adsp"
 #define CHANNEL_NAME "adsp_apps"
+#endif
 #define MAX_PACKET_SIZE 4096
 
 enum audio_pkt_state {
@@ -449,7 +455,7 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 	struct audio_pkt_device *audpkt_dev = NULL;
 	struct gpr_hdr *audpkt_hdr = NULL;
 	void *kbuf;
-	int ret;
+	int ret = 0;
 
 	if (file == NULL || file->private_data == NULL || buf == NULL) {
 		AUDIO_PKT_ERR("invalid parameters\n");
@@ -524,7 +530,11 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 		mutex_unlock(&audpkt_dev->lock);
 		goto free_kbuf;
 	}
-	ret = gpr_send_pkt(ap_priv->adev,(struct gpr_pkt *) kbuf);
+	if (gpr_get_q6_state() != GPR_SUBSYS_DOWN)
+		ret = gpr_send_pkt(ap_priv->adev, (struct gpr_pkt *) kbuf);
+	else
+		AUDIO_PKT_ERR("q6 is down\n");
+
 	if (ret < 0) {
 		AUDIO_PKT_ERR("APR Send Packet Failed ret -%d\n", ret);
 		if (ret == -ECONNRESET)

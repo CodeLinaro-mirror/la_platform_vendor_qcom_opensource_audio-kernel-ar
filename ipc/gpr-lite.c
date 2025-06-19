@@ -1,6 +1,6 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -164,14 +164,21 @@ static void gpr_modem_down(unsigned long opcode)
 {
 	gpr_set_modem_state(GPR_SUBSYS_DOWN);
 	//dispatch_event(opcode, APR_DEST_MODEM);
+#ifdef CONFIG_MDM_AUDIO_SSR
+	snd_event_notify(gpr_priv->dev, SND_EVENT_DOWN);
+#endif
 }
 
 static void gpr_modem_up(void)
 {
+	gpr_set_modem_state(GPR_SUBSYS_LOADED);
 	//if (apr_cmpxchg_modem_state(APR_SUBSYS_DOWN, APR_SUBSYS_UP) ==
 	//						APR_SUBSYS_DOWN)
 	//	wake_up(&modem_wait);
 	//is_modem_up = 1;
+#ifdef CONFIG_MDM_AUDIO_SSR
+	snd_event_notify(gpr_priv->dev, SND_EVENT_UP);
+#endif
 }
 
 
@@ -494,6 +501,10 @@ static void gpr_notifier_register(struct work_struct *work)
 		gpr_subsys_notif_register("gpr_modem",
 				       AUDIO_NOTIFIER_MODEM_DOMAIN,
 				       &modem_service_nb);
+
+#ifdef CONFIG_MDM_AUDIO_SSR
+		gpr_modem_up();
+#endif
 	}
 
 	dev_info_ratelimited(gpr_priv->dev,
@@ -543,6 +554,9 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 		return ret;
 	}
 
+	if (GPR_DOMAIN_MODEM == gpr_priv->dest_domain_id)
+		gpr_set_modem_state(GPR_SUBSYS_UP);
+
 	of_register_gpr_devices(dev);
 
 	INIT_WORK(&gpr_priv->notifier_reg_work, gpr_notifier_register);
@@ -559,6 +573,8 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 	gpr_priv->wsource = wakeup_source_register(gpr_priv->dev, "audio-gpr");
 	dev_info(dev, "%s: gpr-lite probe success\n",
 		__func__);
+
+	gpr_set_q6_state(GPR_SUBSYS_LOADED);
 
 	return 0;
 }
