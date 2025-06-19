@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/init.h>
@@ -13,6 +13,7 @@
 #include <linux/mutex.h>
 #include <linux/list.h>
 #include <linux/dma-mapping.h>
+#include <linux/of_reserved_mem.h>
 #include <linux/dma-buf.h>
 #include <linux/iosys-map.h>
 #include <linux/platform_device.h>
@@ -479,6 +480,7 @@ int msm_audio_get_phy_addr(int fd, dma_addr_t *paddr, size_t *pa_len)
 }
 EXPORT_SYMBOL(msm_audio_get_phy_addr);
 
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 static int msm_audio_set_hyp_assign(int fd, bool assign)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
@@ -499,6 +501,7 @@ static int msm_audio_set_hyp_assign(int fd, bool assign)
 	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
 	return status;
 }
+#endif
 
 void msm_audio_get_handle(int fd, void **handle)
 {
@@ -742,12 +745,14 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	size_t pa_len = 0;
 	struct iosys_map *iosys_vmap = NULL;
 	int ret = 0;
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS);
 	struct qcom_scm_vmperm dst_vmids_map[] = {{VMID_LPASS, PERM_READ | PERM_WRITE},
 		{VMID_ADSP_HEAP, PERM_READ | PERM_WRITE}};
 	u64 src_vmid_unmap_list = BIT(VMID_LPASS) | BIT(VMID_ADSP_HEAP);
 	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
 		PERM_READ | PERM_WRITE | PERM_EXEC}};
+#endif
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	struct msm_audio_ion_private *ion_data =
 			container_of(file->f_inode->i_cdev, struct msm_audio_ion_private, cdev);
@@ -794,6 +799,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		msm_audio_delete_fd_entry(mem_handle, (int)ioctl_param);
 		break;
 	case IOCTL_MAP_HYP_ASSIGN:
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	    ret = msm_audio_get_phy_addr((int)ioctl_param, &paddr, &pa_len);
 		if (ret < 0) {
 			pr_err("%s get phys addr failed %d\n", __func__, ret);
@@ -808,8 +814,10 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		}
 		pr_debug("%s: qcom scm assign success\n", __func__);
 		msm_audio_set_hyp_assign((int)ioctl_param, true);
+#endif
 		break;
 	case IOCTL_UNMAP_HYP_ASSIGN:
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	    ret = msm_audio_get_phy_addr((int)ioctl_param, &paddr, &pa_len);
 		if (ret < 0) {
 			pr_err("%s get phys addr failed %d\n", __func__, ret);
@@ -824,6 +832,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		}
 		pr_debug("%s: qcom scm unassign success\n", __func__);
 		msm_audio_set_hyp_assign((int)ioctl_param, false);
+#endif
 	    break;
 	default:
 		pr_err("%s Entered default. Invalid ioctl num %u",
@@ -832,6 +841,68 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 		break;
 	}
 	return ret;
+}
+
+static int __audio_mem_hyp_assign(struct device *dev, int *source_vms,
+				       int source_nelems, int *dest_vms,
+				       int *dest_perms, int dest_nelems)
+{
+	struct device_node *mem_node;
+	struct reserved_mem *rmem;
+
+	mem_node = of_parse_phandle(dev->of_node, "memory-region", 0);
+	if (!mem_node) {
+		pr_err("%s: Could not parse memory region\n", __func__);
+		return -EINVAL;
+	}
+
+	rmem = of_reserved_mem_lookup(mem_node);
+	of_node_put(mem_node);
+	if (!rmem) {
+		pr_err("%s: Failed to get rmem\n", __func__);
+		return -EINVAL;
+	}
+
+	return hyp_assign_phys(rmem->base, rmem->size, source_vms,
+			       source_nelems, dest_vms, dest_perms,
+			       dest_nelems);
+}
+
+static int audio_mem_hyp_assign(struct device *dev)
+{
+	int source_vm_map[1] = {VMID_HLOS};
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+	int dest_vm_map[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
+	int dest_perms_map[4] = {
+		[0 ... 3] = PERM_READ | PERM_WRITE,
+	};
+#else
+	int dest_vm_map[2] = {VMID_MSS_MSA, VMID_HLOS};
+	int dest_perms_map[2] = {PERM_READ | PERM_WRITE,
+							PERM_READ | PERM_WRITE};
+#endif
+
+	return __audio_mem_hyp_assign(dev, source_vm_map,
+					   ARRAY_SIZE(source_vm_map),
+					   dest_vm_map, dest_perms_map,
+					   ARRAY_SIZE(dest_vm_map));
+}
+
+static int audio_mem_hyp_unassign(struct device *dev)
+{
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+	int source_vm_unmap[4] = {VMID_MSS_MSA, VMID_LPASS, VMID_ADSP_HEAP, VMID_HLOS};
+#else
+	int source_vm_unmap[2] = {VMID_MSS_MSA, VMID_HLOS};
+#endif
+	int dest_vm_unmap[1] = {VMID_HLOS};
+	int dest_perms_unmap[1] = {PERM_READ | PERM_WRITE | PERM_EXEC};
+
+	of_reserved_mem_device_release(dev);
+	return __audio_mem_hyp_assign(dev, source_vm_unmap,
+					   ARRAY_SIZE(source_vm_unmap),
+					   dest_vm_unmap, dest_perms_unmap,
+					   ARRAY_SIZE(dest_vm_unmap));
 }
 
 static const struct of_device_id msm_audio_ion_dt_match[] = {
@@ -908,6 +979,8 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	const char *msm_audio_ion_non_hyp = "qcom,non-hyp-assign";
 	const char *msm_audio_ion_smmu = "qcom,smmu-version";
 	const char *msm_audio_ion_smmu_sid_mask = "qcom,smmu-sid-mask";
+	const char *mdm_audio_ion_scm = "qcom,scm-mp-enabled";
+	bool scm_mp_enabled;
 	bool smmu_enabled;
 	bool is_non_hypervisor_en;
 	struct device *dev = &pdev->dev;
@@ -939,8 +1012,19 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 					     msm_audio_ion_dt);
 	msm_audio_ion_data->smmu_enabled = smmu_enabled;
 
-	if (!smmu_enabled)
+	if (!smmu_enabled) {
 		dev_dbg(dev, "%s: SMMU is Disabled\n", __func__);
+		scm_mp_enabled = of_property_read_bool(dev->of_node,
+						mdm_audio_ion_scm);
+
+		if (scm_mp_enabled) {
+			dev_dbg(dev, "%s: Calling MDSP HYP Assign\n", __func__);
+			rc = audio_mem_hyp_assign(dev);
+			if (rc) {
+				dev_err(dev, "%s: MDSP HYP ASSIGN Failed\n", __func__);
+			}
+		}
+	}
 
 #ifndef CONFIG_SPF_CORE
 	q6_state = apr_get_q6_state();
@@ -987,7 +1071,11 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 		msm_audio_ion_data->smmu_sid_bits =
 			smmu_sid << MSM_AUDIO_SMMU_SID_OFFSET;
 	} else {
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 		msm_audio_ion_data->driver_name = "msm_audio_ion_cma";
+#else
+		msm_audio_ion_data->driver_name = "msm_audio_ion";
+#endif
 	}
 
 	if (!rc)
@@ -1016,7 +1104,26 @@ static void msm_audio_ion_remove(struct platform_device *pdev)
 static int msm_audio_ion_remove(struct platform_device *pdev)
 #endif
 {
+	int rc = 0;
+	bool scm_mp_enabled;
+	struct device *dev = &pdev->dev;
 	struct msm_audio_ion_private *ion_data = dev_get_drvdata(&pdev->dev);
+	const char *mdm_audio_ion_scm = "qcom,scm-mp-enabled";
+
+	if (!ion_data->smmu_enabled) {
+		dev_dbg(dev, "%s: SMMU is Disabled\n", __func__);
+
+		scm_mp_enabled = of_property_read_bool(dev->of_node,
+						mdm_audio_ion_scm);
+
+		if (scm_mp_enabled) {
+			dev_dbg(dev, "%s: Calling MDSP HYP UnAssign\n", __func__);
+			rc = audio_mem_hyp_unassign(dev);
+			if (rc) {
+				dev_err(dev, "%s: MDSP HYP ASSIGN Failed\n", __func__);
+			}
+		}
+	}
 	ion_data->smmu_enabled = 0;
 	ion_data->device_status = 0;
 	msm_audio_ion_unreg_chrdev(ion_data);

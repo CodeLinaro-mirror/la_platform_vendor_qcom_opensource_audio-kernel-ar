@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries. 
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -176,6 +176,8 @@ bool spf_core_is_apm_ready(int timeout_ms)
 
 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	mutex_lock(&core->lock);
+	/* sleep for 100ms before querying AVS up */
+	msleep(100);
 	for (;;) {
 		if (__spf_core_is_apm_ready(core)) {
 			ret = true;
