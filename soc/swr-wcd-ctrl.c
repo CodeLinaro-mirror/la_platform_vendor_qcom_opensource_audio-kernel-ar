@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/irq.h>
@@ -1324,7 +1325,7 @@ static int swrm_get_logical_dev_num(struct swr_master *mstr, u64 dev_id,
 						*dev_num = i;
 						ret = 0;
 					}
-					dev_dbg(swrm->dev, "%s: devnum %d is assigned for dev addr %lx\n",
+					dev_dbg(swrm->dev, "%s: devnum %d is assigned for dev addr %llx\n",
 						__func__, i, swr_dev->addr);
 				}
 			}

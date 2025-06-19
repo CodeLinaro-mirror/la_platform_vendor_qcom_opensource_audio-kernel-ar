@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2017, 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -14,6 +15,8 @@
 #include <linux/slab.h>
 #include <linux/types.h>
 #include <asoc/wcd934x_registers.h>
+#include <linux/gpio/driver.h>
+#include <linux/pinctrl/pinctrl.h>
 
 #include "core.h"
 #include "pinctrl-utils.h"

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2017, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/device.h>
@@ -26,6 +26,7 @@
 #define SDCA_READ_WRITE_BIT       (0x8000)
 static DEFINE_MUTEX(swr_rw_lock);
 
+#ifndef CONFIG_SND_SOC_SDX
 static int regmap_swr_reg_address_get(struct swr_device *swr,
 			u16 *reg_addr, const void *reg, size_t reg_size)
 {
@@ -72,7 +73,7 @@ static int regmap_swr_reg_address_get(struct swr_device *swr,
 
 	return ret;
 }
-
+#endif
 static int regmap_swr_gather_write(void *context,
 				const void *reg, size_t reg_size,
 				const void *val, size_t val_len)
@@ -101,12 +102,13 @@ static int regmap_swr_gather_write(void *context,
 	}
 
 	mutex_lock(&swr_rw_lock);
+#ifndef CONFIG_SND_SOC_SDX
 	ret = regmap_swr_reg_address_get(swr, &reg_addr, reg, reg_size);
 	if (ret < 0) {
 		mutex_unlock(&swr_rw_lock);
 		return ret;
 	}
-
+#endif
 	/* val_len = VAL_BYTES * val_count */
 	for (i = 0; i < (val_len / VAL_BYTES); i++) {
 		value = (u8 *)val + (VAL_BYTES * i);
@@ -182,7 +184,9 @@ mem_fail:
 static int regmap_swr_write(void *context, const void *data, size_t count)
 {
 	struct device *dev = context;
+#ifndef CONFIG_SND_SOC_SDX
 	struct swr_device *swr = to_swr_device(dev);
+#endif
 	struct regmap *map = dev_get_regmap(dev, NULL);
 	int addr_bytes = 0;
 
@@ -190,14 +194,14 @@ static int regmap_swr_write(void *context, const void *data, size_t count)
 		dev_err_ratelimited(dev, "%s: regmap is NULL\n", __func__);
 		return -EINVAL;
 	}
-
+#ifndef CONFIG_SND_SOC_SDX
 	if (swr == NULL) {
 		dev_err_ratelimited(dev, "%s: swr is NULL\n", __func__);
 		return -EINVAL;
 	}
 
 	addr_bytes = (swr->paging_support ? ADDR_BYTES_4 : ADDR_BYTES);
-
+#endif
 	WARN_ON(count < addr_bytes);
 
 	if (count > (addr_bytes + VAL_BYTES + PAD_BYTES))
@@ -234,6 +238,7 @@ static int regmap_swr_read(void *context,
 	}
 
 	mutex_lock(&swr_rw_lock);
+#ifndef CONFIG_SND_SOC_SDX
 	ret = regmap_swr_reg_address_get(swr, &reg_addr, reg, reg_size);
 	if (ret < 0) {
 		dev_err_ratelimited(dev,
@@ -242,6 +247,7 @@ static int regmap_swr_read(void *context,
 		mutex_unlock(&swr_rw_lock);
 		return ret;
 	}
+#endif
 
 	ret = swr_read(swr, swr->dev_num, reg_addr, val, val_size);
 	if (ret < 0)
