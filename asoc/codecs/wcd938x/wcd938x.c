@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -3011,7 +3011,7 @@ static int wcd938x_tx_master_ch_put(struct snd_kcontrol *kcontrol,
 			__func__, ucontrol->value.enumerated.item[0]);
 
 	idx = ucontrol->value.enumerated.item[0];
-	if (idx < 0 || idx >= ARRAY_SIZE(swr_master_ch_map))
+	if (idx < 0 || idx >= ARRAY_SIZE(wcd938x_swr_master_ch_map))
 		return -EINVAL;
 
 	wcd938x->tx_master_ch_map[slave_ch_idx] = wcd938x_slave_get_master_ch(idx);
