@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015, 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/bitops.h>
@@ -156,7 +157,7 @@ int wsa881x_init_thermal(struct wsa881x_tz_priv *tz_pdata)
 		return -EINVAL;
 	}
 	/* Register with the thermal zone */
-	tz_dev = thermal_zone_device_register(tz_pdata->name,
+	tz_dev = thermal_zone_device_register_with_trips(tz_pdata->name, NULL,
 				0, 0, tz_pdata,
 				&wsa881x_thermal_ops, NULL, 0, 0);
 	if (IS_ERR(tz_dev)) {

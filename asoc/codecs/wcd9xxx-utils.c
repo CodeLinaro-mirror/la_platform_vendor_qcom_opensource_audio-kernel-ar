@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -553,7 +554,7 @@ static int regmap_bus_read(void *context, const void *reg, size_t reg_size,
 		goto err;
 	}
 	ret = wcd9xxx_page_write(wcd9xxx, &c_reg);
-	if (ret)
+	if (ret < 0)
 		goto err;
 	ret = wcd9xxx->read_dev(wcd9xxx, c_reg, val_size, val, false);
 	if (ret < 0)
@@ -601,7 +602,7 @@ static int regmap_bus_gather_write(void *context,
 		goto err;
 	}
 	ret = wcd9xxx_page_write(wcd9xxx, &c_reg);
-	if (ret)
+	if (ret < 0)
 		goto err;
 
 	for (i = 0; i < val_size; i++)
@@ -972,10 +973,14 @@ int wcd9xxx_core_res_init(
 	wcd9xxx_core_res->wlock_holders = 0;
 	wcd9xxx_core_res->pm_state = WCD9XXX_PM_SLEEPABLE;
 	init_waitqueue_head(&wcd9xxx_core_res->pm_wq);
+#ifdef CONFIG_SND_SOC_SDX
+	cpu_latency_qos_add_request(&wcd9xxx_core_res->pm_qos_req,
+				PM_QOS_DEFAULT_VALUE);
+#else
 	pm_qos_add_request(&wcd9xxx_core_res->pm_qos_req,
 				PM_QOS_CPU_DMA_LATENCY,
 				PM_QOS_DEFAULT_VALUE);
-
+#endif
 	wcd9xxx_core_res->num_irqs = num_irqs;
 	wcd9xxx_core_res->num_irq_regs = num_irq_regs;
 	wcd9xxx_core_res->wcd_core_regmap = wcd_regmap;
@@ -998,8 +1003,11 @@ void wcd9xxx_core_res_deinit(struct wcd9xxx_core_resource *wcd9xxx_core_res)
 {
 	if (!wcd9xxx_core_res)
 		return;
-
+#ifdef CONFIG_SND_SOC_SDX
+	cpu_latency_qos_remove_request(&wcd9xxx_core_res->pm_qos_req);
+#else
 	pm_qos_remove_request(&wcd9xxx_core_res->pm_qos_req);
+#endif
 	mutex_destroy(&wcd9xxx_core_res->pm_lock);
 }
 EXPORT_SYMBOL(wcd9xxx_core_res_deinit);
