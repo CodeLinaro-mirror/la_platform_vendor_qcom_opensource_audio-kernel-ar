@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (c) 2012, 2014, 2017, 2020, 2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _UAPI_LINUX_MSM_AUDIO_H
@@ -23,6 +23,11 @@
 #define IOCTL_UNMAP_HYP_ASSIGN_V2 _IOW(AUDIO_IOCTL_MAGIC, 112, struct msm_mdf_data)
 
 #define AUDIO_MAX_COMMON_IOCTL_NUM 113
+struct msm_adsp_event_data {
+	__u32 event_type;
+	__u32 payload_len;
+	__u8 payload[0];
+};
 
 /* ss_masks is generated from sys_ids
  * for id in sys_ids
