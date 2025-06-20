@@ -1046,6 +1046,7 @@ static int swrm_cmd_fifo_wr_cmd(struct swr_mstr_ctrl *swrm, u8 cmd_data,
 	 * Check for outstanding cmd wrt. write fifo depth to avoid
 	 * overflow.
 	 */
+	usleep_range(500, 550);
 	swrm_wait_for_fifo_avail(swrm, SWRM_WR_CHECK_AVAIL);
 	swr_master_write(swrm, SWRM_CMD_FIFO_WR_CMD(swrm->ee_val), val);
 	/*
@@ -1650,12 +1651,14 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 
 			if (len < SWRM_MAX_PORT_REG) {
 				/* Only wite MSB if SI > 0xFF */
+				if ((port_req->sinterval >> 8)& 0xFF) {
 				reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
 				val[len++] = SWR_REG_VAL_PACK(
 						(port_req->sinterval >> 8) & 0xFF,
 						port_req->dev_num, get_cmd_id(swrm),
 						SWRS_DP_SAMPLE_CONTROL_2_BANK(slv_port_id,
 									bank));
+				}
 			}
 
 			if (agg_slv_port_offset1[port_req->dev_num][slv_port_id] == 0)
@@ -3191,7 +3194,7 @@ static int swrm_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,swr-master-ee-val",
 				&swrm->ee_val);
 	if (ret) {
-		dev_err(&pdev->dev,
+		dev_dbg(&pdev->dev,
 			"%s: ee_val not specified, initialize with default val\n",
 			__func__);
 		swrm->ee_val = 0x1;
@@ -3200,7 +3203,7 @@ static int swrm_probe(struct platform_device *pdev)
 				"qcom,swr-master-version",
 				&swrm->version);
 	if (ret) {
-		dev_err(&pdev->dev, "%s: swrm version not defined, use default\n",
+		dev_dbg(&pdev->dev, "%s: swrm version not defined, use default\n",
 			 __func__);
 		swrm->version = SWRM_VERSION_2_0;
 	}
@@ -3214,7 +3217,7 @@ static int swrm_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,dynamic-port-map-supported",
 				&swrm->dynamic_port_map_supported);
 	if (ret) {
-		dev_err(&pdev->dev,
+		dev_dbg(&pdev->dev,
 			"%s: failed to get dynamic port map support, use default\n",
 			__func__);
 		swrm->dynamic_port_map_supported = 1;
@@ -3332,7 +3335,7 @@ static int swrm_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,is-always-on",
 				&swrm->is_always_on);
 	if (ret)
-		dev_err(&pdev->dev, "%s: failed to get is_always_on flag\n", __func__);
+		dev_dbg(&pdev->dev, "%s: failed to get is_always_on flag\n", __func__);
 
 	swrm->reg_irq = pdata->reg_irq;
 	swrm->master.read = swrm_read;
@@ -3421,7 +3424,7 @@ static int swrm_probe(struct platform_device *pdev)
 	lpass_core_hw_vote = devm_clk_get(&pdev->dev, "lpass_core_hw_vote");
 	if (IS_ERR(lpass_core_hw_vote)) {
 		ret = PTR_ERR(lpass_core_hw_vote);
-		dev_err(&pdev->dev, "%s: clk get %s failed %d\n",
+		dev_dbg(&pdev->dev, "%s: clk get %s failed %d\n",
 			__func__, "lpass_core_hw_vote", ret);
 		lpass_core_hw_vote = NULL;
 		ret = 0;
@@ -3432,7 +3435,7 @@ static int swrm_probe(struct platform_device *pdev)
 	lpass_core_audio = devm_clk_get(&pdev->dev, "lpass_audio_hw_vote");
 	if (IS_ERR(lpass_core_audio)) {
 		ret = PTR_ERR(lpass_core_audio);
-		dev_err(&pdev->dev, "%s: clk get %s failed %d\n",
+		dev_dbg(&pdev->dev, "%s: clk get %s failed %d\n",
 			__func__, "lpass_core_audio", ret);
 		lpass_core_audio = NULL;
 		ret = 0;
@@ -3471,7 +3474,7 @@ static int swrm_probe(struct platform_device *pdev)
 				   "qcom,swr-mstr-irq-wakeup-capable",
 				   &swrm->swr_irq_wakeup_capable);
 	if (ret)
-		dev_err(swrm->dev, "%s: swrm irq wakeup capable not defined\n",
+		dev_dbg(swrm->dev, "%s: swrm irq wakeup capable not defined\n",
 			__func__);
 	if (swrm->swr_irq_wakeup_capable) {
 		irq_set_irq_wake(swrm->irq, 1);
@@ -3481,7 +3484,6 @@ static int swrm_probe(struct platform_device *pdev)
 				 "%s: Device wakeup init failed: %d\n",
 				 __func__, ret);
 	}
-	
 	ret = swr_register_master(&swrm->master);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: error adding swr master\n", __func__);
@@ -3592,6 +3594,7 @@ static int swrm_probe(struct platform_device *pdev)
 	INIT_WORK(&swrm->dc_presence_work, swrm_notify_work_fn);
 	swrm->event_notifier.notifier_call  = swrm_event_notify;
 	//msm_aud_evt_register_client(&swrm->event_notifier);
+
 	return 0;
 err_parse_num_dev:
 err_mstr_init_fail:
@@ -3776,7 +3779,8 @@ static int swrm_runtime_resume(struct device *dev)
 			}
 			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
 			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
-			swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
+			if (swrm->version > SWRM_VERSION_1_5)
+				swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
 			swrm_master_init(swrm);
 			/* wait for hw enumeration to complete */
 			usleep_range(100, 105);

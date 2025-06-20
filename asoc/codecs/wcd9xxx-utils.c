@@ -998,6 +998,7 @@ EXPORT_SYMBOL(wcd9xxx_core_res_init);
  */
 void wcd9xxx_core_res_deinit(struct wcd9xxx_core_resource *wcd9xxx_core_res)
 {
+
 	if (!wcd9xxx_core_res)
 		return;
         #if 0

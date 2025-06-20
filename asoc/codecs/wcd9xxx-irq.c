@@ -184,7 +184,6 @@ bool wcd9xxx_lock_sleep(
 		cpu_latency_qos_update_request(&wcd9xxx_res->pm_qos_req,
 				      		CPU_IDLE_LATENCY);
 		pm_stay_awake(wcd9xxx_res->dev);
-
 	}
 	mutex_unlock(&wcd9xxx_res->pm_lock);
 
@@ -225,7 +224,6 @@ void wcd9xxx_unlock_sleep(
 		cpu_latency_qos_update_request(&wcd9xxx_res->pm_qos_req,
 				PM_QOS_DEFAULT_VALUE);
 		pm_relax(wcd9xxx_res->dev);
-
 	}
 	mutex_unlock(&wcd9xxx_res->pm_lock);
 	wake_up_all(&wcd9xxx_res->pm_wq);

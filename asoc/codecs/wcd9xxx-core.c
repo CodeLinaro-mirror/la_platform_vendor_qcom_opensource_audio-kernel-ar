@@ -279,7 +279,7 @@ static int wcd9xxx_slim_read_device(struct wcd9xxx *wcd9xxx, unsigned short reg,
 	int ret = 0;
 
       	int slim_read_tries = WCD9XXX_SLIM_RW_MAX_TRIES;
-        
+  
         int32_t reg_addr = WCD9XXX_REGISTER_START_OFFSET + reg;
 
 	if (!wcd9xxx->dev_up) {

@@ -431,6 +431,7 @@ static ssize_t wsa881x_swrslave_reg_show(struct swr_device *pdev, char __user *u
 			total = -EFAULT;
 			goto copy_err;
 		}
+
 		if ((total + len) >= count - 1)
 			break;
 		if (copy_to_user((ubuf + total), tmp_buf, len)) {
@@ -1335,9 +1336,14 @@ static int wsa881x_probe(struct snd_soc_component *component)
 {
 	struct wsa881x_priv *wsa881x = snd_soc_component_get_drvdata(component);
 	struct swr_device *dev;
+	char w_name[MAX_NAME_LEN];
+	struct snd_soc_dapm_context *dapm =
+                        snd_soc_component_get_dapm(component);
+
 	if (!wsa881x)
 		return -EINVAL;
 	snd_soc_component_init_regmap(component, wsa881x->regmap);
+
 	dev = wsa881x->swr_slave;
 	wsa881x->component = component;
 	mutex_init(&wsa881x->bg_lock);
@@ -1352,6 +1358,26 @@ static int wsa881x_probe(struct snd_soc_component *component)
 	snd_soc_add_component_controls(component, wsa_snd_controls,
 				   ARRAY_SIZE(wsa_snd_controls));
 	INIT_DELAYED_WORK(&wsa881x->ocp_ctl_work, wsa881x_ocp_ctl_work);
+
+	memset(w_name, 0, sizeof(w_name));
+        strscpy(w_name, wsa881x->dai_driver->playback.stream_name,
+                                sizeof(w_name));
+        snd_soc_dapm_ignore_suspend(dapm, w_name);
+
+        memset(w_name, 0, sizeof(w_name));
+        strscpy(w_name, "IN", sizeof(w_name));
+        snd_soc_dapm_ignore_suspend(dapm, w_name);
+
+        memset(w_name, 0, sizeof(w_name));
+        strscpy(w_name, "SWR DAC_Port", sizeof(w_name));
+        snd_soc_dapm_ignore_suspend(dapm, w_name);
+
+        memset(w_name, 0, sizeof(w_name));
+        strscpy(w_name, "SPKR", sizeof(w_name));
+        snd_soc_dapm_ignore_suspend(dapm, w_name);
+
+        snd_soc_dapm_sync(dapm);
+
 	return 0;
 }
 
@@ -1495,6 +1521,7 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 	char buffer[MAX_NAME_LEN];
 	const char *wsa881x_name_prefix_of = NULL;
 	struct wsa_ctrl_platform_data *plat_data = NULL;
+
 	wsa881x = devm_kzalloc(&pdev->dev, sizeof(struct wsa881x_priv),
 			    GFP_KERNEL);
 	if (!wsa881x)
@@ -1613,7 +1640,8 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 		sizeof(struct snd_soc_dai_driver));
 
 	/* Get last digit from HEX format */
-	dev_index = pdev->dev_num;
+	//dev_index = pdev->dev_num;
+        dev_index = (int)((char) (pdev->addr & 0xF));
 
 	snprintf(buffer, sizeof(buffer), "wsa-codec.%d", dev_index);
 	wsa881x->driver->name = kstrndup(buffer,
@@ -1679,6 +1707,7 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 
 	mutex_init(&wsa881x->res_lock);
 	mutex_init(&wsa881x->temp_lock);
+
 	return 0;
 
 err_mem:

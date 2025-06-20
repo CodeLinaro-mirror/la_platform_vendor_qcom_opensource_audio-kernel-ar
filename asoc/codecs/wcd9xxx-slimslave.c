@@ -123,7 +123,6 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 	int i = 0;
 	struct wcd9xxx_ch *rx;
 	struct slim_stream_config sconfig_rx;
-	
 	sconfig_rx.direction = direction;
 	sconfig_rx.bps = bit_width;
 	sconfig_rx.rate = rate;
