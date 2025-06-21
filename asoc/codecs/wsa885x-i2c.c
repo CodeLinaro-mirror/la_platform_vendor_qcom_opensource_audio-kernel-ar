@@ -218,6 +218,7 @@ struct wsa885x_i2c_priv {
 	uint32_t rx_slot_mask;
 	uint8_t virq[WSA885X_IRQ_MAX];
 	struct gpio_desc *intr_pin;
+	atomic_t open_count;
 };
 
 static const struct regmap_irq wsa885x_irqs[WSA885X_IRQ_MAX] = {
@@ -405,9 +406,15 @@ static int codec_hw_params(struct snd_pcm_substream *substream,
 	struct snd_soc_component *component = dai->component;
 	struct wsa885x_i2c_priv *wsa885x = snd_soc_component_get_drvdata(component);
 	uint8_t value, cs21_sample_rate_idx, cs24_sample_rate_idx;
+	int open_count = 0;
 
 	dev_dbg(wsa885x->dev, "%s: HW Params called with sampling rate as %d\n", __func__,
 				params_rate(params));
+
+	open_count = atomic_read(&wsa885x->open_count);
+	if (open_count > 1)
+		return 0;
+
 	wsa885x->sample_rate = params_rate(params);
 	switch (wsa885x->sample_rate) {
 	case 8000:
@@ -481,6 +488,10 @@ static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 		snd_soc_component_get_drvdata(component);
 
 	dev_dbg(wsa885x->dev, "%s: TDM num_slots configured as %d\n", __func__, slots);
+
+	if (atomic_inc_return(&wsa885x->open_count) > 1)
+		return 0;
+
 	regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_RESET_CTL, 0x01, 0x01);
 	if (wsa885x->rx_slot_mask == 0b11) {
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
@@ -528,9 +539,14 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 		snd_soc_component_get_drvdata(component);
 	uint8_t pll_div;
 	unsigned int status;
-	int i;
+	int i, open_count = 0;
 
 	dev_dbg(wsa885x->dev, "%s: Freq set as  %d\n", __func__, freq);
+
+	open_count = atomic_read(&wsa885x->open_count);
+	if (open_count > 1)
+		return 0;
+
 	pll_div = CLK_RATE_FIXED / freq;
 	regmap_write(wsa885x->regmap, ANA_TOP_BG_TVP_OVRD_CTL, 0x03);
 	regmap_write(wsa885x->regmap, DIG_CTRL0_SYS_CLK_SEL, 0x04);
@@ -622,14 +638,155 @@ exit:
 	return ret;
 }
 
+static int codec_mute_stream_virt_c1(struct snd_soc_dai *dai, int mute, int stream)
+{
+	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
+	int ret = 0, ps0 = 0, ps3 = 3, open_count = 0;
+
+	dev_dbg(wsa885x->dev, "%s: Stream is %s\n", __func__, mute ? "muted" : "unmuted");
+	if (mute) {
+		open_count = atomic_dec_return(&wsa885x->open_count);
+		if (open_count > 0) {
+			regmap_update_bits(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b01, 0x00);
+			return 0;
+		}
+
+		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
+					 0x03);
+		ret = wait_for_pde_state(wsa885x, ps3, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+		if (!ret) {
+			dev_err(wsa885x->component->dev,
+			"success! function 1, actual ps %d\n",
+					ps3);
+		}
+	} else {
+		open_count = atomic_read(&wsa885x->open_count);
+		if (open_count > 1) {
+			regmap_update_bits(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b01, 0b01);
+			return 0;
+		}
+
+		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_OT23_USAGE,
+					 wsa885x->usage_mode);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_IT21_CLUSERINDEX,
+					 0x01);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER,
+					 0x01);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
+					 0x00);
+		ret = wait_for_pde_state(wsa885x, ps0, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+		if (!ret)
+			dev_dbg(wsa885x->component->dev,
+					"success! function 1, actual ps %d\n", ps0);
+		else {
+			dev_err(wsa885x->component->dev,
+					"PS0 request failed\n");
+			goto exit;
+		}
+
+		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b01);
+
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X0, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X1, 0x00);
+		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
+	}
+exit:
+	return ret;
+}
+
+static int codec_mute_stream_virt_c2(struct snd_soc_dai *dai, int mute, int stream)
+{
+	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
+	int ret = 0, ps0 = 0, ps3 = 3, open_count = 0;
+
+	dev_dbg(wsa885x->dev, "%s: Stream is %s\n", __func__, mute ? "muted" : "unmuted");
+	if (mute) {
+		open_count = atomic_dec_return(&wsa885x->open_count);
+		if (open_count > 0) {
+			regmap_update_bits(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b10, 0x00);
+			return 0;
+		}
+		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
+					 0x03);
+		ret = wait_for_pde_state(wsa885x, ps3, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+		if (!ret) {
+			dev_err(wsa885x->component->dev,
+			"success! function 1, actual ps %d\n",
+					ps3);
+		}
+	} else {
+		open_count = atomic_read(&wsa885x->open_count);
+		if (open_count > 1) {
+			regmap_update_bits(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b10, 0b10);
+			return 0;
+		}
+
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_OT23_USAGE,
+					 wsa885x->usage_mode);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_IT21_CLUSERINDEX,
+					 0x01);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER,
+					 0x01);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
+					 0x00);
+		ret = wait_for_pde_state(wsa885x, ps0, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+		if (!ret)
+			dev_dbg(wsa885x->component->dev,
+					"success! function 1, actual ps %d\n", ps0);
+		else {
+			dev_err(wsa885x->component->dev,
+					"PS0 request failed\n");
+			goto exit;
+		}
+
+		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b10);
+
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X0, 0x00);
+		regmap_write(wsa885x->regmap,
+					 SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X1, 0x00);
+		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
+	}
+exit:
+	return ret;
+}
+
 static int codec_hw_free(struct snd_pcm_substream *substream,
 						 struct snd_soc_dai *dai)
 {
 	struct snd_soc_component *component = dai->component;
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
+	int open_count = 0;
 
 	dev_dbg(wsa885x->dev, "%s: HW Free, resetting I2S registers\n", __func__);
+
+	open_count = atomic_read(&wsa885x->open_count);
+	if (open_count > 0)
+		return 0;
 
 	wsa885x->rx_slot_mask = 0x00;
 	/* Reset I2S register in any case */
@@ -648,25 +805,67 @@ static int codec_hw_free(struct snd_pcm_substream *substream,
 	return 0;
 }
 
-static const struct snd_soc_dai_ops wsa885x_i2c_dai_ops = {
-	.hw_params = codec_hw_params,
-	.set_tdm_slot = codec_set_tdm_slot,
-	.set_sysclk = codec_set_sysclk,
-	.mute_stream = codec_mute_stream,
-	.hw_free = codec_hw_free,
+static const struct snd_soc_dai_ops wsa885x_i2c_dai_ops[] = {
+	{
+		.hw_params = codec_hw_params,
+		.set_tdm_slot = codec_set_tdm_slot,
+		.set_sysclk = codec_set_sysclk,
+		.mute_stream = codec_mute_stream,
+		.hw_free = codec_hw_free,
+	},
+	{
+		.hw_params = codec_hw_params,
+		.set_tdm_slot = codec_set_tdm_slot,
+		.set_sysclk = codec_set_sysclk,
+		.mute_stream = codec_mute_stream_virt_c1,
+		.hw_free = codec_hw_free,
+	},
+	{
+		.hw_params = codec_hw_params,
+		.set_tdm_slot = codec_set_tdm_slot,
+		.set_sysclk = codec_set_sysclk,
+		.mute_stream = codec_mute_stream_virt_c2,
+		.hw_free = codec_hw_free,
+	},
 };
 
-static struct snd_soc_dai_driver wsa885x_i2c_dai = {
-	.name = "wsa885x_dai_drv",
-	.playback = {
-		.stream_name = "",
-		.channels_min = 1,
-		.channels_max = 2,
-		.rates = SNDRV_PCM_RATE_8000_192000,
-		.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE |
-							SNDRV_PCM_FMTBIT_S32_LE,
+static struct snd_soc_dai_driver wsa885x_i2c_dai[] = {
+	{
+		.name = "wsa885x_dai_drv",
+		.playback = {
+			.stream_name = "WSA885X I2C TDM Playback",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE |
+					   SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.ops = &wsa885x_i2c_dai_ops[0],
 	},
-	.ops = &wsa885x_i2c_dai_ops,
+	{
+		.name = "wsa885x_dai_drv_virt_c1",
+		.playback = {
+			.stream_name = "WSA885X I2C VIRTUAL C1 TDM Playback",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE |
+					   SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.ops = &wsa885x_i2c_dai_ops[1],
+	},
+	{
+		.name = "wsa885x_dai_drv_virt_c2",
+		.playback = {
+			.stream_name = "WSA885X I2C VIRTUAL C2 TDM Playback",
+			.channels_min = 1,
+			.channels_max = 2,
+			.rates = SNDRV_PCM_RATE_8000_192000,
+			.formats = SNDRV_PCM_FMTBIT_S16_LE | SNDRV_PCM_FMTBIT_S24_LE |
+					   SNDRV_PCM_FMTBIT_S32_LE,
+		},
+		.ops = &wsa885x_i2c_dai_ops[2],
+	},
 };
 
 static int wsa885x_gpio_set(struct wsa885x_i2c_priv *wsa885x, bool val)
@@ -694,18 +893,13 @@ static struct snd_soc_dai_driver *get_dai_driver(struct device *dev)
 {
 	struct snd_soc_dai_driver *dai_drv = NULL;
 
-	dai_drv = devm_kzalloc(dev, 1 * sizeof(struct snd_soc_dai_driver),
+	dai_drv = devm_kzalloc(dev, ARRAY_SIZE(wsa885x_i2c_dai) * sizeof(struct snd_soc_dai_driver),
 						   GFP_KERNEL);
 	if (!dai_drv)
 		return NULL;
 
 	memcpy((void *)dai_drv, &wsa885x_i2c_dai,
-		   sizeof(struct snd_soc_dai_driver));
-
-	dai_drv->playback.stream_name =
-		devm_kasprintf(dev, GFP_KERNEL, "WSA885X I2C TDM Playback");
-	if (!dai_drv->playback.stream_name)
-		return NULL;
+		   ARRAY_SIZE(wsa885x_i2c_dai) * sizeof(struct snd_soc_dai_driver));
 
 	return dai_drv;
 }
@@ -1002,6 +1196,7 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 	wsa885x->client = client;
 	wsa885x->dev = dev;
 	wsa885x->regmap = devm_regmap_init_i2c(client, &regmap_cfg);
+	atomic_set(&wsa885x->open_count, 0);
 
 	if (IS_ERR(wsa885x->regmap))
 		return PTR_ERR(wsa885x->regmap);
@@ -1103,7 +1298,8 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 
 	wsa885x->dai_driver = get_dai_driver(dev);
 
-	ret = devm_snd_soc_register_component(dev, wsa885x->driver, wsa885x->dai_driver, 1);
+	ret = devm_snd_soc_register_component(dev, wsa885x->driver, wsa885x->dai_driver,
+						   ARRAY_SIZE(wsa885x_i2c_dai));
 	if (ret) {
 		dev_err(dev, "Codec component %s registration failed\n",
 				wsa885x->driver->name);
@@ -1111,7 +1307,7 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 		dev_dbg(dev, "Codec component %s registration success!\n",
 				wsa885x->driver->name);
 		dev_dbg(dev, "Codec component:dai %s registration success!\n",
-				wsa885x->dai_driver->name);
+				wsa885x->dai_driver[0].name);
 	}
 	i2c_set_clientdata(client, wsa885x);
 	devm_regmap_qti_debugfs_register(dev, wsa885x->regmap);
