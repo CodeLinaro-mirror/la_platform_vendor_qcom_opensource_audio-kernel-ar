@@ -630,3 +630,13 @@ SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_tx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_DUMMY()),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
+
+SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_rx_virt_c1,
+	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("wsa885x_i2c", "wsa885x_dai_drv_virt_c1")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
+
+SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_rx_virt_c2,
+	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("wsa885x_i2c", "wsa885x_dai_drv_virt_c2")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
