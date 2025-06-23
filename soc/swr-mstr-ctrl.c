@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/irq.h>
@@ -1971,6 +1971,11 @@ static int swrm_update_clk_base_and_scale(struct swr_master *master, u8 inactive
 	u32 status = 0, val;
 	int clk_scale = 1; /* DIV2 */
 
+	if (!swrm) {
+		pr_err_ratelimited("%s: swrm is null\n", __func__);
+		return -EINVAL;
+	}
+
 	val = swr_master_read(swrm, SWRM_MCP_SLV_STATUS);
 	list_for_each_entry(swr_dev, &master->devices, dev_list) {
 		if (swr_dev->dev_num == 0)
@@ -2735,6 +2740,7 @@ exit:
 static irqreturn_t swrm_wakeup_interrupt(int irq, void *dev)
 {
 	struct swr_mstr_ctrl *swrm = dev;
+	struct irq_data *irqd;
 	int ret = IRQ_HANDLED;
 
 	if (!swrm || !(swrm->dev)) {
@@ -2745,14 +2751,14 @@ static irqreturn_t swrm_wakeup_interrupt(int irq, void *dev)
 	mutex_lock(&swrm->devlock);
 	if (swrm->state == SWR_MSTR_SSR || !swrm->dev_up) {
 		if (swrm->wake_irq > 0) {
-			if (unlikely(!irq_get_irq_data(swrm->wake_irq))) {
+			irqd = irq_get_irq_data(swrm->wake_irq);
+			if (unlikely(!irqd)) {
 				pr_err_ratelimited("%s: irq data is NULL\n", __func__);
 				mutex_unlock(&swrm->devlock);
 				return IRQ_NONE;
 			}
 			mutex_lock(&swrm->irq_lock);
-			if (!irqd_irq_disabled(
-			    irq_get_irq_data(swrm->wake_irq)))
+			if (!irqd_irq_disabled(irqd))
 				disable_irq_nosync(swrm->wake_irq);
 			mutex_unlock(&swrm->irq_lock);
 		}
@@ -2765,13 +2771,13 @@ static irqreturn_t swrm_wakeup_interrupt(int irq, void *dev)
 		goto exit;
 	}
 	if (swrm->wake_irq > 0) {
-		if (unlikely(!irq_get_irq_data(swrm->wake_irq))) {
+		irqd = irq_get_irq_data(swrm->wake_irq);
+		if (unlikely(!irqd)) {
 			pr_err_ratelimited("%s: irq data is NULL\n", __func__);
 			return IRQ_NONE;
 		}
 		mutex_lock(&swrm->irq_lock);
-		if (!irqd_irq_disabled(
-		    irq_get_irq_data(swrm->wake_irq)))
+		if (!irqd_irq_disabled(irqd))
 			disable_irq_nosync(swrm->wake_irq);
 		mutex_unlock(&swrm->irq_lock);
 	}
@@ -3655,6 +3661,7 @@ static int swrm_remove(struct platform_device *pdev)
 #endif
 {
 	struct swr_mstr_ctrl *swrm = platform_get_drvdata(pdev);
+	struct irq_data *irqd;
 
 	if (swrm->swr_mstr_ctrl_proc_entry)
 		proc_remove(swrm->swr_mstr_ctrl_proc_entry);
@@ -3663,10 +3670,9 @@ static int swrm_remove(struct platform_device *pdev)
 		swrm->reg_irq(swrm->handle, swr_mstr_interrupt,
 				swrm, SWR_IRQ_FREE);
 	} else if (swrm->irq) {
-		if (irq_get_irq_data(swrm->irq) != NULL)
-			irqd_set_trigger_type(
-				irq_get_irq_data(swrm->irq),
-				IRQ_TYPE_NONE);
+		irqd = irq_get_irq_data(swrm->irq);
+		if (!irqd)
+			irqd_set_trigger_type(irqd, IRQ_TYPE_NONE);
 		if (swrm->swr_irq_wakeup_capable) {
 			irq_set_irq_wake(swrm->irq, 0);
 			device_init_wakeup(swrm->dev, false);
@@ -3722,6 +3728,7 @@ static int swrm_runtime_resume(struct device *dev)
 	bool hw_core_err = false, aud_core_err = false;
 	struct swr_master *mstr = &swrm->master;
 	struct swr_device *swr_dev;
+	struct irq_data *irqd;
 	u32 temp = 0;
 
 	dev_dbg(dev, "%s: pm_runtime: resume, state:%d\n",
@@ -3752,8 +3759,8 @@ static int swrm_runtime_resume(struct device *dev)
 	    (swrm->state == SWR_MSTR_SSR && swrm->dev_up)) {
 		if (swrm->clk_stop_mode0_supp) {
 			if (swrm->wake_irq > 0) {
-				if (unlikely(!irq_get_irq_data
-				    (swrm->wake_irq))) {
+				irqd = irq_get_irq_data(swrm->wake_irq);
+				if (unlikely(!irqd)) {
 					pr_err_ratelimited("%s: irq data is NULL\n",
 						__func__);
 					mutex_unlock(&swrm->reslock);
@@ -3761,8 +3768,7 @@ static int swrm_runtime_resume(struct device *dev)
 					return IRQ_NONE;
 				}
 				mutex_lock(&swrm->irq_lock);
-				if (!irqd_irq_disabled(
-				    irq_get_irq_data(swrm->wake_irq)))
+				if (!irqd_irq_disabled(irqd))
 					disable_irq_nosync(swrm->wake_irq);
 				mutex_unlock(&swrm->irq_lock);
 			}
