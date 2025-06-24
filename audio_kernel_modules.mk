@@ -111,7 +111,8 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
         $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
         $(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko \
         $(KERNEL_MODULES_OUT)/swr_dmic_legacy_dlkm.ko \
-        $(KERNEL_MODULES_OUT)/swr_haptics_dlkm.ko
+        $(KERNEL_MODULES_OUT)/swr_haptics_dlkm.ko \
+        $(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
 endif
 ifeq ($(call is-board-platform-in-list, holi blair), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \

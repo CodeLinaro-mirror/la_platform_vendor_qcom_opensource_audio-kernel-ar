@@ -32,6 +32,7 @@ def define_lahaina():
             "wcd9xxx_dlkm",
             "swr_haptics_dlkm",
             "stub_dlkm",
+            "hdmi_dlkm",
             "wsa883x_dlkm",
             "wcd937x_dlkm",
             "wcd937x_slave_dlkm",
@@ -50,5 +51,6 @@ def define_lahaina():
             "CONFIG_SND_SOC_WCD_IRQ",
             "CONFIG_SND_SOC_WCD9XXX_V2",
             "CONFIG_SND_SOC_WCD_MBHC_ADC",
+            "CONFIG_MSM_EXT_DISPLAY",
         ]
     )
