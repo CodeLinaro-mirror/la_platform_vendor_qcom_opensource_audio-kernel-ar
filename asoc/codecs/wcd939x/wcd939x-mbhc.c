@@ -23,6 +23,7 @@
 #include <linux/sysfs.h>
 #include <linux/kobject.h>
 #include "wcd939x-registers.h"
+#include <linux/version.h>
 #include "internal.h"
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 #include <linux/soc/qcom/wcd939x-i2c.h>
@@ -517,7 +518,11 @@ ramp_down:
 			break;
 		wcd939x_mbhc->rdown_prev_iter = val;
 	}
+#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 	del_timer(&wcd939x_mbhc->rdown_timer);
+#else
+	timer_delete(&wcd939x_mbhc->rdown_timer);
+#endif
 }
 
 static void wcd939x_mbhc_zdet_ramp(struct snd_soc_component *component,
@@ -2357,7 +2362,11 @@ int wcd939x_mbhc_init(struct wcd939x_mbhc **mbhc,
 	return 0;
 err:
 	if (wcd939x_mbhc)
+#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 		del_timer(&wcd939x_mbhc->rdown_timer);
+#else
+		timer_delete(&wcd939x_mbhc->rdown_timer);
+#endif
 	devm_kfree(component->dev, wcd939x_mbhc);
 	return ret;
 }
@@ -2385,7 +2394,11 @@ void wcd939x_mbhc_deinit(struct snd_soc_component *component)
 
 	wcd939x_mbhc = wcd939x->mbhc;
 	if (wcd939x_mbhc) {
+#if (KERNEL_VERSION(6, 15, 0) > LINUX_VERSION_CODE)
 		del_timer(&wcd939x_mbhc->rdown_timer);
+#else
+		timer_delete(&wcd939x_mbhc->rdown_timer);
+#endif
 		wcd_mbhc_deinit(&wcd939x_mbhc->wcd_mbhc);
 		devm_kfree(component->dev, wcd939x_mbhc);
 	}
