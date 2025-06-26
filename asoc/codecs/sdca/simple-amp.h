@@ -11,6 +11,9 @@
 #include <linux/debugfs.h>
 #include <linux/soundwire/sdw_registers.h>
 
+#define SIMPLE_CHIP_VERSION_V1 0
+#define SIMPLE_CHIP_VERSION_V2 1
+
 #define MCLK_9P6MHZ 9600000
 #define MAX_INIT_REGS 64
 #define MAX_CNTL_NUMBERS 4
@@ -221,6 +224,11 @@ struct simple_amp_priv {
 	struct work_struct temperature_work;
 	struct completion tmp_th_complete;
 	int curr_temp;
+	int chip_version;
 };
+
+void get_reg_defaults(const struct reg_default **reg_def, size_t *num_defaults,
+			struct simple_amp_priv *simple_amp);
+
 
 #endif /* SIMPLE_AMP_H */
