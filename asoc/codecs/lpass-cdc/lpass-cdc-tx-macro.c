@@ -1093,7 +1093,8 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
 		snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
 		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
-		if (tx_priv->adapt_tuning_registers) {
+		if (tx_priv->adapt_tuning_registers > 0 &&
+				tx_priv->adapt_tuning_registers <= MAX_TUNING_REGS) {
 			if (!tx_priv->bcs_enable) {
 				for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
 					snd_soc_component_update_bits(component,

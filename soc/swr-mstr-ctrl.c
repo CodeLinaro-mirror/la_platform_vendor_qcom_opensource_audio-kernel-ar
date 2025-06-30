@@ -3662,6 +3662,7 @@ static int swrm_remove(struct platform_device *pdev)
 {
 	struct swr_mstr_ctrl *swrm = platform_get_drvdata(pdev);
 	struct irq_data *irqd;
+	int ret = 0;
 
 	if (swrm->swr_mstr_ctrl_proc_entry)
 		proc_remove(swrm->swr_mstr_ctrl_proc_entry);
@@ -3671,8 +3672,12 @@ static int swrm_remove(struct platform_device *pdev)
 				swrm, SWR_IRQ_FREE);
 	} else if (swrm->irq) {
 		irqd = irq_get_irq_data(swrm->irq);
-		if (!irqd)
-			irqd_set_trigger_type(irqd, IRQ_TYPE_NONE);
+		if (unlikely(!irqd)) {
+			pr_err_ratelimited("%s: irq data is NULL\n", __func__);
+			ret = IRQ_NONE;
+			goto exit;
+		}
+		irqd_set_trigger_type(irqd, IRQ_TYPE_NONE);
 		if (swrm->swr_irq_wakeup_capable) {
 			irq_set_irq_wake(swrm->irq, 0);
 			device_init_wakeup(swrm->dev, false);
@@ -3696,11 +3701,11 @@ static int swrm_remove(struct platform_device *pdev)
 	mutex_destroy(&swrm->runtime_lock);
 	cpu_latency_qos_remove_request(&swrm->pm_qos_req);
 	devm_kfree(&pdev->dev, swrm);
-
+exit:
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
 	return;
 #else
-	return 0;
+	return ret;
 #endif
 }
 
