@@ -24,8 +24,9 @@
 #define CLK_RATE_FIXED 73728000
 #define SUPPLIES_NUM   2
 #define SLAVE_ADDR     0x00c
+#define NUM_REGS       0x03
 
-#define WSA885X_INTR_STATUS0   0x8585   // Base address of the status register
+#define WSA885X_INTR_STATUS0   0x8584   // Base address of the status register
 #define WSA885X_INTR_MASK0     0x8581   // Base address of the mask register
 #define WSA885X_INTR_CLEAR0    0x8587   // Base address of the acknowledge register
 #define WSA885X_INTR_LEVEL0    0x858A   // Base address of the acknowledge register
@@ -717,6 +718,12 @@ static bool wsa885x_volatile_register(struct device *dev, unsigned int reg)
 	case ANA_TOP_PLL_STATUS_1:
 	case SMP_AMP_CTRL_STEREO_PDE23_ACT_PS:
 	case SMP_AMP_CTRL_STEREO_CS21_CLOCK_VALID:
+	case WSA885X_INTR_STATUS0:
+	case WSA885X_INTR_STATUS0 + 1:
+	case WSA885X_INTR_STATUS0 + 2:
+	case WSA885X_INTR_CLEAR0:
+	case WSA885X_INTR_CLEAR0 + 1:
+	case WSA885X_INTR_CLEAR0 + 2:
 		return true;
 	default:
 		return false;
@@ -734,6 +741,9 @@ static bool wsa885x_writeable_register(struct device *dev, unsigned int reg)
 {
 	if (reg >= 0 && reg <= 0x88ff) {
 		if (reg == ANA_TOP_PLL_STATUS_0 ||
+			reg == WSA885X_INTR_STATUS0 ||
+			reg == WSA885X_INTR_STATUS0 + 1 ||
+			reg == WSA885X_INTR_STATUS0 + 2 ||
 			reg == SMP_AMP_CTRL_STEREO_PDE23_ACT_PS ||
 			reg == SMP_AMP_CTRL_STEREO_CS21_CLOCK_VALID)
 			return false;
@@ -768,6 +778,9 @@ static int wsa885x_component_probe(struct snd_soc_component *component)
 	regmap_write(wsa885x->regmap, DIG_CTRL1_SPMI_PAD_GPIO2_CTL, 0x2e); // check again
 	regmap_write(wsa885x->regmap, DIG_CTRL1_INTR_MODE, 0x01);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_PIN_CT, 0x04);
+	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0, 0x00);
+	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 1, 0x00);
+	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 2, 0x78);
 
 	return 0;
 }
@@ -876,7 +889,7 @@ static const struct snd_soc_component_driver wsa885x_i2c_component = {
 	.num_dapm_routes = 0,
 };
 
-static irqreturn_t wsa885x_interrupt_handler(int irq, void *data)
+static int handle_wsa885x_i2c_irq(int irq, void *data)
 {
 	struct wsa885x_i2c_priv *wsa885x = data;
 
@@ -903,11 +916,15 @@ static irqreturn_t wsa885x_interrupt_handler(int irq, void *data)
 		if (!wsa885x)
 			return IRQ_NONE;
 		if (irq == WSA885X_IRQ_INT_PCM_DATA0_WD) {
-			regmap_update_bits(wsa885x->regmap, 0x84A0, 0x04, 0x00);
-			regmap_update_bits(wsa885x->regmap, 0x84A0, 0x04, 0x01);
+			regmap_update_bits(wsa885x->regmap, 0x84A0,
+								0x04, 0x00);
+			regmap_update_bits(wsa885x->regmap, 0x84A0,
+								0x04, 0x01);
 		} else {
-			regmap_update_bits(wsa885x->regmap, 0x84A4, 0x04, 0x00);
-			regmap_update_bits(wsa885x->regmap, 0x84A4, 0x04, 0x01);
+			regmap_update_bits(wsa885x->regmap, 0x84A4,
+								0x04, 0x00);
+			regmap_update_bits(wsa885x->regmap, 0x84A4,
+								0x04, 0x01);
 		}
 		break;
 	case WSA885X_IRQ_INT_PA0_FSM_ERR:
@@ -924,13 +941,19 @@ static irqreturn_t wsa885x_interrupt_handler(int irq, void *data)
 			regmap_update_bits(wsa885x->regmap, WSA885X_POWER_FSM_CTL0,
 						0x08, 0x00);
 		} else if (irq == WSA885X_IRQ_INT_PA0_FSM_ERR) {
-			regmap_update_bits(wsa885x->regmap, WSA885X_PA0_FSM_CTL0, 0x04, 0x00);
-			regmap_update_bits(wsa885x->regmap, WSA885X_PA0_FSM_CTL0, 0x04, 0x04);
-			regmap_update_bits(wsa885x->regmap, WSA885X_PA0_FSM_CTL0, 0x04, 0x00);
+			regmap_update_bits(wsa885x->regmap, WSA885X_PA0_FSM_CTL0,
+								0x04, 0x00);
+			regmap_update_bits(wsa885x->regmap, WSA885X_PA0_FSM_CTL0,
+								0x04, 0x04);
+			regmap_update_bits(wsa885x->regmap, WSA885X_PA0_FSM_CTL0,
+								0x04, 0x00);
 		} else if (irq == WSA885X_IRQ_INT_PA1_FSM_ERR) {
-			regmap_update_bits(wsa885x->regmap, WSA885X_PA1_FSM_CTL0, 0x04, 0x00);
-			regmap_update_bits(wsa885x->regmap, WSA885X_PA1_FSM_CTL0, 0x04, 0x04);
-			regmap_update_bits(wsa885x->regmap, WSA885X_PA1_FSM_CTL0, 0x04, 0x00);
+			regmap_update_bits(wsa885x->regmap, WSA885X_PA1_FSM_CTL0,
+								0x04, 0x00);
+			regmap_update_bits(wsa885x->regmap, WSA885X_PA1_FSM_CTL0,
+								0x04, 0x04);
+			regmap_update_bits(wsa885x->regmap, WSA885X_PA1_FSM_CTL0,
+								0x04, 0x00);
 		}
 		break;
 	default:
@@ -938,16 +961,65 @@ static irqreturn_t wsa885x_interrupt_handler(int irq, void *data)
 		return IRQ_NONE;
 	}
 
-	pr_err_ratelimited("%s: interrupt for irq = %d triggered\n",
-					   wsa885x_irq_names[irq], irq);
+	pr_err_ratelimited("%s: handled %s interrupt\n", __func__,
+							wsa885x_irq_names[irq]);
 
 	return IRQ_HANDLED;
 }
 
+static irqreturn_t wsa885x_interrupt_handler(int irq, void *data)
+{
+	unsigned int status[NUM_REGS];
+	int i, bit, ret = IRQ_NONE;
+	int irq_num;
+	struct wsa885x_i2c_priv *wsa885x = data;
+	int status_reg[NUM_REGS] = {
+			WSA885X_INTR_STATUS0,
+			WSA885X_INTR_STATUS0 + 1,
+			WSA885X_INTR_STATUS0 + 2
+	};
+	int clear_reg[NUM_REGS] = {
+			WSA885X_INTR_CLEAR0,
+			WSA885X_INTR_CLEAR0 + 1,
+			WSA885X_INTR_CLEAR0 + 2
+	};
+
+	pr_debug("%s: interrupt for irq = %d triggered\n", __func__, irq);
+	/* Read all status registers */
+	for (i = 0; i < NUM_REGS; i++) {
+		ret = regmap_read(wsa885x->regmap, status_reg[i], &status[i]);
+		if (ret) {
+			dev_err(wsa885x->dev, "Failed to read status_reg[%d] (0x%x): %d\n",
+						i, status_reg[i], ret);
+			return IRQ_NONE;
+		}
+	}
+
+	/* Handle each interrupt bit */
+	for (i = 0; i < NUM_REGS; i++) {
+		for (bit = 0; bit < 8; bit++) {
+			if (status[i] & (1 << bit)) {
+				irq_num = i * 8 + bit;
+				ret = handle_wsa885x_i2c_irq(irq_num, wsa885x);
+				/* Clear the interrupt by writing 1 to the bit */
+				regmap_update_bits(wsa885x->regmap,
+								   clear_reg[i],
+								   (1 << bit),
+								   (1 << bit));
+				/* Optionally clear again to 0 if needed */
+				regmap_update_bits(wsa885x->regmap,
+								   clear_reg[i],
+								   (1 << bit), 0);
+			}
+		}
+	}
+
+	return ret;
+}
+
 int wsa885x_register_irq(struct wsa885x_i2c_priv *wsa885x)
 {
-	int ret, i;
-	struct regmap_irq_chip_data *irq_data;
+	int ret;
 
 	// Get the IRQ number for the GPIO
 	int irq_number = gpiod_to_irq(wsa885x->intr_pin);
@@ -958,30 +1030,14 @@ int wsa885x_register_irq(struct wsa885x_i2c_priv *wsa885x)
 		return irq_number;
 	}
 
-	// Add the IRQ chip to the regmap
-	ret = devm_regmap_add_irq_chip(wsa885x->dev, wsa885x->regmap, irq_number, IRQF_ONESHOT, 0,
-								   &wsa885x_irq_chip, &irq_data);
+	ret = devm_request_threaded_irq(wsa885x->dev, irq_number, NULL,
+					wsa885x_interrupt_handler,
+		IRQF_SHARED | IRQF_ONESHOT | IRQF_TRIGGER_FALLING, "WSA885X I2C Interrupt",
+					wsa885x);
 	if (ret) {
-		pr_err("Failed to add IRQ chip: %d\n", ret);
+		dev_err(wsa885x->dev, "Failed to request IRQ for wsa885x i2c\n");
 		gpiod_put(wsa885x->intr_pin);
 		return ret;
-	}
-
-	for (i = 0; i < WSA885X_IRQ_MAX; i++) {
-		wsa885x->virq[i] = regmap_irq_get_virq(irq_data, i);
-		if (wsa885x->virq[i] < 0) {
-			dev_err(wsa885x->dev, "Failed to get VIRQ for %s\n", wsa885x_irq_names[i]);
-			return wsa885x->virq[i];
-		}
-		ret = devm_request_threaded_irq(wsa885x->dev, wsa885x->virq[i], NULL,
-						wsa885x_interrupt_handler,
-			IRQF_ONESHOT | IRQF_TRIGGER_FALLING, wsa885x_irq_names[i], wsa885x);
-		if (ret) {
-			dev_err(wsa885x->dev, "Failed to request IRQ for virq[%d]\n",
-							wsa885x->virq[i]);
-			gpiod_put(wsa885x->intr_pin);
-			return ret;
-		}
 	}
 	return ret;
 }
