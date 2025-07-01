@@ -92,9 +92,16 @@ static ssize_t codec_debug_data_read(struct file *file, char __user *ubuf,
 		return -EINVAL;
 
 	if (regdump_info->reg_address > SDCA_REG_BASE) {
-		reg_val = snd_soc_component_read(component, regdump_info->reg_address);
+		if (regdump_info->sdca_readable_register(regdump_info->reg_address)) {
+			reg_val = snd_soc_component_read(component, regdump_info->reg_address);
+		} else {
+			dev_err(component->dev, "%s: 0x%0x isnt't readable\n",
+				__func__, regdump_info->reg_address);
+			return -EINVAL;
+		}
 	} else {
-		pr_err("%s: invalid reg_address\n", __func__);
+		dev_err(component->dev, "%s: invalid reg_address\n",
+			__func__);
 		return -EINVAL;
 	}
 
@@ -130,15 +137,22 @@ static ssize_t codec_debug_data_write(struct file *file,
 	buf[cnt] = '\0';
 	ret = kstrtouint(buf, 0, &data);
 	if (ret) {
-		dev_dbg(component->dev, "%ss: convert data string failed\n", __func__);
+		dev_dbg(component->dev, "%s: convert data string failed\n", __func__);
 		return -EINVAL;
 	}
 
 	if (regdump_info->reg_address > SDCA_REG_BASE) {
-		snd_soc_component_update_bits(component, regdump_info->reg_address,
-			0xFF, data);
+		if (regdump_info->sdca_writeable_register(regdump_info->reg_address)) {
+			snd_soc_component_update_bits(component, regdump_info->reg_address,
+				0xFF, data);
+		} else {
+			dev_err(component->dev, "%s: 0x%0x isnt't writeable\n",
+					__func__, regdump_info->reg_address);
+			return -EINVAL;
+		}
 	} else {
-		pr_err("%s: the reg isn't in the range\n", __func__);
+		dev_err(component->dev, "%s: the reg isn't in the range\n",
+				__func__);
 		return -EINVAL;
 	}
 
@@ -166,18 +180,20 @@ static ssize_t codec_debug_registers_dump(struct file *file, char __user *ubuf,
 		return -EINVAL;
 
 	for (i = ((int) *ppos/BYTES_PER_LINE); i < regdump_info->reg_num; i++) {
-		reg_val = snd_soc_component_read(component, regdump_info->reg_array[i]);
-		len = scnprintf(tmp_buf, BYTES_PER_LINE, "0x%.8x: 0x%.2x\n",
-					regdump_info->reg_array[i], (reg_val & 0xFF));
-		if (((total + len) >= count - 1) || (len < 0))
-			break;
+		if (regdump_info->sdca_readable_register(regdump_info->reg_array[i])) {
+			reg_val = snd_soc_component_read(component, regdump_info->reg_array[i]);
+			len = scnprintf(tmp_buf, BYTES_PER_LINE, "0x%.8x: 0x%.2x\n",
+						regdump_info->reg_array[i], (reg_val & 0xFF));
+			if (((total + len) >= count - 1) || (len < 0))
+				break;
 
-		if (copy_to_user((ubuf + total), tmp_buf, len)) {
-			total = -EFAULT;
-			goto copy_err;
+			if (copy_to_user((ubuf + total), tmp_buf, len)) {
+				total = -EFAULT;
+				goto copy_err;
+			}
+			total += len;
+			*ppos += len;
 		}
-		total += len;
-		*ppos += len;
 	}
 
 copy_err:
@@ -209,8 +225,15 @@ void sdca_devices_debugfs_dentry_create(
 	struct snd_soc_component *component =
 					regdump_info->component;
 
+	if ((!regdump_info->sdca_readable_register) ||
+		(!regdump_info->sdca_writeable_register)) {
+		dev_err(component->dev, "%s: read/write access check table is NULL\n",
+			__func__);
+		return;
+	}
 	debugfs_info->sdca_dentry = debugfs_create_dir(
 					dev_name(component->dev), 0);
+
 	if (!IS_ERR(debugfs_info->sdca_dentry)) {
 		debugfs_info->address =
 				debugfs_create_file("address",
@@ -245,4 +268,6 @@ void sdca_devices_debugfs_dentry_remove(struct sdca_debugfs_info *debugfs_info)
 	}
 }
 EXPORT_SYMBOL_GPL(sdca_devices_debugfs_dentry_remove);
+
 MODULE_LICENSE("GPL");
+
