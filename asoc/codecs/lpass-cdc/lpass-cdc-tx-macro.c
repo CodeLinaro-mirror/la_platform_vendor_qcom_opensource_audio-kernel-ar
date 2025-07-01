@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/module.h>
@@ -23,7 +23,6 @@
 #define LPASS_CDC_TX_MACRO_MAX_OFFSET 0x1000
 
 #define NUM_DECIMATORS 8
-#define MAX_TUNING_REGS 10
 
 #define LPASS_CDC_TX_MACRO_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
 			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
@@ -46,10 +45,9 @@
 
 #define LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS	40
 #define LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS	100
-#define LPASS_CDC_TX_MACRO_HS_AMIC_UNMUTE_DELAY_MS	300
 #define LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS	300
 #define LPASS_CDC_TX_MACRO_AMIC_HPF_DELAY_MS	300
-#define LPASS_CDC_TX_MACRO_DEC_UNMUTE_DELAY_MS  35
+#define LPASS_CDC_TX_MACRO_DEC_UNMUTE_DELAY_MS  10
 
 static int tx_unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
 module_param(tx_unmute_delay, int, 0664);
@@ -166,8 +164,6 @@ struct lpass_cdc_tx_macro_priv {
 	bool swr_dmic_enable;
 	bool swr_dmic_gain_disable;
 	int wlock_holders;
-	int adapt_tuning_registers;
-	u32 tuning_reg_values[MAX_TUNING_REGS * 3];
 };
 
 static int lpass_cdc_tx_macro_wake_enable(struct lpass_cdc_tx_macro_priv *tx_priv,
@@ -1015,7 +1011,6 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 adapt_ctrl = 0;
 	u16 adapt_pdm_ctl0 = 0;
 	u16 adapt_pdm_ctl1 = 0;
-	u8 i = 0;
 #endif
 	int hpf_delay = LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS;
 	int unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
@@ -1081,36 +1076,6 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 						0x0E, tx_priv->dmic_clk_div[mic_pair] << 0x1);
 					/* TODO: Add all DIV support */
 		}
-		usleep_range(5000, 5050);
-#ifdef CONFIG_BOLERO_VER_2P85
-		adapt_ctrl = LPASS_TX_CDC_ADPT0_ADPT_CTRL +
-				 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
-		adapt_pdm_ctl0 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_0 +
-				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
-		adapt_pdm_ctl1 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_1 +
-				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
-		snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
-		snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
-		snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
-		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
-		if (tx_priv->adapt_tuning_registers) {
-			if (!tx_priv->bcs_enable) {
-				for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
-					snd_soc_component_update_bits(component,
-					(tx_priv->tuning_reg_values[i] +
-					 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
-					 0xFF, tx_priv->tuning_reg_values[i + 1]);
-				}
-			} else {
-				for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
-					snd_soc_component_update_bits(component,
-					(tx_priv->tuning_reg_values[i] +
-					LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
-					0xFF, tx_priv->tuning_reg_values[i + 2]);
-				}
-			}
-		}
-#endif
 		snd_soc_component_update_bits(component,
 			tx_vol_ctl_reg, 0x20, 0x20);
 		if (!is_amic_enabled(component, decimator)) {
@@ -1135,10 +1100,7 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 
 		if (is_amic_enabled(component, decimator)) {
 			hpf_delay = LPASS_CDC_TX_MACRO_AMIC_HPF_DELAY_MS;
-			if (tx_priv->bcs_enable)
-				unmute_delay = LPASS_CDC_TX_MACRO_HS_AMIC_UNMUTE_DELAY_MS;
-			else
-				unmute_delay = LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS;
+			unmute_delay = LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS;
 		}
 		if (tx_priv->tx_hpf_work[decimator].hpf_cut_off_freq !=
 							CF_MIN_3DB_150HZ) {
@@ -1175,6 +1137,18 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 					LPASS_CDC_TX0_TX_PATH_SEC7, 0x40,
 					0x40);
 		}
+#ifdef CONFIG_BOLERO_VER_2P85
+		adapt_ctrl = LPASS_TX_CDC_ADPT0_ADPT_CTRL +
+				 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		adapt_pdm_ctl0 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_0 +
+				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		adapt_pdm_ctl1 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_1 +
+				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+		snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
+		snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
+		snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
+#endif
 		break;
 	case SND_SOC_DAPM_PRE_PMD:
 		hpf_cut_off_freq =
@@ -1395,6 +1369,10 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 			LPASS_CDC_TX_MACRO_DEC_MAX) {
 		adc_mux_reg = LPASS_CDC_TX_INP_MUX_ADC_MUX0_CFG1 +
 			LPASS_CDC_TX_MACRO_ADC_MUX_CFG_OFFSET * decimator;
+		if (snd_soc_component_read(component, adc_mux_reg) & 0x3) {
+			if (!tx_priv->swr_dmic_enable)
+				continue;
+		}
 		tx_mute_ctl_reg = LPASS_CDC_TX0_TX_PATH_CTL +
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 		if (mute) {
@@ -2315,16 +2293,6 @@ static int lpass_cdc_tx_macro_probe(struct platform_device *pdev)
 				lpass_cdc_tx_macro_update_clk_div_factor(
 						temp[i], tx_priv, i);
 
-	}
-
-	tx_priv->adapt_tuning_registers = of_property_read_variable_u32_array(pdev->dev.of_node,
-				"adapt-tuning-reg-values", tx_priv->tuning_reg_values, 0,
-						ARRAY_SIZE(tx_priv->tuning_reg_values));
-
-	if (tx_priv->adapt_tuning_registers == -EOVERFLOW ||
-		(tx_priv->adapt_tuning_registers < 0)) {
-		dev_err(&pdev->dev, "failure in reading tuning registers\n");
-		tx_priv->adapt_tuning_registers = 0;
 	}
 
 	mutex_init(&tx_priv->mclk_lock);
