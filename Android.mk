@@ -67,7 +67,7 @@ endif
 
 ifeq ($(call is-board-platform-in-list, gen4 msmnile),true)
 KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
-ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm msmnile_gvmq))
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq))
 KBUILD_OPTIONS +=CONFIG_SND_SOC_GVM=y
 endif
 endif
@@ -78,7 +78,7 @@ AUDIO_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*/*/*) \
 	$(wildcard $(LOCAL_PATH)/*/*/*/*)
 
-ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm msmnile_gvmq))
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq))
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := stub_dlkm.ko
