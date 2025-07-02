@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -971,6 +971,10 @@ static int lpass_cdc_wsa2_macro_mute_stream(struct snd_soc_dai *dai, int mute, i
 		break;
 	case LPASS_CDC_WSA2_MACRO_AIF1_PCM_PB:
 		regmap = dev_get_regmap(wsa2_priv->dev->parent, NULL);
+		if (!regmap) {
+			dev_err(wsa2_dev, "%s: regmap is NULL\n", __func__);
+			break;
+		}
 		regmap_update_bits(regmap,
 				LPASS_CDC_WSA2_TX0_SPKR_PROT_PATH_CFG0,
 				0x03, 0x00);
