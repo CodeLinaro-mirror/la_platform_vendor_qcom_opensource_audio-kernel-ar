@@ -184,6 +184,7 @@ ifdef CONFIG_WCD9XXX_CODEC_CORE
 	WCD9XXX_OBJS += wcd9xxx-resmgr-v2.o
 	WCD9XXX_OBJS += wcd-dsp-utils.o
 	WCD9XXX_OBJS += wcd-dsp-mgr.o
+	WCD9XXX_OBJS += wcd-clsh.o
 else
 	WCD9XXX_OBJS += wcd-clsh.o
 endif
@@ -200,7 +201,7 @@ ifdef CONFIG_SND_SOC_WSA881X
 	WSA881X_OBJS += wsa881x.o
 	WSA881X_OBJS += wsa881x-tables.o
 	WSA881X_OBJS += wsa881x-regmap.o
-	WSA881X_OBJS += wsa881x-temp-sensor.o
+        WSA881X_OBJS += wsa881x-temp-sensor.o
 endif
 
 ifdef CONFIG_SND_SOC_SWR_DMIC
