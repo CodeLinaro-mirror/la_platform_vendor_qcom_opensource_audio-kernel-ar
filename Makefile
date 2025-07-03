@@ -10,6 +10,18 @@ KBUILD_OPTIONS += CONFIG_SND_SOC_GVM=y
 KBUILD_OPTIONS += MODNAME=audio_dlkm
 endif
 
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sdxpinn sdxpinn-cpe-wkk sdxbaagha))
+
+ifeq ($(TARGET_SUPPORT), sdxpinn)
+KBUILD_OPTIONS += CONFIG_ARCH_SDXPINN=y
+endif
+
+ifeq ($(TARGET_SUPPORT), sdxpinn-cpe-wkk)
+KBUILD_OPTIONS += CONFIG_ARCH_SDXPINN=y
+endif
+
+endif
+
 M=$(PWD)
 AUDIO_ROOT=$(KERNEL_SRC)/$(M)
 
