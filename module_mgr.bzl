@@ -1,5 +1,6 @@
 load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
-load("//build/kernel/kleaf:kernel.bzl", "ddk_module", "kernel_module_group")
+load("//build/kernel/kleaf:kernel.bzl", "ddk_module",
+                                        "ddk_submodule")
 
 def _create_module_conditional_src_map(conditional_srcs):
     processed_conditional_srcs = {}
@@ -55,26 +56,7 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
     rule_prefix = "{}_{}_{}".format(target, variant, product) if product else "{}_{}".format(target, variant)
     enabled_modules = _get_enabled_module_objs(registry, modules)
     options = _combine_target_module_options(enabled_modules, config_options)
-    headers = select({
-        "//build/kernel/kleaf:socrepo_true": [
-            "//soc-repo:all_headers",
-            "//soc-repo:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
-            "//soc-repo:{}_{}/drivers/pinctrl/qcom/pinctrl-msm".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/pdr_interface".format(target, variant),
-            "//soc-repo:{}_{}/drivers/remoteproc/rproc_qcom_common".format(target, variant),
-            "//soc-repo:{}_{}/drivers/base/regmap/qti-regmap-debugfs".format(target, variant),
-            "//soc-repo:{}_{}/drivers/power/supply/qti_battery_charger".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/wcd_usbss_i2c".format(target, variant),
-            "//soc-repo:{}_{}/kernel/trace/qcom_ipc_logging".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/socinfo".format(target, variant),
-        ] + registry.hdrs,
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"] + registry.hdrs,
-    })
-    kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_{}_base_kernel".format(target, variant),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
-    })
-
+    headers = ["//msm-kernel:all_headers"] + registry.hdrs
     submodule_rules = []
     for module in enabled_modules:
         rule_name = "{}_{}".format(rule_prefix, module.name)
@@ -84,9 +66,8 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
         if not srcs:
             continue
 
-        ddk_module(
+        ddk_submodule(
             name = rule_name,
-            kernel_build = kernel_build,
             srcs = srcs,
             out = "{}.ko".format(module.name),
             deps = deps,
@@ -95,20 +76,21 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
 
         submodule_rules.append(rule_name)
 
-    kernel_module_group(
+    ddk_module(
         name = "{}_modules".format(rule_prefix),
-        srcs = submodule_rules
+        kernel_build = "//msm-kernel:{}_{}".format(target, variant),
+        deps = submodule_rules
     )
 
     copy_to_dist_dir(
         name = "{}_modules_dist".format(rule_prefix),
-        data = submodule_rules,
+        data = [":{}_modules".format(rule_prefix)],
         dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
         flat = True,
         wipe_dist_dir = False,
         allow_duplicate_filenames = False,
         mode_overrides = {"**/*": "644"},
-        log = "info",
+        log = "info"
     )
 
 def create_module_registry(hdrs = []):
