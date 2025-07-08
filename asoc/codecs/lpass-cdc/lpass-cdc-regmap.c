@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022,2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/regmap.h>
@@ -156,14 +156,14 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_TX_TX_INP_MUX_ADC_MUX5_CFG2, 0x00},
 	{ LPASS_TX_TX_INP_MUX_ADC_MUX6_CFG2, 0x00},
 	{ LPASS_TX_TX_INP_MUX_ADC_MUX7_CFG2, 0x00},
-	{ LPASS_CDC_TX0_TX_PATH_CFG2, 0x01},
-	{ LPASS_CDC_TX1_TX_PATH_CFG2, 0x01},
-	{ LPASS_CDC_TX2_TX_PATH_CFG2, 0x01},
-	{ LPASS_CDC_TX3_TX_PATH_CFG2, 0x01},
-	{ LPASS_CDC_TX4_TX_PATH_CFG2, 0x01},
-	{ LPASS_CDC_TX5_TX_PATH_CFG2, 0x01},
-	{ LPASS_CDC_TX6_TX_PATH_CFG2, 0x01},
-	{ LPASS_CDC_TX7_TX_PATH_CFG2, 0x01},
+	{ LPASS_CDC_TX0_TX_PATH_CFG2, 0x03},
+	{ LPASS_CDC_TX1_TX_PATH_CFG2, 0x03},
+	{ LPASS_CDC_TX2_TX_PATH_CFG2, 0x03},
+	{ LPASS_CDC_TX3_TX_PATH_CFG2, 0x03},
+	{ LPASS_CDC_TX4_TX_PATH_CFG2, 0x03},
+	{ LPASS_CDC_TX5_TX_PATH_CFG2, 0x03},
+	{ LPASS_CDC_TX6_TX_PATH_CFG2, 0x03},
+	{ LPASS_CDC_TX7_TX_PATH_CFG2, 0x03},
 	{ LPASS_TX_CDC_ADPT0_ADPT_CTRL, 0x51},
 	{ LPASS_TX_CDC_ADPT0_ADPT_GAIN_0, 0x11},
 	{ LPASS_TX_CDC_ADPT0_ADPT_GAIN_1, 0x01},
