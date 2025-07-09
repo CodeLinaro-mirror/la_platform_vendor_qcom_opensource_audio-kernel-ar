@@ -53,6 +53,7 @@ def define_sdxkova():
             "CONFIG_REGMAP_SWR",
             "CONFIG_SPF_CORE", # dsp/
             "CONFIG_AUDIO_PRM",
+            "CONFIG_MDM_AUDIO_SSR",
             "CONFIG_MSM_QDSP6_SSR",
             "CONFIG_MSM_QDSP6_PDR",
             "CONFIG_MSM_QDSP6_NOTIFIER",
