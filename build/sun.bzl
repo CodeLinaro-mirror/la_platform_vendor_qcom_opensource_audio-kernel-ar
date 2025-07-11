@@ -40,6 +40,9 @@ def define_sun():
             "wcd938x_slave_dlkm",
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
+            "wcd9378_dlkm",
+            "wcd9378_slave_dlkm",
+            "sdca_registers_dlkm",
             "lpass_bt_swr_dlkm",
             "qmp_dlkm",
             "simple_amp_dlkm"
@@ -61,5 +64,6 @@ def define_sun():
             "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
             "CONFIG_SND_SOC_SIMPLE_AMP",
+            "CONFIG_SND_SOC_SDCA_REGISTERS",
         ]
     )
