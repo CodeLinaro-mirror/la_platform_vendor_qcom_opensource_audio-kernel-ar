@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _WCD939X_INTERNAL_H
@@ -25,6 +25,7 @@
 #define MAX_USBCSS_HS_IMPEDANCE_MOHMS 20000
 #define MIN_DIFF_SLOPE_FACTOR 9800
 #define MAX_DIFF_SLOPE_FACTOR 10000
+#define WCD939X_ECID_REGS 16
 
 /* Convert from vout ctl to micbias voltage in mV */
 #define  WCD_VOUT_CTL_TO_MICB(v)  (1000 + v * 50)
@@ -154,6 +155,8 @@ struct wcd939x_priv {
 	bool notify_swr_dmic;
 	struct blocking_notifier_head notifier;
 	struct proc_dir_entry *wcd939x_proc_entry;
+	u8 ecid_val[WCD939X_ECID_REGS];
+	struct snd_info_entry *ecid_entry;
 };
 
 struct wcd939x_micbias_setting {
