@@ -27,8 +27,22 @@ struct sdca_regdump_info {
 	bool (*sdca_writeable_register)(u32 reg);
 };
 
-extern void sdca_devices_debugfs_dentry_create(struct sdca_debugfs_info *debugfs_info,
+#if IS_ENABLED(CONFIG_SND_SOC_SDCA_REGISTERS)
+void sdca_devices_debugfs_dentry_create(struct sdca_debugfs_info *debugfs_info,
 				struct sdca_regdump_info *regdump_info);
-extern void sdca_devices_debugfs_dentry_remove(struct sdca_debugfs_info *debugfs_info);
+void sdca_devices_debugfs_dentry_remove(struct sdca_debugfs_info *debugfs_info);
+
+#else
+static inline void sdca_devices_debugfs_dentry_create(
+				struct sdca_debugfs_info *debugfs_info,
+				struct sdca_regdump_info *regdump_info)
+{
+}
+static inline void sdca_devices_debugfs_dentry_remove(
+				struct sdca_debugfs_info *debugfs_info)
+{
+}
+#endif
 
 #endif
+
