@@ -8,7 +8,7 @@
 #define _LINUX_MSM_AUDIO_ION_H
 #include <sound/pcm.h>
 #include <linux/msm_ion.h>
-#include <linux/dma-mapping.h>
+#include <linux/dma-map-ops.h>
 
 enum {
 	HLOS_TO_ADSP = 1,

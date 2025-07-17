@@ -7,7 +7,7 @@
 #define __MFD_WCD9XXX_PDATA_H__
 
 #if IS_ENABLED(CONFIG_WCD9XXX_CODEC_CORE)
-#include <linux/slimbus/slimbus.h>
+#include <linux/slimbus.h>
 #endif
 
 #include "msm-cdc-supply.h"

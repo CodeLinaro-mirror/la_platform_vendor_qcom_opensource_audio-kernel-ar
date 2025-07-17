@@ -1,9 +1,8 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
 /*
+ * SPDX-License-Identifier: GPL-2.0-only
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
-
 #include <sound/soc.h>
 
 SND_SOC_DAILINK_DEFS(usb_audio_rx,
@@ -161,7 +160,8 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx0,
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
 			   COMP_CODEC("bolero_codec", "rx_macro_rx1"),
 			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
-			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc")),
+			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc"),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx1,
@@ -170,7 +170,8 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx1,
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
 			   COMP_CODEC("bolero_codec", "rx_macro_rx2"),
 			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
-			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc")),
+			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc"),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx2,
@@ -179,7 +180,8 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx2,
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
 			   COMP_CODEC("bolero_codec", "rx_macro_rx3"),
 			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
-			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc")),
+			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc"),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx3,
@@ -188,7 +190,8 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx3,
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
 			   COMP_CODEC("bolero_codec", "rx_macro_rx4"),
 			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
-			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc")),
+			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc"),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx5,
@@ -197,7 +200,8 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx5,
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
 			   COMP_CODEC("bolero_codec", "rx_macro_rx5"),
 			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
-			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc")),
+			   COMP_CODEC("wcd938x_codec", "wcd938x_cdc"),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx6,
@@ -213,7 +217,8 @@ SND_SOC_DAILINK_DEFS(tx_dma_tx3,
 			   COMP_CODEC("wcd939x_codec", "wcd939x_cdc"),
 			   COMP_CODEC("bolero_codec", "tx_macro_tx1"),
                            COMP_CODEC("wcd938x_codec", "wcd938x_cdc"),
-                           COMP_CODEC("wcd937x_codec", "wcd937x_cdc")),
+                           COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			   COMP_CODEC("wcd9378_codec", "wcd9378_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(tx_dma_tx4,
@@ -223,6 +228,7 @@ SND_SOC_DAILINK_DEFS(tx_dma_tx4,
 			COMP_CODEC("bolero_codec", "tx_macro_tx2"),
 			COMP_CODEC("wcd938x_codec", "wcd938x_cdc"),
 			COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			COMP_CODEC("wcd9378_codec", "wcd9378_cdc"),
 			COMP_CODEC("swr-dmic.01", "swr_dmic_tx0"),
 			COMP_CODEC("swr-dmic.02", "swr_dmic_tx1"),
 			COMP_CODEC("swr-dmic.03", "swr_dmic_tx2"),

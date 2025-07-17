@@ -79,6 +79,10 @@ ifeq ($(KERNEL_BUILD), 0)
 		include $(AUDIO_ROOT)/config/sunauto.conf
 		INCS    +=  -include $(AUDIO_ROOT)/config/sunautoconf.h
 	endif
+	ifeq ($(CONFIG_ARCH_KERA), y)
+		include $(AUDIO_ROOT)/config/keraauto.conf
+		INCS    +=  -include $(AUDIO_ROOT)/config/keraautoconf.h
+	endif
 	ifeq ($(CONFIG_ARCH_LITO), y)
 		include $(AUDIO_ROOT)/config/litoauto.conf
 		export
@@ -169,7 +173,6 @@ endif
 # for SM6150 sound card driver
 ifdef CONFIG_SND_SOC_SM6150
 	MACHINE_OBJS += sm6150.o
-	MACHINE_OBJS += machine_615x_init.o
 endif
 
 # For sa6155 sound card driver
@@ -213,6 +216,11 @@ endif
 
 # for SUN sound card driver
 ifdef CONFIG_SND_SOC_SUN
+	MACHINE_OBJS += sun.o
+endif
+
+# for KERA sound card driver
+ifdef CONFIG_SND_SOC_KERA
 	MACHINE_OBJS += sun.o
 endif
 
@@ -317,6 +325,9 @@ obj-$(CONFIG_SND_SOC_PINEAPPLE) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_SUN) += machine_dlkm.o
+machine_dlkm-y := $(MACHINE_OBJS)
+
+obj-$(CONFIG_SND_SOC_KERA) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_HOLI) += machine_dlkm.o

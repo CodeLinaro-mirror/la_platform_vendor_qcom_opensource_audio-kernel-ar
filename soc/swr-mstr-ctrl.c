@@ -1,9 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
+ * SPDX-License-Identifier: GPL-2.0-only
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
-
 #include <linux/irq.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -101,6 +100,10 @@
 #define SAMPLING_RATE_384KHZ  384000
 
 #define SWR_BASECLK_VAL_1_FOR_19P2MHZ  (0x1)
+#define SWRS_DEVID_COMBINE(cls_id, addr_id)	\
+			(((long)(cls_id) << 32) | (addr_id))
+#define WCD9378_TX_DEVID (0x1001170223)
+#define WCD9378_RX_DEVID (0x1001170224)
 
 /* pm runtime auto suspend timer in msecs */
 static int auto_suspend_timer = 500;
@@ -1046,6 +1049,7 @@ static int swrm_cmd_fifo_wr_cmd(struct swr_mstr_ctrl *swrm, u8 cmd_data,
 	 * Check for outstanding cmd wrt. write fifo depth to avoid
 	 * overflow.
 	 */
+	usleep_range(500, 550);
 	swrm_wait_for_fifo_avail(swrm, SWRM_WR_CHECK_AVAIL);
 	swr_master_write(swrm, SWRM_CMD_FIFO_WR_CMD(swrm->ee_val), val);
 	/*
@@ -1650,12 +1654,14 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 
 			if (len < SWRM_MAX_PORT_REG) {
 				/* Only wite MSB if SI > 0xFF */
+				if ((port_req->sinterval >> 8)& 0xFF) {
 				reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
 				val[len++] = SWR_REG_VAL_PACK(
 						(port_req->sinterval >> 8) & 0xFF,
 						port_req->dev_num, get_cmd_id(swrm),
 						SWRS_DP_SAMPLE_CONTROL_2_BANK(slv_port_id,
 									bank));
+				}
 			}
 
 			if (agg_slv_port_offset1[port_req->dev_num][slv_port_id] == 0)
@@ -1908,16 +1914,21 @@ static void swrm_apply_port_config(struct swr_master *master)
 /* also, if the device enumerates on the bus when active bank is 1, issue bank switch */
 static void swrm_initialize_clk_base_scale(struct swr_mstr_ctrl *swrm, u8 dev_num)
 {
-	int clk_scale, n_row, n_col;
-	int cls_id;
-	int frame_shape;
-	u8 active_bank;
+	int clk_scale = 0, n_row = 0, n_col = 0;
+	int cls_id = 0, addr_id = 0;
+	long dev_id = 0;
+	int frame_shape = 0;
+	u8 active_bank = 0;
 
 	if (dev_num == 0)
 		return;
 
 	cls_id = swr_master_read(swrm, SWRM_ENUMERATOR_SLAVE_DEV_ID_2(dev_num));
-	if (cls_id & 0xFF00) {
+	addr_id = swr_master_read(swrm, SWRM_ENUMERATOR_SLAVE_DEV_ID_1(dev_num));
+	dev_id = SWRS_DEVID_COMBINE(cls_id, addr_id);
+
+	if ((cls_id & 0xFF00) ||
+		(dev_id == WCD9378_TX_DEVID || dev_id == WCD9378_RX_DEVID)) {
 
 		active_bank = get_active_bank_num(swrm);
 		if (active_bank != 0) {
@@ -1942,7 +1953,6 @@ static void swrm_initialize_clk_base_scale(struct swr_mstr_ctrl *swrm, u8 dev_nu
 	}
 }
 
-#define SLAVE_DEV_CLASS_ID  GENMASK(45, 40)
 static int swrm_update_clk_base_and_scale(struct swr_master *master, u8 inactive_bank)
 {
 	struct swr_device *swr_dev;
@@ -1955,8 +1965,7 @@ static int swrm_update_clk_base_and_scale(struct swr_master *master, u8 inactive
 		if (swr_dev->dev_num == 0)
 			continue;
 
-		/* check class_id if 1 */
-		if (!(swr_dev->addr & SLAVE_DEV_CLASS_ID))
+		if (!swr_dev->paging_support)
 			continue;
 
 		/* v1.2 slave could be attached to the bus */
@@ -2104,6 +2113,7 @@ static int swrm_slvdev_datapath_control(struct swr_master *master, bool enable)
 	swrm_update_clk_base_and_scale(master, bank);
 	enable_bank_switch(swrm, bank, n_row, n_col);
 	inactive_bank = bank ? 0 : 1;
+	swrm_update_clk_base_and_scale(master, inactive_bank);
 
 	if (enable)
 		swrm_copy_data_port_config(master, inactive_bank);
@@ -2418,7 +2428,7 @@ static void swrm_process_change_enum_slave_status(struct swr_mstr_ctrl *swrm)
 	}
 
 	num_enum_devs = 0;
-	memset(enum_devnum, 0, sizeof(SWR_MAX_DEV_NUM * 2 * sizeof(u8)));
+	memset(enum_devnum, 0, (SWR_MAX_DEV_NUM * 2 * sizeof(u8)));
 	chg_sts = swrm_check_slave_change_status(swrm, enum_devnum, &num_enum_devs);
 
 	if (num_enum_devs == 0)
@@ -3776,7 +3786,8 @@ static int swrm_runtime_resume(struct device *dev)
 			}
 			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
 			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
-			swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
+			if (swrm->version > SWRM_VERSION_1_5)
+				swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
 			swrm_master_init(swrm);
 			/* wait for hw enumeration to complete */
 			usleep_range(100, 105);
