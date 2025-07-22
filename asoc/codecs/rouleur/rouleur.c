@@ -1956,6 +1956,8 @@ static const struct snd_kcontrol_new rouleur_snd_controls[] = {
 			analog_gain),
 	SOC_SINGLE_TLV("ADC2 Volume", ROULEUR_ANA_TX_AMIC2, 0, 12, 0,
 			analog_gain),
+	SOC_ENUM_EXT("ADC1 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
 	SOC_ENUM_EXT("ADC2 ChMap", tx_master_ch_enum,
 			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
         SOC_ENUM_EXT("ADC3 ChMap", tx_master_ch_enum,
