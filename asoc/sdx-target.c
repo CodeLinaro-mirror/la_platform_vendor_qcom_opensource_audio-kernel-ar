@@ -709,7 +709,11 @@ static int msm_populate_dai_link_component_of_node(
 		}
 	}
 
-	/* In multi-codec scenario, check if codecs are enabled for this platform */
+#ifndef CONFIG_SND_SOC_SDX
+	int codecs_enabled = 0;
+	struct snd_soc_dai_link_component *codecs_comp = NULL;
+
+	/* In multi-codec scenario, check if codecs are enabled for this platform  */
 	for (i = 0; i < card->num_links; i++) {
 		codecs_enabled = 0;
 		if (dai_link[i].num_codecs > 1) {
@@ -755,7 +759,7 @@ static int msm_populate_dai_link_component_of_node(
 			}
 		}
 	}
-
+#endif
 err:
 	return ret;
 }

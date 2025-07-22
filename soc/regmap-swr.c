@@ -108,6 +108,8 @@ static int regmap_swr_gather_write(void *context,
 		mutex_unlock(&swr_rw_lock);
 		return ret;
 	}
+#else
+	reg_addr = *(u16 *)reg;
 #endif
 	/* val_len = VAL_BYTES * val_count */
 	for (i = 0; i < (val_len / VAL_BYTES); i++) {
@@ -201,6 +203,8 @@ static int regmap_swr_write(void *context, const void *data, size_t count)
 	}
 
 	addr_bytes = (swr->paging_support ? ADDR_BYTES_4 : ADDR_BYTES);
+#else
+	addr_bytes = ADDR_BYTES;
 #endif
 	WARN_ON(count < addr_bytes);
 
@@ -247,6 +251,8 @@ static int regmap_swr_read(void *context,
 		mutex_unlock(&swr_rw_lock);
 		return ret;
 	}
+#else
+	reg_addr = *(u16*)reg;
 #endif
 
 	ret = swr_read(swr, swr->dev_num, reg_addr, val, val_size);

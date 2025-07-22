@@ -1020,6 +1020,7 @@ static int wcd9xxx_i2c_write_device(struct wcd9xxx *wcd9xxx, u16 reg, u8 *value,
 		}
 	}
 	pr_debug("write success register = %x val = %x\n", reg, data[1]);
+	ret  = 0;
 fail:
 	kfree(data);
 	return ret;
