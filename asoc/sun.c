@@ -1,9 +1,8 @@
-// SPDX-License-Identifier: GPL-2.0-only
 /*
+ * SPDX-License-Identifier: GPL-2.0-only
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
-
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/gpio.h>
@@ -15,6 +14,7 @@
 #include <linux/input.h>
 #include <soc/qcom/socinfo.h>
 #include <linux/of_device.h>
+#include <linux/soc/qcom/fsa4480-i2c.h>
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 #include <linux/soc/qcom/wcd939x-i2c.h>
 #endif
@@ -35,9 +35,11 @@
 #include "asoc/msm-cdc-pinctrl.h"
 #include "asoc/wcd-mbhc-v2.h"
 #include "codecs/wcd939x/wcd939x-mbhc.h"
+#include "codecs/wcd9378/wcd9378-mbhc.h"
 #include "codecs/wsa884x/wsa884x.h"
 #include "codecs/wsa883x/wsa883x.h"
 #include "codecs/wcd939x/wcd939x.h"
+#include "codecs/wcd9378/wcd9378.h"
 #include "codecs/lpass-cdc/lpass-cdc.h"
 #include <bindings/audio-codec-port-types.h>
 #include "codecs/lpass-cdc/lpass-cdc-wsa-macro.h"
@@ -65,6 +67,12 @@
 #define STEREO_SPEAKER  2
 #define QUAD_SPEAKER    4
 
+enum {
+	WCD937X_DEV_INDEX,
+	WCD939X_DEV_INDEX,
+	WCD9378_DEV_INDEX,
+};
+
 struct msm_asoc_mach_data {
 	struct snd_info_entry *codec_root;
 	struct msm_common_pdata *common_pdata;
@@ -75,6 +83,7 @@ struct msm_asoc_mach_data {
 	struct device_node *dmic67_gpio_p; /* used by pinctrl API */
 	struct pinctrl *usbc_en2_gpio_p; /* used by pinctrl API */
 	bool is_afe_config_done;
+	struct device_node *fsa_handle;
 	struct device_node *wcd_usbss_handle;
 	struct clk *lpass_audio_hw_vote;
 	int core_audio_vote_count;
@@ -84,6 +93,7 @@ struct msm_asoc_mach_data {
 	int backend_used;
 	struct prm_earpa_hw_intf_config upd_config;
 	bool dedicated_wsa2; /* used to define how wsa2 slave devices are used */
+	int wcd_used;
 };
 
 static bool is_initial_boot;
@@ -133,25 +143,30 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 
 static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool active)
 {
+	int ret = 0;
 	struct snd_soc_card *card = component->card;
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(card);
 
-	if (!pdata->wcd_usbss_handle)
+	if (!pdata->wcd_usbss_handle && !pdata->fsa_handle)
 		return false;
 
+	if (pdata->fsa_handle) {
+		ret = fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
+	} else {
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
-	int ret = 0;
-	if (wcd_mbhc_cfg.usbss_hsj_connect_enable)
-		ret = wcd_usbss_switch_update(WCD_USBSS_GND_MIC_SWAP_HSJ,
+		if (wcd_mbhc_cfg.usbss_hsj_connect_enable)
+			ret = wcd_usbss_switch_update(WCD_USBSS_GND_MIC_SWAP_HSJ,
 							WCD_USBSS_CABLE_CONNECT);
-	else if (wcd_mbhc_cfg.enable_usbc_analog)
-		ret = wcd_usbss_switch_update(WCD_USBSS_GND_MIC_SWAP_AATC,
+		else if (wcd_mbhc_cfg.enable_usbc_analog)
+			ret = wcd_usbss_switch_update(WCD_USBSS_GND_MIC_SWAP_AATC,
 							WCD_USBSS_CABLE_CONNECT);
+#endif
+	}
 	if (ret == 0)
 		return true;
-#endif
-	return false;
+	else
+		return false;
 }
 
 static void msm_parse_upd_configuration(struct platform_device *pdev,
@@ -198,6 +213,7 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 	u8  dev_num = 0;
 	struct snd_soc_component *component = NULL;
 	struct msm_asoc_mach_data *pdata = NULL;
+	char wcd_name[20];
 
 	if (!rtd) {
 		pr_err_ratelimited("%s: rtd is NULL\n", __func__);
@@ -230,7 +246,11 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 			return;
 		}
 	} else {
-		component = snd_soc_rtdcom_lookup(rtd, WCD939X_DRV_NAME);
+		if (pdata->wcd_used == WCD9378_DEV_INDEX)
+			strscpy(wcd_name, WCD9378_DRV_NAME, sizeof(WCD9378_DRV_NAME));
+		else
+			strscpy(wcd_name, WCD939X_DRV_NAME, sizeof(WCD939X_DRV_NAME));
+		component = snd_soc_rtdcom_lookup(rtd, wcd_name);
 		if (!component) {
 			pr_err("%s component is NULL\n", __func__);
 			return;
@@ -243,7 +263,11 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 		else
 			pdata->get_dev_num = wsa884x_codec_get_dev_num;
 	} else {
-		pdata->get_dev_num = wcd939x_codec_get_dev_num;
+		if (pdata->wcd_used == WCD9378_DEV_INDEX) {
+			pdata->get_dev_num = wcd9378_codec_get_dev_num;
+		} else {
+			pdata->get_dev_num = wcd939x_codec_get_dev_num;
+		}
 	}
 
 	if (!pdata->get_dev_num) {
@@ -1501,6 +1525,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	struct msm_asoc_mach_data *pdata;
 	int ret = 0;
 	void *mbhc_calibration;
+	char wcd_name[20];
 
 	pdata = snd_soc_card_get_drvdata(card);
 	if (!pdata)
@@ -1517,7 +1542,11 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 		return -EINVAL;
 	}
 
-	component = snd_soc_rtdcom_lookup(rtd, WCD939X_DRV_NAME);
+	if (pdata->wcd_used == WCD9378_DEV_INDEX)
+		strscpy(wcd_name, WCD9378_DRV_NAME, sizeof(WCD9378_DRV_NAME));
+	else
+		strscpy(wcd_name, WCD939X_DRV_NAME, sizeof(WCD939X_DRV_NAME));
+	component = snd_soc_rtdcom_lookup(rtd, wcd_name);
 	if (!component) {
 		pr_err("%s component is NULL\n", __func__);
 		return -EINVAL;
@@ -1534,7 +1563,16 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 		wcd_mbhc_cfg.usbss_hsj_connect_enable = true;
 #endif
 
-	ret = wcd939x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+	switch (pdata->wcd_used) {
+	case WCD9378_DEV_INDEX:
+		ret = wcd9378_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+		break;
+	case WCD939X_DEV_INDEX:
+		ret = wcd939x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+		break;
+	default:
+		return -EINVAL;
+	}
 	if (ret) {
 		dev_err(component->dev, "%s: mbhc hs detect failed, err:%d\n",
 			__func__, ret);
@@ -2100,12 +2138,21 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	if (!component) {
 		pr_err("%s could not find component for %s\n",
 			__func__, WCD939X_DRV_NAME);
-		return -EINVAL;
+		component = snd_soc_rtdcom_lookup(rtd, WCD9378_DRV_NAME);
+		if (!component) {
+			pr_err("%s component is NULL\n", __func__);
+			return -EINVAL;
+		}
+		pdata->wcd_used = WCD9378_DEV_INDEX;
+	} else {
+		pdata->wcd_used = WCD939X_DEV_INDEX;
 	}
 	dapm = snd_soc_component_get_dapm(component);
 	card = component->card->snd_card;
 
 	snd_soc_dapm_ignore_suspend(dapm, "EAR");
+	if (pdata->wcd_used != WCD939X_DEV_INDEX)
+		snd_soc_dapm_ignore_suspend(dapm, "AUX");
 	snd_soc_dapm_ignore_suspend(dapm, "HPHL");
 	snd_soc_dapm_ignore_suspend(dapm, "HPHR");
 	snd_soc_dapm_ignore_suspend(dapm, "AMIC1");
@@ -2125,10 +2172,13 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 		}
 		pdata->codec_root = entry;
 	}
-	wcd939x_info_create_codec_entry(pdata->codec_root, component);
-
-	codec_variant = wcd939x_get_codec_variant(component);
-	dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
+	if (pdata->wcd_used == WCD9378_DEV_INDEX) {
+		wcd9378_info_create_codec_entry(pdata->codec_root, component);
+	} else {
+		wcd939x_info_create_codec_entry(pdata->codec_root, component);
+		codec_variant = wcd939x_get_codec_variant(component);
+		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
+	}
 	if (codec_variant == WCD9395)
 		ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, true);
 	else
@@ -2374,6 +2424,23 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	/* parse upd configuration */
 	msm_parse_upd_configuration(pdev, pdata);
 
+
+
+	pdata->fsa_handle = of_parse_phandle(pdev->dev.of_node,
+						"fsa4480-i2c-handle", 0);
+	if (!pdata->fsa_handle)
+		dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
+			"fsa4480-i2c-handle", pdev->dev.of_node->full_name);
+
+	pdata->wcd_usbss_handle = of_parse_phandle(pdev->dev.of_node,
+						"wcd939x-i2c-handle", 0);
+	if (!pdata->wcd_usbss_handle)
+		dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
+			"wcd939x-i2c-handle", pdev->dev.of_node->full_name);
+
+	if ((pdata->wcd_usbss_handle) || (pdata->fsa_handle))
+		wcd_mbhc_cfg.swap_gnd_mic = msm_usbc_swap_gnd_mic;
+
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
 		if (codec_reg_done)
@@ -2386,16 +2453,6 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	}
 	dev_info(&pdev->dev, "%s: Sound card %s registered\n",
 		 __func__, card->name);
-
-	if (wcd_mbhc_cfg.enable_usbc_analog ||
-				wcd_mbhc_cfg.usbss_hsj_connect_enable)
-		wcd_mbhc_cfg.swap_gnd_mic = msm_usbc_swap_gnd_mic;
-
-	pdata->wcd_usbss_handle = of_parse_phandle(pdev->dev.of_node,
-					"wcd939x-i2c-handle", 0);
-	if (!pdata->wcd_usbss_handle)
-		dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
-			"wcd939x-i2c-handle", pdev->dev.of_node->full_name);
 
 	pdata->dmic01_gpio_p = of_parse_phandle(pdev->dev.of_node,
 					      "qcom,cdc-dmic01-gpios",

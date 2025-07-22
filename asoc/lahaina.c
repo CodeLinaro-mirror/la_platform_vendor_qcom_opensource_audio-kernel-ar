@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -422,7 +422,7 @@ static struct snd_soc_dai_link msm_wcn_btfm_be_dai_links[] = {
  		.name = LPASS_BE_SLIMBUS_8_TX,
  		.stream_name = LPASS_BE_SLIMBUS_8_TX,
  		.no_pcm = 1,
-		.capture_only = 1,	
+		.capture_only = 1,
  		//.id = MSM_BACKEND_DAI_SLIMBUS_8_TX,
  		//.be_hw_params_fixup = msm_be_hw_params_fixup,
  		.ops = &msm_common_be_ops,
@@ -666,7 +666,7 @@ static struct snd_soc_dai_link msm_lahaina_dai_links[
 #if 0
 			ARRAY_SIZE(ext_disp_be_dai_link) +
 #endif
-			ARRAY_SIZE(msm_wcn_btfm_be_dai_links)]; 
+			ARRAY_SIZE(msm_wcn_btfm_be_dai_links)];
 
 static int msm_populate_dai_link_component_of_node(
 					struct snd_soc_card *card)
@@ -883,7 +883,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
                                         ARRAY_SIZE(msm_va_cdc_dma_be_dai_links);
                         }
                 }
-		// WSA BE DAI Links	
+		// WSA BE DAI Links
 		if (wsa_max_devs) {
 			memcpy(msm_lahaina_dai_links + total_links,
 				msm_wsa_cdc_dma_be_dai_links,
@@ -891,7 +891,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 			total_links +=
 				ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links);
 		}
-		// MI2S BE DAI Links 
+		// MI2S BE DAI Links
 		rc = of_property_read_u32(dev->of_node,
 				"qcom,mi2s-audio-intf", &val);
 		if (!rc && val) {
@@ -901,7 +901,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 			total_links += ARRAY_SIZE(msm_mi2s_dai_links);
 		}
 
-		// TDM BE DAI Links 
+		// TDM BE DAI Links
 		rc = of_property_read_u32(dev->of_node,
 				"qcom,tdm-audio-intf", &val);
 		if (!rc && val) {
@@ -1150,11 +1150,11 @@ done:
                 return -ENOMEM;
         wcd_mbhc_cfg.calibration = mbhc_calibration;
         if (!is_wcd937x) {
-		pr_err("%s wcd938x_mbhc_hs_detect  ",__func__);	
+		pr_debug("%s wcd938x_mbhc_hs_detect  ",__func__);
                 ret = wcd938x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
 	}
         else {
-		pr_err("%s wcd937x_mbhc_hs_detect  ",__func__);	
+		pr_debug("%s wcd937x_mbhc_hs_detect  ",__func__);
                 ret = wcd937x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
 	}
         if (ret) {
@@ -1189,7 +1189,7 @@ static int lahaina_ssr_enable(struct device *dev, void *data)
 	}
 
 	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
-        dev_err(dev, "%s: setting snd_card to ONLINE\n", __func__);
+        dev_dbg(dev, "%s: setting snd_card to ONLINE\n", __func__);
 
 err:
 	return ret;
@@ -1218,6 +1218,38 @@ static const struct snd_event_ops lahaina_ssr_ops = {
 	.enable = lahaina_ssr_enable,
 	.disable = lahaina_ssr_disable,
 };
+
+static int msm_audio_ssr_compare(struct device *dev, void *data)
+{
+	struct device_node *node = data;
+
+	dev_err(dev, "%s: dev->of_node = 0x%p, node = 0x%p\n",
+		__func__, dev->of_node, node);
+	return (dev->of_node && dev->of_node == node);
+}
+
+static int msm_audio_ssr_register(struct device *dev)
+{
+	struct device_node *np = dev->of_node;
+	struct snd_event_clients *ssr_clients = NULL;
+	struct device_node *node = NULL;
+	int ret = 0;
+	int i = 0;
+
+	for (i = 0; ; i++) {
+		node = of_parse_phandle(np, "qcom,msm_audio_ssr_devs", i);
+		if (!node)
+			break;
+		snd_event_mstr_add_client(&ssr_clients,
+				msm_audio_ssr_compare, node);
+	}
+
+	ret = snd_event_master_register(dev, &lahaina_ssr_ops,
+				ssr_clients, NULL);
+	if (!ret)
+		snd_event_notify(dev, SND_EVENT_UP);
+	return ret;
+}
 
 struct msm_common_pdata *msm_common_get_pdata(struct snd_soc_card *card)
 {
@@ -1305,7 +1337,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto err;
 	}
 
-	
+
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
 	if (ret == -EPROBE_DEFER) {
 		pr_err("%s: devm_snd_soc_register_card -EPROBE_DEFER\n",__func__);
@@ -1418,6 +1450,11 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
 	pr_err("%s is_initial_boot is true ", __func__);
 	is_initial_boot = true;
+
+	ret = msm_audio_ssr_register(&pdev->dev);
+	if (ret)
+		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
+				__func__, ret);
 
         /* change card status to ONLINE */
         dev_err(&pdev->dev, "%s: setting snd_card to ONLINE\n", __func__);
