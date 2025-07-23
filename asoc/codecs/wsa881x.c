@@ -258,6 +258,32 @@ static int wsa881x_set_t0_init(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int wsa881x_get_temp_control(struct snd_kcontrol *kcontrol,
+                   struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+		snd_soc_kcontrol_component(kcontrol);
+	struct wsa881x_priv *wsa881x = snd_soc_component_get_drvdata(component);
+	int temp = 0;
+	int ret = 0;
+
+	if (!wsa881x || !wsa881x->tz_pdata.tz_dev) {
+		dev_err(component->dev, "%s: thermal zone device not initialized\n", __func__);
+		ucontrol->value.integer.value[0] = INT_MIN; /* Error indicator */
+		return 0;
+	}
+
+	ret = wsa881x_get_temp(wsa881x->tz_pdata.tz_dev, &temp);
+	if (ret) {
+		dev_err(component->dev, "%s: failed to get temperature, ret=%d\n", __func__, ret);
+		ucontrol->value.integer.value[0] = INT_MIN; /* Error indicator */
+		return 0;
+	}
+
+	ucontrol->value.integer.value[0] = temp;
+	return 0;
+}
+
 static const struct snd_kcontrol_new wsa_snd_controls[] = {
 	SOC_ENUM_EXT("WSA PA Gain", wsa_pa_gain_enum,
 		     wsa_pa_gain_get, wsa_pa_gain_put),
@@ -265,6 +291,11 @@ static const struct snd_kcontrol_new wsa_snd_controls[] = {
 		wsa881x_get_mute, wsa881x_set_mute),
 	SOC_SINGLE_EXT("WSA T0 Init", SND_SOC_NOPM, 0, 1, 0,
 		wsa881x_get_t0_init, wsa881x_set_t0_init),
+	/* WSA Temp control provides the current temperature of the speaker in Celsius.
+	 * This is a read-only control with range from INT_MIN to INT_MAX to accommodate
+	 * all possible temperature values. */
+	SOC_SINGLE_EXT("WSA Temp", SND_SOC_NOPM, 0, INT_MAX, 0,
+		wsa881x_get_temp_control, NULL),
 };
 
 static int codec_debug_open(struct inode *inode, struct file *file)
