@@ -23,7 +23,7 @@
 #define LPASS_CDC_TX_MACRO_MAX_OFFSET 0x1000
 
 #define NUM_DECIMATORS 8
-#define MAX_TUNING_REGS 10
+#define MAX_TUNING_REG_VALUE_PAIRS 30
 
 #define LPASS_CDC_TX_MACRO_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
 			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
@@ -167,7 +167,7 @@ struct lpass_cdc_tx_macro_priv {
 	bool swr_dmic_gain_disable;
 	int wlock_holders;
 	int adapt_tuning_registers;
-	u32 tuning_reg_values[MAX_TUNING_REGS * 3];
+	u32 tuning_reg_values[MAX_TUNING_REG_VALUE_PAIRS];
 };
 
 static int lpass_cdc_tx_macro_wake_enable(struct lpass_cdc_tx_macro_priv *tx_priv,
@@ -1102,7 +1102,7 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		if (is_amic_enabled(component, decimator))
 			snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x1);
 		if (tx_priv->adapt_tuning_registers > 0 &&
-				tx_priv->adapt_tuning_registers <= MAX_TUNING_REGS) {
+				tx_priv->adapt_tuning_registers <= MAX_TUNING_REG_VALUE_PAIRS) {
 			if (!tx_priv->bcs_enable) {
 				for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
 					snd_soc_component_update_bits(component,
