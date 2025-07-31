@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022, 2024-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -117,6 +117,8 @@
 #define LPASS_BE_RT_PROXY_PCM_RX "PCM_RT_PROXY-RX-1"
 #define LPASS_BE_RT_PROXY_PCM_TX "PCM_RT_PROXY-TX-1"
 
+#define LPASS_BE_PCM_DUMMY_RX_0 "PCM_DUMMY-RX-0"
 #define LPASS_BE_PCM_DUMMY_TX_0 "PCM_DUMMY-TX-0"
+#define LPASS_BE_PCM_DUMMY_TX_1 "PCM_DUMMY-TX-1"
 
 #endif /*_MSM_AUDIO_DEFS_H*/
