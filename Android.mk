@@ -1,5 +1,7 @@
 # Android makefile for audio kernel modules
 
+ifeq ($(AUDIO_DLKM_ENABLE), true)
+
 LOCAL_PATH := $(call my-dir)
 
 ifeq ($(call is-board-platform, taro),true)
@@ -23,9 +25,6 @@ include $(call all-subdir-makefiles)
 LOCAL_PATH    := vendor/qcom/opensource/audio-kernel
 endif
 
-BOARD_OPENSOURCE_DIR ?= vendor/qcom/opensource
-BOARD_COMMON_DIR ?= device/qcom/common
-
 # Build/Package only in case of supported target
 ifeq ($(call is-board-platform-in-list,taro kalama bengal monaco msmnile gen4), true)
 
@@ -33,13 +32,11 @@ ifeq ($(call is-board-platform-in-list,taro kalama bengal monaco msmnile gen4), 
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
 
 ifneq ($(findstring opensource,$(LOCAL_PATH)),)
-	AUDIO_BLD_DIR := $(abspath .)/$(BOARD_OPENSOURCE_DIR)/audio-kernel
+	AUDIO_BLD_DIR := $(abspath .)/vendor/qcom/opensource/audio-kernel
 endif # opensource
 
-ifeq ($(TARGET_KERNEL_SUPPORTS_BAZEL),true)
 include $(AUDIO_BLD_DIR)/EnableBazel.mk
-endif
-DLKM_DIR := $(TOP)/$(BOARD_COMMON_DIR)/dlkm
+DLKM_DIR := $(TOP)/device/qcom/common/dlkm
 
 
 ###########################################################
@@ -53,6 +50,7 @@ KBUILD_OPTIONS := AUDIO_ROOT=$(AUDIO_BLD_DIR)
 KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
+
 ifeq ($(call is-board-platform-in-list, msmnile gen4),true)
 KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), msmnile_gvmq))
@@ -66,7 +64,9 @@ endif
 endif
 endif
 
+ifneq ($(call is-board-platform-in-list, bengal), true)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
+endif
 
 AUDIO_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*) \
@@ -618,4 +618,5 @@ endif
 ###########################################################
 endif # DLKM check
 endif # supported target check
+endif
 endif

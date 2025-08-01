@@ -45,6 +45,6 @@ ddk_headers(
     hdrs = [":audio_common_headers",  ":audio_uapi_headers", ":audio_src_headers", ":audio_configs"]
 )
 
-load(":build/monaco.bzl", "define_monaco")
+load(":build/bengal.bzl", "define_bengal")
 
-define_monaco()
+define_bengal()
