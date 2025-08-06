@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024 - 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef SIMPLE_AMP_H
@@ -120,7 +120,7 @@ enum sdca_function_type {
 #define T1_TEMP -10
 #define T2_TEMP 150
 #define LOW_TEMP_THRESHOLD 5
-#define HIGH_TEMP_THRESHOLD 45
+#define HIGH_TEMP_THRESHOLD 60
 #define TEMP_INVALID	0xFFFF
 #define SIMPLE_AMP_TEMP_RETRY 3
 #define READ_REG_MAX 6
