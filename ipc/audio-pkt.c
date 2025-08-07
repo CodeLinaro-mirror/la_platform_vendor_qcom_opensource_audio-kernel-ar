@@ -549,7 +549,7 @@ ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 		goto free_kbuf;
 	}
 	if (gpr_get_q6_state() != GPR_SUBSYS_DOWN)
-		ret = gpr_send_pkt(ap_priv->adev, (struct gpr_pkt *) kbuf);
+		ret = gprlite_send_pkt(ap_priv->adev, (struct gpr_pkt *) kbuf);
 	else
 		AUDIO_PKT_ERR("q6 is down\n");
 

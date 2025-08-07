@@ -281,7 +281,7 @@ void gpr_driver_unregister(struct gpr_driver *drv);
 	module_driver(__gpr_driver, gpr_driver_register, \
 			gpr_driver_unregister)
 
-int gpr_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt);
+int gprlite_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt);
 
 enum gpr_subsys_state gpr_get_modem_state(void);
 enum gpr_subsys_state gpr_get_q6_state(void);

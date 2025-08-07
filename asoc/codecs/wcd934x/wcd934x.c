@@ -10941,7 +10941,7 @@ static int tavil_swrm_bulk_write(void *handle, u32 *reg, u32 *val, size_t len)
 					      (len * 2), false);
 	else
 		ret = wcd9xxx_swrm_i2c_bulk_write(wcd9xxx, bulk_reg, len);
-	if (ret) {
+	if (ret < 0) {
 		dev_err(tavil->dev, "%s: swrm bulk write failed, ret: %d\n",
 			__func__, ret);
 	}

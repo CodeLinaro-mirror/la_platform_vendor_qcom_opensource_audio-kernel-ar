@@ -114,7 +114,7 @@ static int prm_gpr_send_pkt(struct gpr_pkt *pkt, wait_queue_head_t *wait)
 		pr_info("%s: apm ready check done\n", __func__);
 	}
 	g_prm.resp_received = false;
-	ret = gpr_send_pkt(g_prm.adev, pkt);
+	ret = gprlite_send_pkt(g_prm.adev, pkt);
 	if (ret < 0) {
 		pr_err("%s: packet not transmitted %d\n", __func__, ret);
 		mutex_unlock(&g_prm.lock);

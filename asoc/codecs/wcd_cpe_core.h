@@ -5,7 +5,6 @@
 #ifndef WCD_CPE_CORE_H
 #define WCD_CPE_CORE_H
 
-#include <soc/qcom/ramdump.h>
 #include <linux/dma-mapping.h>
 #include "wcd_cpe_services.h"
 

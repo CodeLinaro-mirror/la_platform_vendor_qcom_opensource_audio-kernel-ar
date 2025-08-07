@@ -14,7 +14,9 @@
 #include <linux/gpio.h>
 #include <linux/of_gpio.h>
 #include <linux/of_platform.h>
+#if IS_ENABLED(GPIO_WAKEUP_CAPABLE)
 #include <linux/pinctrl/qcom-pinctrl.h>
+#endif
 #include <linux/pinctrl/consumer.h>
 #include <asoc/msm-cdc-pinctrl.h>
 #include <linux/version.h>
@@ -194,15 +196,16 @@ int msm_cdc_pinctrl_set_wakeup_capable(struct device_node *np, bool enable)
 	gpio_data = msm_cdc_pinctrl_get_gpiodata(np);
 	if (!gpio_data)
 		return -EINVAL;
-
+#if IS_ENABLED(GPIO_WAKEUP_CAPABLE)
 	if (gpio_data->wakeup_capable) {
 		for (i = 0; i < gpio_data->count; i++) {
 			ret = msm_gpio_mpm_wake_set(gpio_data->tlmm_gpio[i],
 						    enable);
 			if (ret < 0)
-				goto exit;
+				return ret;
 		}
 	}
+#endif
 	if (gpio_data->chip_wakeup_reg) {
 		for (i = 0; i < gpio_data->wakeup_reg_count; i++) {
 			temp = ioread32(gpio_data->chip_wakeup_register[i]);
@@ -215,7 +218,7 @@ int msm_cdc_pinctrl_set_wakeup_capable(struct device_node *np, bool enable)
 			iowrite32(temp, gpio_data->chip_wakeup_register[i]);
 		}
 	}
-exit:
+
 	return ret;
 }
 EXPORT_SYMBOL(msm_cdc_pinctrl_set_wakeup_capable);

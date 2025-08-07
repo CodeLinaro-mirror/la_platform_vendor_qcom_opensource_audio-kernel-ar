@@ -134,7 +134,7 @@ static bool __spf_core_is_apm_ready(struct spf_core *core)
 
 	dev_err_ratelimited(spf_core_priv->dev, "%s: send_command ret\n", __func__);
 
-	rc = gpr_send_pkt(adev, &pkt);
+	rc = gprlite_send_pkt(adev, &pkt);
 	if (rc < 0) {
 		ret = false;
 		goto done;
@@ -240,7 +240,7 @@ void spf_core_apm_close_all(void)
 
 	dev_info_ratelimited(spf_core_priv->dev, "%s: send_command \n", __func__);
 
-	rc = gpr_send_pkt(adev, &pkt);
+	rc = gprlite_send_pkt(adev, &pkt);
 	if (rc < 0) {
 		dev_err_ratelimited(spf_core_priv->dev, "%s: send_pkt_failed %d\n",
 				__func__, rc);

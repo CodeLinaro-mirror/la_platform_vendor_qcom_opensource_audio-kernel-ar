@@ -81,14 +81,14 @@ void gpr_subsys_notif_deregister(char *client_name)
 }
 
 /**
- * gpr_send_pkt() - Send a gpr message from gpr device
+ * gprlite_send_pkt() - Send a gpr message from gpr device
  *
  * @adev: Pointer to previously registered gpr device.
  * @pkt: Pointer to gpr packet to send
  *
  * Return: Will be an negative and/or packet size on success.
  */
-int gpr_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt)
+int gprlite_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt)
 {
 	struct gpr *gpr;
 	struct gpr_hdr *hdr;
@@ -145,7 +145,7 @@ int gpr_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt)
 
 	return ret ? ret : pkt_size;
 }
-EXPORT_SYMBOL_GPL(gpr_send_pkt);
+EXPORT_SYMBOL_GPL(gprlite_send_pkt);
 
  /**
   * apr_set_modem_state - Update modem load status.
