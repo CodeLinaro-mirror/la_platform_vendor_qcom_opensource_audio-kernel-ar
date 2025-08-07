@@ -141,7 +141,7 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdxkovaautoconf.h
 	endif
-	ifeq ($(CONFIG_ARCH_SDXECHO), y)
+	ifeq ($(TARGET_SUPPORT), sdxecho)
 		include $(AUDIO_ROOT)/config/sdxechoauto.conf
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdxechoautoconf.h
