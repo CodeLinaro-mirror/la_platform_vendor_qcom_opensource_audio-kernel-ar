@@ -1,10 +1,27 @@
 # We can build either as part of a standalone Kernel build or as
 # an external module.  Determine which mechanism is being used
+ifeq ($(TARGET_SUPPORT), sdxecho)
+CONFIG_ARCH_SDXECHO := y
+AUDIO_ROOT := $(M)
+UAPI_OUT := $(M)
+HEADER_INSTALL_DIR := $(KERNEL_SRC)/kernel_platform/msm-kernel/scripts
+KERNEL_BINARY_DIR := $(KERNEL_SRC)/
+MODNAME:=audio
+endif
+
+
 ifeq ($(MODNAME),)
 	KERNEL_BUILD := 1
 else
 	KERNEL_BUILD := 0
 endif
+$(info -----------asoc_codecs_compiling----------)
+$(info KERNEL_SRC=$(KERNEL_SRC))
+$(info asoc_codecs_MODNAME=$(MODNAME))
+$(info KERNEL_BUILD=$(KERNEL_BUILD))
+$(info AUDIO_ROOT=$(AUDIO_ROOT))
+$(info UAPI_OUT=$(UAPI_OUT))
+$(info KERNEL_BINARY_DIR=$(KERNEL_BINARY_DIR))
 
 ifeq ($(KERNEL_BUILD), 1)
 	# These are configurable via Kconfig for kernel-based builds
