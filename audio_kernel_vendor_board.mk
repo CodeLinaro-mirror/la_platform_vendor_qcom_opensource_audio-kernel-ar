@@ -13,4 +13,6 @@ ifeq ($(AUDIO_DLKM_ENABLE), true)
     include vendor/qcom/opensource/audio-kernel/legacy/audio_kernel_modules.mk
   endif
   BOARD_VENDOR_KERNEL_MODULES += $(AUDIO_KERNEL_MODULES)
+  BOARD_VENDOR_RAMDISK_KERNEL_MODULES += $(AUDIO_KERNEL_MODULES)
+  BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD += $(AUDIO_KERNEL_MODULES)
 endif
