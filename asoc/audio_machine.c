@@ -1429,6 +1429,28 @@ static struct snd_soc_dai_link wsa885x_tdm_dai_links[] = {
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_tx),
 	},
+	{
+		.name = LPASS_BE_SEN_TDM_RX_1,
+		.stream_name = LPASS_BE_SEN_TDM_RX_1,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_rx_virt_c1),
+	},
+	{
+		.name = LPASS_BE_SEN_TDM_RX_2,
+		.stream_name = LPASS_BE_SEN_TDM_RX_2,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_rx_virt_c2),
+	},
 };
 
 static struct snd_soc_dai_link msm_canoe_dai_links[
