@@ -14,7 +14,9 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/of_device.h>
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 #include <linux/soc/qcom/fsa4480-i2c.h>
+#endif
 #include <sound/control.h>
 #include <sound/core.h>
 #include <sound/soc.h>
@@ -33,7 +35,9 @@
 #include "codecs/wsa881x.h"
 #include "codecs/wcd934x/wcd934x.h"
 #include "bindings/audio-codec-port-types.h"
+#if !IS_ENABLED(CONFIG_SND_SOC_SDX)
 #include "sdx-port-config.h"
+#endif
 #include "msm-audio-defs.h"
 #include "msm_common.h"
 #include "msm_dailink.h"
@@ -200,8 +204,11 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 
 	if (!pdata->fsa_handle)
 		return false;
-
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
+#else
+	return true;
+#endif
 }
 
 static bool msm_swap_gnd_mic(struct snd_soc_component *component, bool active)
@@ -669,8 +676,6 @@ static int msm_populate_dai_link_component_of_node(
 	struct device *cdev = card->dev;
 	struct snd_soc_dai_link *dai_link = card->dai_link;
 	struct device_node *np = NULL;
-	int codecs_enabled = 0;
-	struct snd_soc_dai_link_component *codecs_comp = NULL;
 
 	if (!cdev) {
 		dev_err(cdev, "%s: Sound card device memory NULL\n", __func__);

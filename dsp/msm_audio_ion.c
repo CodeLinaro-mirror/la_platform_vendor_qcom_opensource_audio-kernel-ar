@@ -584,15 +584,16 @@ static int msm_audio_ion_import(struct dma_buf **dma_buf, int fd,
 		rc = -EINVAL;
 		goto err;
 	}
-
+#if defined(DMA_BUF_GET_FLAGS_SUPPORTED)
 	if (ionflag != NULL) {
 		rc = dma_buf_get_flags(*dma_buf, ionflag);
 		if (rc) {
 			pr_err("%s: could not get flags for the dma_buf\n",
 				__func__);
-			goto err_ion_flag;
+			goto err;
 		}
 	}
+#endif
 	if (ion_data->smmu_enabled) {
 		rc = msm_audio_ion_buf_map(*dma_buf, paddr, plen, iosys_vmap, ion_data);
 		if (rc) {
@@ -606,9 +607,9 @@ static int msm_audio_ion_import(struct dma_buf **dma_buf, int fd,
 	}
 	return 0;
 
-err_ion_flag:
-	dma_buf_put(*dma_buf);
+
 err:
+	dma_buf_put(*dma_buf);
 	*dma_buf = NULL;
 	return rc;
 }

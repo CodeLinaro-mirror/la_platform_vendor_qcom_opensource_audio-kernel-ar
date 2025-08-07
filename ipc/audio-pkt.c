@@ -14,7 +14,9 @@
 
 #include <linux/platform_device.h>
 #include <linux/of_platform.h>
+#if IS_ENABLED(IPC_LOGGING_ENABLED)
 #include <linux/ipc_logging.h>
+#endif
 #include <linux/refcount.h>
 #include <linux/device.h>
 #include <linux/module.h>
@@ -35,8 +37,6 @@
 
 /* Define IPC Logging Macros */
 #define AUDIO_PKT_IPC_LOG_PAGE_CNT 2
-static void *audio_pkt_ilctxt;
-
 static int audio_pkt_debug_mask;
 static struct sk_buff_head audio_pkt_backup_buffers;
 static struct work_struct audio_pkt_skb_backup_work;
@@ -48,11 +48,15 @@ module_param_named(debug_mask, audio_pkt_debug_mask, int, 0664);
 #define AUDIO_PKT_BUF_SIZE SZ_4K
 #define AUDIO_PKT_BACKUP_BUFFERS_NUM 10
 
+#if IS_ENABLED(IPC_LOGGING_ENABLED)
+static void *audio_pkt_ilctxt;
+
 enum {
 	AUDIO_PKT_INFO = 1U << 0,
 };
 
 #define AUDIO_PKT_INFO(x, ...)						\
+
 do {									\
 	if (audio_pkt_debug_mask & AUDIO_PKT_INFO) {			\
 		ipc_log_string(audio_pkt_ilctxt,			\
@@ -65,6 +69,20 @@ do {									      \
 	pr_err_ratelimited("[%s]: "x, __func__, ##__VA_ARGS__);		      \
 	ipc_log_string(audio_pkt_ilctxt, "[%s]: "x, __func__, ##__VA_ARGS__); \
 } while (0)
+
+#else
+
+#define AUDIO_PKT_INFO(x, ...) \
+do { \
+	pr_info("[%s]: "x, __func__, ##__VA_ARGS__); \
+} while(0)
+
+#define AUDIO_PKT_ERR(x, ...)						      \
+do {									      \
+	pr_err_ratelimited("[%s]: "x, __func__, ##__VA_ARGS__);		      \
+} while (0)
+
+#endif
 
 
 #define MODULE_NAME "audio-pkt"
