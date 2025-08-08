@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -1522,9 +1522,6 @@ static int lpass_cdc_va_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 		if (mute) {
 			snd_soc_component_update_bits(component, va_mute_ctl_reg, 0x10, 0x10);
 		} else {
-			snd_soc_component_update_bits(component, va_mute_ctl_reg, 0x40, 0x40);
-			usleep_range(2000, 2100);
-			snd_soc_component_update_bits(component, va_mute_ctl_reg, 0x40, 0x00);
 			va_priv->va_dec_unmute_work.dai_id = dai->id;
 			/*
 			 * Schedule dwork after 10MS to unmute the dec to unblock the main thread

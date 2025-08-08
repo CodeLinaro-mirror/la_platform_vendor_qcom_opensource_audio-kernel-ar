@@ -1,5 +1,5 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -212,7 +212,8 @@ int audio_pkt_release(struct inode *inode, struct file *file)
 	/* Discard all SKBs */
 	while (!skb_queue_empty(&audpkt_dev->queue)) {
 		skb = skb_dequeue(&audpkt_dev->queue);
-		kfree_skb(skb);
+		if (skb)
+			kfree_skb(skb);
 	}
 	wake_up_interruptible(&audpkt_dev->readq);
 	spin_unlock_irqrestore(&audpkt_dev->queue_lock, flags);
@@ -242,7 +243,8 @@ static int audio_pkt_internal_release(struct platform_device *adev)
 	/* Discard all SKBs */
 	while (!skb_queue_empty(&audpkt_dev->queue)) {
 		skb = skb_dequeue(&audpkt_dev->queue);
-		kfree_skb(skb);
+		if (skb)
+			kfree_skb(skb);
 	}
 	spin_unlock_irqrestore(&audpkt_dev->queue_lock, flags);
 
