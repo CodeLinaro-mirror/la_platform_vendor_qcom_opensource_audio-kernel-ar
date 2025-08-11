@@ -633,6 +633,8 @@ static void wdsp_collect_ramdumps(struct wdsp_mgr_priv *wdsp)
 	struct wdsp_img_section img_section;
 	struct wdsp_err_signal_arg *data = &wdsp->dump_data.err_data;
 	struct qcom_dump_segment rd_seg;
+	struct list_head head;
+
 	int ret = 0;
 
 	if (wdsp->ssr_type != WDSP_SSR_TYPE_WDSP_DOWN ||
@@ -684,12 +686,13 @@ static void wdsp_collect_ramdumps(struct wdsp_mgr_priv *wdsp)
 	 * then cause a BUG here to aid debugging.
 	 */
 	BUG_ON(wdsp->panic_on_error);
-
+	INIT_LIST_HEAD(&head);
+	memset(&rd_seg, 0, sizeof(rd_seg));
 	rd_seg.da = (unsigned long) wdsp->dump_data.rd_v_addr;
 	rd_seg.size = img_section.size;
 	rd_seg.va = wdsp->dump_data.rd_v_addr;
-
-	ret = qcom_elf_dump(wdsp->dump_data.rd_dev, wdsp->mdev, 1);
+	list_add(&rd_seg.node, &head);
+	ret = qcom_dump(&head,wdsp->dump_data.rd_dev);
 	if (ret < 0)
 		WDSP_ERR(wdsp, "qcom_elf_dump failed with error %d", ret);
 

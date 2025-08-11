@@ -653,7 +653,8 @@ static int audio_notify_probe(struct platform_device *pdev)
 	struct property *prop;
 	int size;
 	phandle rproc_phandle;
-
+printk("%s kiran line=%d",__func__,__LINE__);
+	msleep(3000);
 	adsp_private = NULL;
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
@@ -675,15 +676,15 @@ static int audio_notify_probe(struct platform_device *pdev)
 		ret = -EPROBE_DEFER;
 		return ret;
 	}
-
+printk("%s kiran line=%d",__func__,__LINE__);
 	adsp_private = pdev;
 
 	audio_notifier_subsys_init();
-
+printk("%s kiran line=%d",__func__,__LINE__);
 	audio_notifier_init_service(AUDIO_NOTIFIER_PDR_SERVICE);
 	/* Do not return error since PDR enablement is not critical */
 	audio_notifier_late_init();
-
+printk("%s kiran line=%d",__func__,__LINE__);
 	priv->notifier_probe_complete = true;
 
 	return 0;

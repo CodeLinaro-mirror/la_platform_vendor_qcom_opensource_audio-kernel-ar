@@ -922,7 +922,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 #ifndef CONFIG_SPF_CORE
 	enum apr_subsys_state q6_state;
 #endif
-
+printk("%s kiran line=%d",__func__,__LINE__);
 	dev_err(dev, "%s: msm_audio_ion_probe\n", __func__);
 	if (dev->of_node == NULL) {
 		dev_err(dev,
@@ -930,7 +930,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 			__func__);
 		return 0;
 	}
-
+printk("%s kiran line=%d",__func__,__LINE__);
 	msm_audio_ion_data = devm_kzalloc(&pdev->dev, (sizeof(struct msm_audio_ion_private)),
                                           GFP_KERNEL);
 	if (!msm_audio_ion_data)
@@ -943,7 +943,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	smmu_enabled = of_property_read_bool(dev->of_node,
 					     msm_audio_ion_dt);
 	msm_audio_ion_data->smmu_enabled = smmu_enabled;
-
+printk("%s kiran line=%d",__func__,__LINE__);
 	if (!smmu_enabled)
 		dev_dbg(dev, "%s: SMMU is Disabled\n", __func__);
 
@@ -958,6 +958,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 #endif
 	dev_dbg(dev, "%s: adsp is ready\n", __func__);
 	if (smmu_enabled) {
+printk("%s kiran line=%d",__func__,__LINE__);
 		msm_audio_ion_data->driver_name = "msm_audio_ion";
 		rc = of_property_read_u32(dev->of_node,
 					msm_audio_ion_smmu,
@@ -968,6 +969,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 				__func__);
 		return rc;
 		}
+printk("%s kiran line=%d",__func__,__LINE__);
 		dev_dbg(dev, "%s: SMMU is Enabled. SMMU version is (%d)",
 			__func__, msm_audio_ion_data->smmu_version);
 		/* Get SMMU SID information from Devicetree */
@@ -980,7 +982,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 				__func__);
 			smmu_sid_mask = 0xFFFFFFFFFFFFFFFF;
 		}
-
+printk("%s kiran line=%d",__func__,__LINE__);
 		rc = of_parse_phandle_with_args(dev->of_node, "iommus",
 						"#iommu-cells", 0, &iommuspec);
 		if (rc)
@@ -992,12 +994,13 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 		msm_audio_ion_data->smmu_sid_bits =
 			smmu_sid << MSM_AUDIO_SMMU_SID_OFFSET;
 	} else {
+printk("%s kiran line=%d",__func__,__LINE__);
 		msm_audio_ion_data->driver_name = "msm_audio_ion_cma";
 	}
 
 	if (!rc)
 		msm_audio_ion_data->device_status |= MSM_AUDIO_ION_PROBED;
-
+printk("%s kiran line=%d",__func__,__LINE__);
 	msm_audio_ion_data->cb_dev = dev;
 	dev_set_drvdata(dev, msm_audio_ion_data);
 	if (!msm_audio_ion_fd_list_init) {
@@ -1012,6 +1015,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 		pr_err("%s register char dev failed, rc : %d", __func__, rc);
 		return rc;
 	}
+printk("%s kiran line=%d",__func__,__LINE__);
 	return rc;
 }
 

@@ -238,14 +238,17 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 
 	clk_gpio = of_get_named_gpio(pdev->dev.of_node,
 				     "qcom,audio-ref-clk-gpio", 0);
+printk("%s enter line=%d ", __func__,__LINE__);
 	if (clk_gpio > 0) {
 		ret = gpio_request(clk_gpio, "EXT_CLK");
+printk("%s enter line=%d", __func__,__LINE__);
 		if (ret) {
 			dev_err(&pdev->dev,
 				"Request ext clk gpio failed %d, err:%d\n",
 				clk_gpio, ret);
 			goto err;
 		}
+printk("%s enter line=%d", __func__,__LINE__);
 		if (of_property_read_bool(pdev->dev.of_node,
 					"qcom,node_has_rpm_clock")) {
 			audio_clk = clk_get(&pdev->dev, NULL);
@@ -254,6 +257,7 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 				ret = PTR_ERR(audio_clk);
 				goto err_gpio;
 			}
+printk("%s enter line=%d", __func__,__LINE__);
 			audio_pmi_clk.c.parent = audio_clk;
 			audio_pmi_clk.gpio = clk_gpio;
 		} else
@@ -268,6 +272,7 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 				ret = PTR_ERR(audio_clk);
 				goto err;
 			}
+printk("%s enter line=%d", __func__,__LINE__);
 			audio_pmi_lnbb_clk.c.parent = audio_clk;
 			audio_pmi_lnbb_clk.gpio = -EINVAL;
 		}
@@ -277,7 +282,7 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 	if (ret)
 		dev_dbg(&pdev->dev, "%s: Parsing pinctrl failed\n",
 			__func__);
-
+printk("%s enter line=%d", __func__,__LINE__);
 	ret = of_msm_clock_register(pdev->dev.of_node, audio_ref_clock,
 			      ARRAY_SIZE(audio_ref_clock));
 	if (ret) {

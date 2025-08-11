@@ -2477,7 +2477,7 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 	struct swr_master *mstr = &swrm->master;
 	int retry = 5;
 	bool interrupt_handled = false;
-
+dev_err(swrm->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (unlikely(swrm_lock_sleep(swrm) == false)) {
 		dev_err_ratelimited(swrm->dev, "%s Failed to hold suspend\n", __func__);
 		return IRQ_NONE;
@@ -2488,10 +2488,12 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 		ret = IRQ_NONE;
 		goto exit;
 	}
+	dev_err(swrm->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (swrm_request_hw_vote(swrm, LPASS_AUDIO_CORE, true)) {
 		ret = IRQ_NONE;
 		goto err_audio_hw_vote;
 	}
+	dev_err(swrm->dev, "%s: line=%d\n",  __func__,__LINE__);
 	ret = swrm_clk_request(swrm, true);
 	if (ret) {
 		dev_err_ratelimited(dev, "%s: swrm clk failed\n", __func__);
@@ -2499,11 +2501,11 @@ static irqreturn_t swr_mstr_interrupt(int irq, void *dev)
 		goto err_audio_core_vote;
 	}
 	mutex_unlock(&swrm->reslock);
-
+dev_err(swrm->dev, "%s: line=%d\n",  __func__,__LINE__);
 	intr_sts = swr_master_read(swrm, SWRM_INTERRUPT_STATUS(swrm->ee_val));
 	intr_sts_masked = intr_sts & swrm->intr_mask;
 
-	dev_dbg(swrm->dev, "%s: status: 0x%x \n", __func__, intr_sts_masked);
+	dev_info(swrm->dev, "%s: status: 0x%x \n", __func__, intr_sts_masked);
 handle_irq:
 	for (i = 0; i < SWRM_INTERRUPT_MAX; i++) {
 		value = intr_sts_masked & (1 << i);
@@ -3172,7 +3174,7 @@ static int swrm_probe(struct platform_device *pdev)
 	struct clk *lpass_core_audio = NULL;
 	struct proc_dir_entry *swr_mstr_ctrl_regdump_file = NULL;
 	u32 swrm_hw_ver = 0;
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	/* Allocate soundwire master driver structure */
 	swrm = devm_kzalloc(&pdev->dev, sizeof(struct swr_mstr_ctrl),
 			GFP_KERNEL);
@@ -3180,10 +3182,13 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_memory_fail;
 	}
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swrm->pdev = pdev;
 	swrm->dev = &pdev->dev;
 	platform_set_drvdata(pdev, swrm);
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swr_set_ctrl_data(&swrm->master, swrm);
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	pdata = dev_get_platdata(&pdev->dev);
 	if (!pdata) {
 		dev_err(&pdev->dev, "%s: pdata from parent is NULL\n",
@@ -3191,7 +3196,9 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_pdata_fail;
 	}
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swrm->handle = (void *)pdata->handle;
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (!swrm->handle) {
 		dev_err(&pdev->dev, "%s: swrm->handle is NULL\n",
 			__func__);
@@ -3220,16 +3227,17 @@ static int swrm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: failed to get master id\n", __func__);
 		goto err_pdata_fail;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,dynamic-port-map-supported",
 				&swrm->dynamic_port_map_supported);
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (ret) {
 		dev_dbg(&pdev->dev,
 			"%s: failed to get dynamic port map support, use default\n",
 			__func__);
 		swrm->dynamic_port_map_supported = 1;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (!(of_property_read_u32(pdev->dev.of_node,
 			"swrm-io-base", &swrm->swrm_base_reg)))
 		ret = of_property_read_u32(pdev->dev.of_node,
@@ -3261,11 +3269,13 @@ static int swrm_probe(struct platform_device *pdev)
 					swrm->swrm_base_reg, SWRM_MAX_REGISTER);
 	}
 
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swrm->core_vote = pdata->core_vote;
 	if (!(of_property_read_u32(pdev->dev.of_node,
 			"qcom,swrm-hctl-reg", &swrm_hctl_reg)))
 		swrm->swrm_hctl_reg = devm_ioremap(&pdev->dev,
 						swrm_hctl_reg, 0x4);
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);	
 	swrm->clk = pdata->clk;
 	if (!swrm->clk) {
 		dev_err(&pdev->dev, "%s: swrm->clk is NULL\n",
@@ -3273,12 +3283,13 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_pdata_fail;
 	}
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);	
 	if (of_property_read_u32(pdev->dev.of_node,
 			"qcom,swr-clock-stop-mode0",
 			&swrm->clk_stop_mode0_supp)) {
 		swrm->clk_stop_mode0_supp = FALSE;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	/* Parse soundwire port mapping */
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,swr-num-ports",
 				&num_ports);
@@ -3287,13 +3298,13 @@ static int swrm_probe(struct platform_device *pdev)
 		goto err_pdata_fail;
 	}
 	swrm->num_ports = num_ports;
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (!of_find_property(pdev->dev.of_node, "qcom,swr-port-mapping",
 				&map_size)) {
 		dev_err(swrm->dev, "missing port mapping\n");
 		goto err_pdata_fail;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	map_length = map_size / (3 * sizeof(u32));
 	if (num_ports > SWR_MSTR_PORT_LEN) {
 		dev_err(&pdev->dev, "%s:invalid number of swr ports\n",
@@ -3302,7 +3313,7 @@ static int swrm_probe(struct platform_device *pdev)
 		goto err_pdata_fail;
 	}
 	temp = devm_kzalloc(&pdev->dev, map_size, GFP_KERNEL);
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (!temp) {
 		ret = -ENOMEM;
 		goto err_pdata_fail;
@@ -3314,7 +3325,7 @@ static int swrm_probe(struct platform_device *pdev)
 					__func__);
 		goto err_pdata_fail;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	for (i = 0; i < map_length; i++) {
 		port_num = temp[3 * i];
 		port_type = temp[3 * i + 1];
@@ -3343,7 +3354,8 @@ static int swrm_probe(struct platform_device *pdev)
 				&swrm->is_always_on);
 	if (ret)
 		dev_dbg(&pdev->dev, "%s: failed to get is_always_on flag\n", __func__);
-
+dev_err(&pdev->dev, "%s: line=%d pdev-dev name=%s\n",  __func__,__LINE__,pdev->dev.init_name);
+dev_info(&pdev->dev, "Received pdata->reg_irq: %p\n", pdata->reg_irq);
 	swrm->reg_irq = pdata->reg_irq;
 	swrm->master.read = swrm_read;
 	swrm->master.write = swrm_write;
@@ -3426,7 +3438,7 @@ static int swrm_probe(struct platform_device *pdev)
 			&swrm->disable_div2_clk_switch)) {
 		swrm->disable_div2_clk_switch = FALSE;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	/* Register LPASS core hw vote */
 	lpass_core_hw_vote = devm_clk_get(&pdev->dev, "lpass_core_hw_vote");
 	if (IS_ERR(lpass_core_hw_vote)) {
@@ -3437,7 +3449,7 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = 0;
 	}
 	swrm->lpass_core_hw_vote = lpass_core_hw_vote;
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	/* Register LPASS audio core vote */
 	lpass_core_audio = devm_clk_get(&pdev->dev, "lpass_audio_hw_vote");
 	if (IS_ERR(lpass_core_audio)) {
@@ -3448,16 +3460,20 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = 0;
 	}
 	swrm->lpass_core_audio = lpass_core_audio;
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
+	
 	if (swrm->reg_irq) {
+dev_err(&pdev->dev, "%s: line=%d swrm->reg_irq=%p\n",  __func__,__LINE__,(void *)swrm->reg_irq);
 		ret = swrm->reg_irq(swrm->handle, swr_mstr_interrupt, swrm,
 			    SWR_IRQ_REGISTER);
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 		if (ret) {
 			dev_err(&pdev->dev, "%s: IRQ register failed ret %d\n",
 				__func__, ret);
 			goto err_irq_fail;
 		}
 	} else {
+		dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 		swrm->irq = platform_get_irq_byname(pdev, "swr_master_irq");
 		if (swrm->irq < 0) {
 			dev_err(swrm->dev, "%s() error getting irq hdle: %d\n",
@@ -3476,6 +3492,7 @@ static int swrm_probe(struct platform_device *pdev)
 		}
 
 	}
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	/* Make inband tx interrupts as wakeup capable for slave irq */
 	ret = of_property_read_u32(pdev->dev.of_node,
 				   "qcom,swr-mstr-irq-wakeup-capable",
@@ -3491,6 +3508,7 @@ static int swrm_probe(struct platform_device *pdev)
 				 "%s: Device wakeup init failed: %d\n",
 				 __func__, ret);
 	}
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	ret = swr_register_master(&swrm->master);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: error adding swr master\n", __func__);
@@ -3500,6 +3518,7 @@ static int swrm_probe(struct platform_device *pdev)
 	/* Add devices registered with board-info as the
 	 * controller will be up now
 	 */
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swr_master_add_boarddevices(&swrm->master);
 	if (!swrm->is_always_on && swrm_request_hw_vote(swrm, LPASS_AUDIO_CORE, true))
 		dev_dbg(&pdev->dev, "%s: Audio HW Vote is failed\n", __func__);
@@ -3519,6 +3538,7 @@ static int swrm_probe(struct platform_device *pdev)
 
 	swrm->num_auto_enum = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
                                 & SWRM_COMP_PARAMS_AUTO_ENUM_SLAVES) >> 20);
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	ret = of_property_read_u32(swrm->dev->of_node, "qcom,swr-num-dev",
 				   &swrm->num_dev);
 	if (ret) {
@@ -3540,7 +3560,7 @@ static int swrm_probe(struct platform_device *pdev)
 				swrm->num_dev, swrm->num_auto_enum);
 		}
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	ret = swrm_master_init(swrm);
 	if (ret < 0) {
 		dev_err(&pdev->dev,
@@ -3550,7 +3570,7 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -EPROBE_DEFER;
 		goto err_mstr_init_fail;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	mutex_unlock(&swrm->mlock);
 	INIT_WORK(&swrm->wakeup_work, swrm_wakeup_work);
 

@@ -12,6 +12,7 @@
 #include <linux/delay.h>
 #include <linux/sched.h>
 #include <linux/mfd/core.h>
+#include <linux/pm_qos.h>
 #include <asoc/core.h>
 #include <asoc/msm-cdc-supply.h>
 #include <asoc/msm-cdc-pinctrl.h>
@@ -61,7 +62,7 @@ static int wcd9xxx_read_of_property_u32(struct device *dev, const char *name,
 	if (rc)
 		dev_err(dev, "%s: Looking up %s property in node %s failed",
 			__func__, name, dev->of_node->full_name);
-
+pr_err("%s: enter\n", __func__);
 	return rc;
 }
 
@@ -70,7 +71,7 @@ static void wcd9xxx_dt_parse_micbias_info(struct device *dev,
 {
 	u32 prop_val;
 	int rc;
-
+pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-ldoh-v", NULL)) {
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias-ldoh-v",
@@ -78,19 +79,21 @@ static void wcd9xxx_dt_parse_micbias_info(struct device *dev,
 		if (!rc)
 			mb->ldoh_v  =  (u8)prop_val;
 	}
-
+pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB1 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-cfilt1-mv",
 			     NULL)) {
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias-cfilt1-mv",
 						   &prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->cfilt1_mv = prop_val;
 
 		rc = wcd9xxx_read_of_property_u32(dev,
 						"qcom,cdc-micbias1-cfilt-sel",
 						&prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->bias1_cfilt_sel = (u8)prop_val;
 
@@ -99,25 +102,29 @@ static void wcd9xxx_dt_parse_micbias_info(struct device *dev,
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias1-mv",
 						  &prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->micb1_mv = prop_val;
 	} else {
 		dev_info(dev, "%s: Micbias1 DT property not found\n",
 			__func__);
 	}
-
+pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB2 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-cfilt2-mv",
 			     NULL)) {
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias-cfilt2-mv",
 						   &prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->cfilt2_mv = prop_val;
 
 		rc = wcd9xxx_read_of_property_u32(dev,
 						"qcom,cdc-micbias2-cfilt-sel",
 						&prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->bias2_cfilt_sel = (u8)prop_val;
 
@@ -126,54 +133,64 @@ static void wcd9xxx_dt_parse_micbias_info(struct device *dev,
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias2-mv",
 						  &prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->micb2_mv = prop_val;
 	} else {
 		dev_info(dev, "%s: Micbias2 DT property not found\n",
 			__func__);
 	}
-
+pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB3 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-cfilt3-mv",
 			     NULL)) {
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias-cfilt3-mv",
 						   &prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->cfilt3_mv = prop_val;
 
 		rc = wcd9xxx_read_of_property_u32(dev,
 						"qcom,cdc-micbias3-cfilt-sel",
 						&prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->bias3_cfilt_sel = (u8)prop_val;
 
 	} else if (of_find_property(dev->of_node, "qcom,cdc-micbias3-mv",
 				    NULL)) {
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias3-mv",
 						  &prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->micb3_mv = prop_val;
 	} else {
 		dev_info(dev, "%s: Micbias3 DT property not found\n",
 			__func__);
 	}
-
+pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB4 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias4-cfilt-sel",
 			     NULL)) {
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		rc = wcd9xxx_read_of_property_u32(dev,
 						"qcom,cdc-micbias4-cfilt-sel",
 						&prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->bias4_cfilt_sel = (u8)prop_val;
 
 	} else if (of_find_property(dev->of_node, "qcom,cdc-micbias4-mv",
 				    NULL)) {
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias4-mv",
 						  &prop_val);
+		pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->micb4_mv = prop_val;
 	} else {
@@ -199,27 +216,27 @@ static void wcd9xxx_dt_parse_micbias_info(struct device *dev,
 				      "qcom,cdc-micbias2-headset-only");
 
 	/* Print micbias info */
-	dev_dbg(dev, "%s: ldoh_v  %u cfilt1_mv %u cfilt2_mv %u cfilt3_mv %u",
+	dev_err(dev, "%s: ldoh_v  %u cfilt1_mv %u cfilt2_mv %u cfilt3_mv %u",
 		__func__, (u32)mb->ldoh_v, (u32)mb->cfilt1_mv,
 		(u32)mb->cfilt2_mv, (u32)mb->cfilt3_mv);
 
-	dev_dbg(dev, "%s: micb1_mv %u micb2_mv %u micb3_mv %u micb4_mv %u",
+	dev_err(dev, "%s: micb1_mv %u micb2_mv %u micb3_mv %u micb4_mv %u",
 		__func__, mb->micb1_mv, mb->micb2_mv,
 		mb->micb3_mv, mb->micb4_mv);
 
-	dev_dbg(dev, "%s: bias1_cfilt_sel %u bias2_cfilt_sel %u\n",
+	dev_err(dev, "%s: bias1_cfilt_sel %u bias2_cfilt_sel %u\n",
 		__func__, (u32)mb->bias1_cfilt_sel, (u32)mb->bias2_cfilt_sel);
 
-	dev_dbg(dev, "%s: bias3_cfilt_sel %u bias4_cfilt_sel %u\n",
+	dev_err(dev, "%s: bias3_cfilt_sel %u bias4_cfilt_sel %u\n",
 		__func__, (u32)mb->bias3_cfilt_sel, (u32)mb->bias4_cfilt_sel);
 
-	dev_dbg(dev, "%s: bias1_ext_cap %d bias2_ext_cap %d\n",
+	dev_err(dev, "%s: bias1_ext_cap %d bias2_ext_cap %d\n",
 		__func__, mb->bias1_cap_mode, mb->bias2_cap_mode);
 
-	dev_dbg(dev, "%s: bias3_ext_cap %d bias4_ext_cap %d\n",
+	dev_err(dev, "%s: bias3_ext_cap %d bias4_ext_cap %d\n",
 		__func__, mb->bias3_cap_mode, mb->bias4_cap_mode);
 
-	dev_dbg(dev, "%s: bias2_is_headset_only %d\n",
+	dev_err(dev, "%s: bias2_is_headset_only %d\n",
 		__func__, mb->bias2_is_headset_only);
 }
 
@@ -254,7 +271,7 @@ static u32 wcd9xxx_validate_dmic_sample_rate(struct device *dev,
 	case 8:
 	case 16:
 		/* Valid dmic DIV factors */
-		dev_dbg(dev, "%s: DMIC_DIV = %u, mclk_rate = %u\n",
+		dev_err(dev, "%s: DMIC_DIV = %u, mclk_rate = %u\n",
 			__func__, div_factor, mclk_rate);
 		break;
 	case 6:
@@ -265,8 +282,8 @@ static u32 wcd9xxx_validate_dmic_sample_rate(struct device *dev,
 		 */
 		if ((mclk_rate == WCD9XXX_MCLK_CLK_9P6HZ) &&
 		    (of_device_is_compatible(dev->of_node,
-					     "qcom,tavil-slim-pgd")))
-			dev_dbg(dev, "%s: DMIC_DIV = %u, mclk_rate = %u\n",
+					     "slim217,250")))
+			dev_err(dev, "%s: DMIC_DIV = %u, mclk_rate = %u\n",
 				__func__, div_factor, mclk_rate);
 		else if (mclk_rate != WCD9XXX_MCLK_CLK_12P288MHZ)
 			goto undefined_rate;
@@ -279,7 +296,7 @@ static u32 wcd9xxx_validate_dmic_sample_rate(struct device *dev,
 	return dmic_sample_rate;
 
 undefined_rate:
-	dev_dbg(dev, "%s: Invalid %s = %d, for mclk %d\n",
+	dev_info(dev, "%s: Invalid %s = %d, for mclk %d\n",
 		 __func__, dmic_rate_type, dmic_sample_rate, mclk_rate);
 	dmic_sample_rate = WCD9XXX_DMIC_SAMPLE_RATE_UNDEFINED;
 
@@ -333,6 +350,14 @@ struct wcd9xxx_pdata *wcd9xxx_populate_dt_data(struct device *dev)
 			dev->of_node->full_name);
 		goto err_parse_dt_prop;
 	}
+	/*(pdata->reset_gpio = of_get_named_gpio(dev->of_node,
+                                                     "qcom,wcd-rst-gpio-node", 0);
+	if (!pdata->reset_gpio) {
+                dev_err(dev, "%s: Looking up %s gpio property in node %s failed\n",
+                        __func__, "qcom,wcd-rst-gpio-node",
+                        dev->of_node->full_name);
+               goto err_parse_dt_prop;
+        }*/
 
 	pdata->has_buck_vsel_gpio = of_property_read_bool(dev->of_node,
 						"qcom,has-buck-vsel-gpio");
@@ -487,8 +512,10 @@ int wcd9xxx_page_write(struct wcd9xxx *wcd9xxx, unsigned short *reg)
 	pg_num = c_reg >> 8;
 	reg_addr = c_reg & 0xff;
 	if (wcd9xxx->prev_pg_valid) {
+		//pr_err("%s line=%d\n",__func__,__LINE__);
 		prev_pg_num = wcd9xxx->prev_pg;
 		if (prev_pg_num != pg_num) {
+			//pr_err("%s line=%d\n",__func__,__LINE__);
 			ret = wcd9xxx->write_dev(
 					wcd9xxx, PAGE_REG_ADDR, 1,
 					(void *) &pg_num, false);
@@ -696,16 +723,22 @@ int wcd9xxx_reset(struct device *dev)
 	}
 
 	value = msm_cdc_pinctrl_get_state(wcd9xxx->wcd_rst_np);
-	if (value > 0) {
+	dev_err(dev, "%s:  val=%d\n",__func__,value);
+	if(value == -EINVAL){
+		//gpio data invalid. defer probe
+		return -EPROBE_DEFER;
+
+	}else if (value > 0) {
+		dev_err(dev, "%s   val=%d greater than 0\n",__func__,value);
 		wcd9xxx->avoid_cdc_rstlow = 1;
 		return 0;
-	}
+	} 
 
 	rc = msm_cdc_pinctrl_select_sleep_state(wcd9xxx->wcd_rst_np);
 	if (rc) {
 		dev_err(dev, "%s: wcd sleep state request fail!\n",
 			__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 
 	/* 20ms sleep required after pulling the reset gpio to LOW */
@@ -715,14 +748,13 @@ int wcd9xxx_reset(struct device *dev)
 	if (rc) {
 		dev_err(dev, "%s: wcd active state request fail!\n",
 			__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 	msleep(20);
 
 	return rc;
 }
 EXPORT_SYMBOL(wcd9xxx_reset);
-
 /*
  * wcd9xxx_reset_low:
  *	Pull the wcd9xxx codec reset_n to low
@@ -878,6 +910,9 @@ int wcd9xxx_get_codec_info(struct device *dev)
 
 	switch (wcd9xxx->type) {
 	case WCD934X:
+		dev_err(dev, "%s: kiran codec wcd934x\n",
+                        __func__);
+
 		cinfo->dev = tavil_devs;
 		cinfo->size = ARRAY_SIZE(tavil_devs);
 		break;
@@ -972,11 +1007,9 @@ int wcd9xxx_core_res_init(
 	wcd9xxx_core_res->wlock_holders = 0;
 	wcd9xxx_core_res->pm_state = WCD9XXX_PM_SLEEPABLE;
 	init_waitqueue_head(&wcd9xxx_core_res->pm_wq);
-	#if 0
-	pm_qos_add_request(&wcd9xxx_core_res->pm_qos_req,
-				PM_QOS_CPU_DMA_LATENCY,
+
+	cpu_latency_qos_add_request(&wcd9xxx_core_res->pm_qos_req,
 				PM_QOS_DEFAULT_VALUE);
-	#endif
 
 	wcd9xxx_core_res->num_irqs = num_irqs;
 	wcd9xxx_core_res->num_irq_regs = num_irq_regs;
@@ -1001,9 +1034,9 @@ void wcd9xxx_core_res_deinit(struct wcd9xxx_core_resource *wcd9xxx_core_res)
 
 	if (!wcd9xxx_core_res)
 		return;
-        #if 0
-	pm_qos_remove_request(&wcd9xxx_core_res->pm_qos_req);
-        #endif
+
+	cpu_latency_qos_remove_request(&wcd9xxx_core_res->pm_qos_req);
+
 	mutex_destroy(&wcd9xxx_core_res->pm_lock);
 }
 EXPORT_SYMBOL(wcd9xxx_core_res_deinit);
@@ -1054,7 +1087,7 @@ int wcd9xxx_core_res_suspend(
 {
 	int ret = 0;
 
-	pr_debug("%s: enter\n", __func__);
+	pr_err("%s: enter\n", __func__);
 	/*
 	 * pm_qos_update_request() can be called after this suspend chain call
 	 * started. thus suspend can be called while lock is being held
@@ -1114,7 +1147,7 @@ int wcd9xxx_core_res_resume(
 {
 	int ret = 0;
 
-	pr_debug("%s: enter\n", __func__);
+	pr_err("%s: enter\n", __func__);
 	mutex_lock(&wcd9xxx_core_res->pm_lock);
 	if (wcd9xxx_core_res->pm_state == WCD9XXX_PM_ASLEEP) {
 		pr_debug("%s: resuming system, state %d, wlock %d\n", __func__,
@@ -1141,6 +1174,7 @@ EXPORT_SYMBOL(wcd9xxx_core_res_resume);
  */
 enum wcd9xxx_intf_status wcd9xxx_get_intf_type(void)
 {
+	pr_err("%s: enter\n", __func__);
 	return wcd9xxx_intf;
 }
 EXPORT_SYMBOL(wcd9xxx_get_intf_type);

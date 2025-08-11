@@ -546,8 +546,8 @@ SND_SOC_DAILINK_DEFS(slimbus_0_tx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("tavil_codec", "tavil_tx1"),
 		COMP_CODEC("tasha_codec", "tasha_tx1"),
-			   COMP_CODEC("wsa-codec1", "wsa_rx1"),
-			   COMP_CODEC("wsa-codec2", "wsa_rx2"),
+			   COMP_CODEC("wsa-codec.1", "wsa_rx1"),
+			   COMP_CODEC("wsa-codec.2", "wsa_rx2"),
 		COMP_CODEC("msm-stub-codec.1", "msm-stub-tx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 

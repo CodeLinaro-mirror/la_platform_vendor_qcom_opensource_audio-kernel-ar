@@ -273,7 +273,7 @@ static int wcd934x_bring_down(struct wcd9xxx *wcd9xxx)
 static int wcd934x_bring_up(struct wcd9xxx *wcd9xxx)
 {
 	struct regmap *wcd_regmap;
-
+	dev_err(wcd9xxx->dev, "%s: enter line=%d\n",__func__,__LINE__);
 	if (!wcd9xxx)
 		return -EINVAL;
 
@@ -294,7 +294,7 @@ static int wcd934x_bring_up(struct wcd9xxx *wcd9xxx)
 	regmap_write(wcd_regmap, WCD934X_CODEC_RPM_RST_CTL, 0x3);
 	regmap_write(wcd_regmap, WCD934X_CODEC_RPM_RST_CTL, 0x7);
 	regmap_write(wcd_regmap, WCD934X_CODEC_RPM_PWR_CDC_DIG_HM_CTL, 0x3);
-
+dev_err(wcd9xxx->dev, "%s: exit line=%d\n",__func__,__LINE__);
 	return 0;
 }
 

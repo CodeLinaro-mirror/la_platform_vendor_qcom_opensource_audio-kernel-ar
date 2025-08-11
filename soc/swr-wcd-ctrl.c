@@ -1324,7 +1324,7 @@ static int swrm_get_logical_dev_num(struct swr_master *mstr, u64 dev_id,
 						*dev_num = i;
 						ret = 0;
 					}
-					dev_dbg(swrm->dev, "%s: devnum %d is assigned for dev addr %lx\n",
+					dev_dbg(swrm->dev, "%s: devnum %d is assigned for dev addr %llx\n",
 						__func__, i, swr_dev->addr);
 				}
 			}
@@ -1424,6 +1424,7 @@ static int swrm_probe(struct platform_device *pdev)
 	struct swr_mstr_ctrl *swrm;
 	struct swr_ctrl_platform_data *pdata;
 	int ret;
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 
 	/* Allocate soundwire master driver structure */
 	swrm = kzalloc(sizeof(struct swr_mstr_ctrl), GFP_KERNEL);
@@ -1431,10 +1432,12 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -ENOMEM;
 		goto err_memory_fail;
 	}
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swrm->dev = &pdev->dev;
 	swrm->pdev = pdev;
 	platform_set_drvdata(pdev, swrm);
 	swr_set_ctrl_data(&swrm->master, swrm);
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	pdata = dev_get_platdata(&pdev->dev);
 	if (!pdata) {
 		dev_err(&pdev->dev, "%s: pdata from parent is NULL\n",
@@ -1442,6 +1445,7 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_pdata_fail;
 	}
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swrm->handle = (void *)pdata->handle;
 	if (!swrm->handle) {
 		dev_err(&pdev->dev, "%s: swrm->handle is NULL\n",
@@ -1449,6 +1453,7 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_pdata_fail;
 	}
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	swrm->read = pdata->read;
 	if (!swrm->read) {
 		dev_err(&pdev->dev, "%s: swrm->read is NULL\n",
@@ -1457,6 +1462,7 @@ static int swrm_probe(struct platform_device *pdev)
 		goto err_pdata_fail;
 	}
 	swrm->write = pdata->write;
+	dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	if (!swrm->write) {
 		dev_err(&pdev->dev, "%s: swrm->write is NULL\n",
 			__func__);
@@ -1535,7 +1541,7 @@ static int swrm_probe(struct platform_device *pdev)
 		dev_err(&pdev->dev, "%s: error adding swr master\n", __func__);
 		goto err_mstr_fail;
 	}
-
+dev_err(&pdev->dev, "%s: line=%d\n",  __func__,__LINE__);
 	/* Add devices registered with board-info as the
 	 * controller will be up now
 	 */
@@ -1582,7 +1588,7 @@ static int swrm_probe(struct platform_device *pdev)
 	INIT_WORK(&swrm->dc_presence_work, swrm_notify_work_fn);
 	swrm->event_notifier.notifier_call  = swrm_event_notify;
 	msm_aud_evt_register_client(&swrm->event_notifier);
-
+dev_err(&pdev->dev, "%s exit: line=%d\n",  __func__,__LINE__);
 	return 0;
 err_mstr_fail:
 	swrm->reg_irq(swrm->handle, swr_mstr_interrupt,

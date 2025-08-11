@@ -83,21 +83,23 @@ int wcd9xxx_init_slimslave(struct wcd9xxx *wcd9xxx,
 			   unsigned int tx_num, unsigned int *tx_slot,
 			   unsigned int rx_num, unsigned int *rx_slot);
 
+
 int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 			    struct list_head *wcd9xxx_ch_list,
 			    unsigned int rate, unsigned int bit_width,
-			    unsigned int direction);
+			    unsigned int direction);	
 int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 			    struct list_head *wcd9xxx_ch_list,
 			    unsigned int rate, unsigned int bit_width,
 		            unsigned int direction);
-int wcd9xxx_close_slim_sch(struct slim_stream_config *sconfig);
 int wcd9xxx_get_channel(struct wcd9xxx *wcd9xxx,
 			unsigned int *rx_ch,
 			unsigned int *tx_ch);
 int wcd9xxx_get_slave_port(unsigned int ch_num);
+
 int wcd9xxx_disconnect_port_tx(struct wcd9xxx *wcd9xxx);
 int wcd9xxx_disconnect_port_rx(struct wcd9xxx *wcd9xxx);
+
 int wcd9xxx_rx_vport_validation(u32 port_id,
 				struct list_head *codec_dai_list);
 int wcd9xxx_tx_vport_validation(u32 vtable, u32 port_id,

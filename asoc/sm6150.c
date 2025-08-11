@@ -30,6 +30,7 @@
 #include <asoc/msm-cdc-pinctrl.h>
 #include "asoc/wcd-mbhc-v2.h"
 #include "codecs/wcd937x/wcd937x-mbhc.h"
+#include "codecs/wcd934x/wcd934x.h"
 #include "codecs/wsa881x.h"
 #include "codecs/bolero/bolero-cdc.h"
 #include <bindings/audio-codec-port-types.h>
@@ -615,7 +616,10 @@ static int dmic_0_1_gpio_cnt;
 static int dmic_2_3_gpio_cnt;
 
 static void *def_wcd_mbhc_cal(void);
+static int msm_snd_enable_codec_ext_clk(struct snd_soc_component *component,
+					int enable, bool dapm);
 static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime*);
+static int msm_wsa881x_init(struct snd_soc_pcm_runtime *rtd);
 static int msm_wcd937x_wsa881x_init(struct snd_soc_pcm_runtime *rtd);
 
 /*
@@ -645,12 +649,12 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.moisture_duty_cycle_en = true,
 };
 
-/*static struct snd_soc_dapm_route wcd_audio_paths[] = {
+static struct snd_soc_dapm_route wcd_audio_paths[] = {
 	{"MIC BIAS1", NULL, "MCLK TX"},
 	{"MIC BIAS2", NULL, "MCLK TX"},
 	{"MIC BIAS3", NULL, "MCLK TX"},
 	{"MIC BIAS4", NULL, "MCLK TX"},
-};*/
+};
 
 /*static struct afe_clk_set mi2s_clk[MI2S_MAX] = {
 	{
@@ -4005,6 +4009,293 @@ static struct snd_info_entry *msm_snd_info_create_subdir(struct module *mod,
 	return entry;
 }
 
+static int msm_snd_enable_codec_ext_tx_clk(struct snd_soc_component *component,
+					   int enable, bool dapm)
+{
+	int ret = 0;
+
+	if (!strcmp(component->name, "tavil_codec")) {
+		ret = tavil_cdc_mclk_tx_enable(component, enable);
+	} else {
+		dev_err(component->dev, "%s: unknown codec to enable TX ext clk\n",
+			__func__);
+		ret = -EINVAL;
+	}
+
+	return ret;
+}
+
+static int msm_snd_enable_codec_ext_clk(struct snd_soc_component *component,
+					int enable, bool dapm)
+{
+	int ret = 0;
+
+	if (!strcmp(component->name, "tavil_codec")) {
+		ret = tavil_cdc_mclk_enable(component, enable);
+	} else {
+		dev_err(component->dev, "%s: unknown codec to enable ext clk\n",
+			__func__);
+		ret = -EINVAL;
+	}
+	return ret;
+}
+
+static int msm_mclk_tx_event(struct snd_soc_dapm_widget *w,
+			     struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_component *component =
+			snd_soc_dapm_to_component(w->dapm);
+
+	pr_debug("%s: event = %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		return msm_snd_enable_codec_ext_tx_clk(component, 1, true);
+	case SND_SOC_DAPM_POST_PMD:
+		return msm_snd_enable_codec_ext_tx_clk(component, 0, true);
+	}
+	return 0;
+}
+
+static int msm_mclk_event(struct snd_soc_dapm_widget *w,
+				 struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_component *component =
+			snd_soc_dapm_to_component(w->dapm);
+
+	pr_debug("%s: event = %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		return msm_snd_enable_codec_ext_clk(component, 1, true);
+	case SND_SOC_DAPM_POST_PMD:
+		return msm_snd_enable_codec_ext_clk(component, 0, true);
+	}
+	return 0;
+}
+
+static int msm_hifi_ctrl_event(struct snd_soc_dapm_widget *w,
+			       struct snd_kcontrol *k, int event)
+{
+	struct snd_soc_component *component =
+			snd_soc_dapm_to_component(w->dapm);
+	struct snd_soc_card *card = component->card;
+	struct msm_asoc_mach_data *pdata =
+				snd_soc_card_get_drvdata(card);
+
+	dev_dbg(component->dev, "%s: msm_hifi_control = %d\n",
+		__func__, msm_hifi_control);
+
+	if (!pdata || !pdata->hph_en0_gpio_p) {
+		dev_err(component->dev, "%s: hph_en0_gpio is invalid\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	if (msm_hifi_control != MSM_HIFI_ON) {
+		dev_dbg(component->dev, "%s: HiFi mixer control is not set\n",
+			__func__);
+		return 0;
+	}
+
+	switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+		msm_cdc_pinctrl_select_active_state(pdata->hph_en0_gpio_p);
+		break;
+	case SND_SOC_DAPM_PRE_PMD:
+		msm_cdc_pinctrl_select_sleep_state(pdata->hph_en0_gpio_p);
+		break;
+	}
+
+	return 0;
+}
+
+static const struct snd_soc_dapm_widget msm_ext_dapm_widgets[] = {
+
+	SND_SOC_DAPM_SUPPLY("MCLK",  SND_SOC_NOPM, 0, 0,
+			    msm_mclk_event,
+			    SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_SUPPLY("MCLK TX",  SND_SOC_NOPM, 0, 0,
+	msm_mclk_tx_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_SPK("Lineout_1 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_2 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_3 amp", NULL),
+	SND_SOC_DAPM_SPK("Lineout_4 amp", NULL),
+	SND_SOC_DAPM_SPK("hifi amp", msm_hifi_ctrl_event),
+	SND_SOC_DAPM_MIC("Handset Mic", NULL),
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Secondary Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCRight Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("ANCLeft Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Analog Mic4", NULL),
+	SND_SOC_DAPM_MIC("Analog Mic5", NULL),
+	SND_SOC_DAPM_MIC("Analog Mic6", NULL),
+	SND_SOC_DAPM_MIC("Analog Mic7", NULL),
+	SND_SOC_DAPM_MIC("Analog Mic8", NULL),
+
+	SND_SOC_DAPM_MIC("Digital Mic0", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic1", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic2", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic3", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic4", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic5", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic6", NULL),
+};
+
+static int msm_audrx_tavil_init(struct snd_soc_pcm_runtime *rtd)
+{
+	int ret = 0;
+	//void *config_data;
+	struct snd_soc_component *component = NULL;
+	struct snd_soc_dapm_context *dapm;
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(rtd, 0);
+	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	struct snd_card *card = rtd->card->snd_card;
+	struct snd_info_entry *entry;
+	struct msm_asoc_mach_data *pdata =
+				snd_soc_card_get_drvdata(rtd->card);
+
+	/*
+	 * Codec SLIMBUS configuration
+	 * RX1, RX2, RX3, RX4, RX5, RX6, RX7, RX8
+	 * TX1, TX2, TX3, TX4, TX5, TX6, TX7, TX8, TX9, TX10, TX11, TX12, TX13
+	 * TX14, TX15, TX16
+	 */
+	unsigned int rx_ch[WCD934X_RX_MAX] = {144, 145, 146, 147, 148, 149,
+					      150, 151};
+	unsigned int tx_ch[WCD934X_TX_MAX] = {128, 129, 130, 131, 132, 133,
+					      134, 135, 136, 137, 138, 139,
+					      140, 141, 142, 143};
+
+	pr_info("%s: dev_name:%s\n", __func__, dev_name(cpu_dai->dev));
+
+	rtd->pmdown_time = 0;
+
+	component = snd_soc_rtdcom_lookup(rtd, "tavil_codec");
+	if (!component) {
+		pr_err("%s: component is NULL\n", __func__);
+		return -EINVAL;
+	}
+	pr_info("%s: line=%d\n", __func__,__LINE__);
+
+	dapm = snd_soc_component_get_dapm(component);
+pr_info("%s: line=%d\n", __func__,__LINE__);
+
+	ret = snd_soc_add_component_controls(component, msm_ext_snd_controls,
+					 ARRAY_SIZE(msm_ext_snd_controls));
+	if (ret < 0) {
+		pr_err("%s: add_codec_controls failed, err %d\n",
+			__func__, ret);
+		return ret;
+	}
+pr_info("%s: line=%d\n", __func__,__LINE__);
+
+	ret = snd_soc_add_component_controls(component, msm_common_snd_controls,
+					 ARRAY_SIZE(msm_common_snd_controls));
+	if (ret < 0) {
+		pr_err("%s: add_codec_controls failed, err %d\n",
+			__func__, ret);
+		return ret;
+	}
+pr_info("%s: line=%d\n", __func__,__LINE__);
+	snd_soc_dapm_new_controls(dapm, msm_ext_dapm_widgets,
+				ARRAY_SIZE(msm_ext_dapm_widgets));
+
+	snd_soc_dapm_add_routes(dapm, wcd_audio_paths,
+				ARRAY_SIZE(wcd_audio_paths));
+
+	snd_soc_dapm_ignore_suspend(dapm, "Handset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Headset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "ANCRight Headset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "ANCLeft Headset Mic");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic0");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic1");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic2");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic3");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic4");
+	snd_soc_dapm_ignore_suspend(dapm, "Digital Mic5");
+	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic5");
+	snd_soc_dapm_ignore_suspend(dapm, "MADINPUT");
+	snd_soc_dapm_ignore_suspend(dapm, "MAD_CPE_INPUT");
+	snd_soc_dapm_ignore_suspend(dapm, "MAD_CPE_OUT1");
+	snd_soc_dapm_ignore_suspend(dapm, "MAD_CPE_OUT2");
+	snd_soc_dapm_ignore_suspend(dapm, "EAR");
+	snd_soc_dapm_ignore_suspend(dapm, "LINEOUT1");
+	snd_soc_dapm_ignore_suspend(dapm, "LINEOUT2");
+	snd_soc_dapm_ignore_suspend(dapm, "ANC EAR");
+	snd_soc_dapm_ignore_suspend(dapm, "SPK1 OUT");
+	snd_soc_dapm_ignore_suspend(dapm, "SPK2 OUT");
+	snd_soc_dapm_ignore_suspend(dapm, "HPHL");
+	snd_soc_dapm_ignore_suspend(dapm, "HPHR");
+	snd_soc_dapm_ignore_suspend(dapm, "AIF4 VI");
+	snd_soc_dapm_ignore_suspend(dapm, "VIINPUT");
+	snd_soc_dapm_ignore_suspend(dapm, "ANC HPHL");
+	snd_soc_dapm_ignore_suspend(dapm, "ANC HPHR");
+
+	snd_soc_dapm_sync(dapm);
+pr_info("%s: line=%d\n", __func__,__LINE__);
+	snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
+				    tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
+#if  0
+	msm_codec_fn.get_afe_config_fn = tavil_get_afe_config;
+
+	ret = msm_afe_set_config(component);
+	if (ret) {
+		pr_err("%s: Failed to set AFE config %d\n", __func__, ret);
+		goto err;
+	}
+	pdata->is_afe_config_done = true;
+
+	config_data = msm_codec_fn.get_afe_config_fn(component,
+						     AFE_AANC_VERSION);
+	if (config_data) {
+		ret = afe_set_config(AFE_AANC_VERSION, config_data, 0);
+		if (ret) {
+			pr_err("%s: Failed to set aanc version %d\n",
+				__func__, ret);
+			goto err;
+		}
+	}
+
+#endif
+	/*
+	 * Send speaker configuration only for WSA8810.
+	 * Default configuration is for WSA8815.
+	 */
+
+	tavil_set_spkr_mode(component, WCD934X_SPKR_MODE_1);
+	tavil_set_spkr_gain_offset(component,
+			WCD934X_RX_GAIN_OFFSET_M1P5_DB);
+pr_info("%s: line=%d\n", __func__,__LINE__);
+	card = rtd->card->snd_card;
+	if (!pdata->codec_root) {
+		entry = msm_snd_info_create_subdir(card->module, "codecs",
+						 card->proc_root);
+		if (!entry) {
+			pr_debug("%s: Cannot create codecs module entry\n",
+				 __func__);
+			ret = 0;
+			goto err;
+		}
+		pdata->codec_root = entry;
+	}
+	pr_info("%s: line=%d\n", __func__,__LINE__);
+
+	tavil_codec_info_create_codec_entry(pdata->codec_root, component);
+pr_info("%s: line=%d\n", __func__,__LINE__);
+	tavil_set_port_map(component,
+				ARRAY_SIZE(sm_port_map_tavil_wsa), sm_port_map_tavil_wsa);
+
+	codec_reg_done = true;
+	pr_info("%s: line=%d\n", __func__,__LINE__);
+	return 0;
+err:
+	return ret;
+}
+
+
 static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 {
 	int ret = 0;
@@ -4307,7 +4598,132 @@ static struct snd_soc_dai_link msm_wcn_btfm_be_dai_links[] = {
  	},
 };
 
-
+static struct snd_soc_dai_link msm_tavil_be_dai_links[] = {
+	{
+		.name = LPASS_BE_SLIMBUS_0_RX,
+		.stream_name = LPASS_BE_SLIMBUS_0_RX,
+		.init = &msm_audrx_tavil_init,
+		.playback_only = 1,	
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_0_rx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_0_TX,
+		.stream_name = LPASS_BE_SLIMBUS_0_TX,
+		.init = &msm_wsa881x_init,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+                .ignore_suspend = 1,		
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_0_tx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_1_RX,
+		.stream_name = LPASS_BE_SLIMBUS_1_RX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.playback_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_1_rx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_1_TX,
+		.stream_name = LPASS_BE_SLIMBUS_1_TX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.capture_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_1_tx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_2_RX,
+		.stream_name = LPASS_BE_SLIMBUS_2_RX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.playback_only = 1,
+	        .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_2_rx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_3_RX,
+		.stream_name = LPASS_BE_SLIMBUS_3_RX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.playback_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_3_rx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_3_TX,
+		.stream_name = LPASS_BE_SLIMBUS_3_TX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.capture_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_3_tx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_4_RX,
+		.stream_name = LPASS_BE_SLIMBUS_4_RX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.playback_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_4_rx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_5_RX,
+		.stream_name = LPASS_BE_SLIMBUS_5_RX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.playback_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_5_rx),
+	},
+	/* MAD BE */
+	{
+		.name = LPASS_BE_SLIMBUS_5_TX,
+		.stream_name = LPASS_BE_SLIMBUS_5_TX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.capture_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_5_tx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_6_RX,
+		.stream_name = LPASS_BE_SLIMBUS_6_RX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.playback_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_6_rx),
+	},
+	/* Slimbus VI Recording */
+	{
+		.name = LPASS_BE_SLIMBUS_4_TX,
+		.stream_name = LPASS_BE_SLIMBUS_4_TX,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+		.capture_only = 1,
+                .ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(slimbus_tx_vi),
+	},
+};
 static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 
 	/* DISP PORT BACK END DAI Link */
@@ -4583,6 +4999,7 @@ static struct snd_soc_dai_link msm_rx_tx_cdc_dma_be_dai_links[] = {
 static struct snd_soc_dai_link msm_sm6150_dai_links[
 			 ARRAY_SIZE(msm_common_dai_links) +
 			 ARRAY_SIZE(msm_wcn_btfm_be_dai_links) +
+			 ARRAY_SIZE(msm_tavil_be_dai_links) +
 			 ARRAY_SIZE(ext_disp_be_dai_link) +
 			 ARRAY_SIZE(msm_mi2s_dai_links) +
 			 ARRAY_SIZE(msm_auxpcm_be_dai_links) +
@@ -4788,6 +5205,10 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 				__func__);
 
 		if (tavil_codec) {
+			memcpy(msm_sm6150_dai_links + total_links,
+				msm_tavil_be_dai_links,
+				sizeof(msm_tavil_be_dai_links));
+			total_links += ARRAY_SIZE(msm_tavil_be_dai_links);
 
 		}  else {
 
@@ -4888,6 +5309,67 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 	}
 
 	return card;
+}
+
+static int msm_wsa881x_init(struct snd_soc_pcm_runtime *rtd)
+{
+	u8 spkleft_ports[WSA881X_MAX_SWR_PORTS] = {0, 1, 2, 3};
+	u8 spkright_ports[WSA881X_MAX_SWR_PORTS] = {0, 1, 2, 3};
+	u8 spkleft_port_types[WSA881X_MAX_SWR_PORTS] = {SPKR_L, SPKR_L_COMP,
+						SPKR_L_BOOST, SPKR_L_VI};
+	u8 spkright_port_types[WSA881X_MAX_SWR_PORTS] = {SPKR_R, SPKR_R_COMP,
+						SPKR_R_BOOST, SPKR_R_VI};
+	unsigned int ch_rate[WSA881X_MAX_SWR_PORTS] = {SWR_CLK_RATE_2P4MHZ, SWR_CLK_RATE_0P6MHZ,
+							SWR_CLK_RATE_0P3MHZ, SWR_CLK_RATE_1P2MHZ};
+	unsigned int ch_mask[WSA881X_MAX_SWR_PORTS] = {0x1, 0xF, 0x3, 0x3};
+	struct snd_soc_component *component = NULL;
+	struct msm_asoc_mach_data *pdata =
+                snd_soc_card_get_drvdata(rtd->card);
+	struct snd_soc_dapm_context *dapm = NULL;
+
+
+	if (pdata->wsa_max_devs > 0) {
+			component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
+		if (!component) {
+			pr_err("%s: wsa-codec.1 component is NULL\n", __func__);
+			return -EINVAL;
+		}
+
+		dapm = snd_soc_component_get_dapm(component);
+
+		wsa881x_set_channel_map(component, &spkleft_ports[0],
+				WSA881X_MAX_SWR_PORTS, &ch_mask[0],
+				&ch_rate[0], &spkleft_port_types[0]);
+		if (dapm->component) {
+			snd_soc_dapm_ignore_suspend(dapm, "IN");
+			snd_soc_dapm_ignore_suspend(dapm, "SPKR");
+		}
+		wsa881x_codec_info_create_codec_entry(pdata->codec_root,
+						      component);
+	}
+
+	/* If current platform has more than one WSA */
+	if (pdata->wsa_max_devs > 1) {
+			component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.2");
+		if (!component) {
+			pr_err("%s: wsa-codec.2 component is NULL\n", __func__);
+			return -EINVAL;
+		}
+
+		dapm = snd_soc_component_get_dapm(component);
+
+		wsa881x_set_channel_map(component, &spkright_ports[0],
+				WSA881X_MAX_SWR_PORTS, &ch_mask[0],
+				&ch_rate[0], &spkright_port_types[0]);
+		if (dapm->component) {
+			snd_soc_dapm_ignore_suspend(dapm, "IN");
+			snd_soc_dapm_ignore_suspend(dapm, "SPKR");
+		}
+		wsa881x_codec_info_create_codec_entry(pdata->codec_root,
+						      component);
+	}
+
+	return 0;
 }
 
 static int msm_wcd937x_wsa881x_init(struct snd_soc_pcm_runtime *rtd)
@@ -5189,9 +5671,11 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err;
 	}
+	
 	card->dev = &pdev->dev;
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, pdata);
+	
 
 	ret = snd_soc_of_parse_card_name(card, "qcom,model");
 	if (ret) {
@@ -5199,12 +5683,14 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
+	
 	ret = snd_soc_of_parse_audio_routing(card, "qcom,audio-routing");
 	if (ret) {
 		dev_err(&pdev->dev, "parse audio routing failed, err:%d\n",
 			ret);
 		goto err;
 	}
+	
 	ret = msm_populate_dai_link_component_of_node(card);
 	if (ret) {
 		ret = -EPROBE_DEFER;
@@ -5231,7 +5717,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 			ret);
 		goto err;
 	}
-	dev_info(&pdev->dev, "Sound card %s registered\n", card->name);
+	dev_err(&pdev->dev, "Sound card %s registered\n", card->name);
 	pdata->hph_en1_gpio = of_get_named_gpio(pdev->dev.of_node,
 						"qcom,hph-en1-gpio", 0);
 	if (!gpio_is_valid(pdata->hph_en1_gpio))

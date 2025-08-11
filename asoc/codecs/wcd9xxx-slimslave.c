@@ -14,7 +14,6 @@ struct wcd9xxx_slim_sch {
 
 static struct wcd9xxx_slim_sch sh_ch;
 
-
 static int wcd9xxx_configure_ports(struct wcd9xxx *wcd9xxx)
 {
 	if (wcd9xxx->codec_type->slim_slave_type ==
@@ -70,7 +69,7 @@ int wcd9xxx_init_slimslave(struct wcd9xxx *wcd9xxx, u8 wcd9xxx_pgd_la,
 			INIT_LIST_HEAD(&wcd9xxx->rx_chs[i].list);
 		}
 		wcd9xxx->sruntime_rx = slim_stream_allocate(wcd9xxx->slim, "WCD9xxx-SLIM-RX");
-		if (wcd9xxx->sruntime_rx == NULL) {
+		if (wcd9xxx->sruntime_rx == NULL) {			
 			pr_err("%s: Failed to alloc %d rx slimbus channels\n",
 				__func__, wcd9xxx->num_rx_port);
 			kfree(wcd9xxx->rx_chs);
@@ -119,13 +118,15 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 	u8 ch_cnt = 0;
 	u8  payload = 0;
 	u16 codec_port = 0;
-	int ret = 0;
-	int i = 0;
+	int ret=0;
 	struct wcd9xxx_ch *rx;
+	int i = 0;
 	struct slim_stream_config sconfig_rx;
+
 	sconfig_rx.direction = direction;
 	sconfig_rx.bps = bit_width;
 	sconfig_rx.rate = rate;
+
 	/* Configure slave interface device */
 
 	list_for_each_entry(rx, wcd9xxx_ch_list, list) {
@@ -134,16 +135,15 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 		sconfig_rx.port_mask |= BIT(rx->port);
 	}
 	pr_debug("ch_count=%d,mask=%lu,rate=%d,WATER_MARK_VAL=%d\n",
-		 ch_cnt, sconfig_rx.port_mask, sconfig_rx.rate, WATER_MARK_VAL);
+				 ch_cnt, sconfig_rx.port_mask, sconfig_rx.rate, WATER_MARK_VAL);
 	sconfig_rx.ch_count = ch_cnt;
 	sconfig_rx.chs = kcalloc(sconfig_rx.ch_count, sizeof(unsigned int), GFP_KERNEL);
 
 	if (!sconfig_rx.chs) {
 		return -ENOMEM;
 	}
-
 	list_for_each_entry(rx, wcd9xxx_ch_list, list) {
-		sconfig_rx.chs[i++] = rx->ch_num;	
+		sconfig_rx.chs[i++] = rx->ch_num;
 		codec_port = rx->port;
 		pr_debug("%s: codec_port %d rx 0x%p, payload %d\n"
 			 "sh_ch.rx_port_ch_reg_base0 0x%x\n"
@@ -221,6 +221,7 @@ int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 	int ret = 0;
 	int i=0;
 	struct wcd9xxx_ch *tx;
+	int i = 0;
 	struct slim_stream_config sconfig_tx;
 
 	sconfig_tx.direction = direction;
@@ -239,7 +240,6 @@ int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 		return -ENOMEM;
 	}
 
-	
 	list_for_each_entry(tx, wcd9xxx_ch_list, list) {
 		codec_port = tx->port;
 		sconfig_tx.chs[i++] = tx->ch_num;
@@ -279,11 +279,11 @@ int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 	}
 
 	ret = slim_stream_prepare(wcd9xxx->sruntime_tx, &sconfig_tx);
-		if (ret < 0) {
-			pr_err("%s: slim_stream_prepare failed ret[%d]\n",
-			       __func__, ret);
-			goto err;
-		}
+	if (ret < 0) {
+		pr_err("%s: slim_stream_prepare failed ret[%d]\n",
+			__func__, ret);
+		goto err;
+	}	
 	ret = slim_stream_enable(wcd9xxx->sruntime_tx);
 	if (ret < 0) {
 		pr_err("%s: slim_stream_enable failed ret[%d]\n",
@@ -303,7 +303,7 @@ err:
 	sconfig_tx.chs = NULL;
 	return ret;
 }
-EXPORT_SYMBOL(wcd9xxx_cfg_slim_sch_tx);
+EXPORT_SYMBOL_GPL(wcd9xxx_cfg_slim_sch_tx);
 
 int wcd9xxx_get_slave_port(unsigned int ch_num)
 {
@@ -323,9 +323,10 @@ EXPORT_SYMBOL(wcd9xxx_get_slave_port);
 int wcd9xxx_disconnect_port_tx(struct wcd9xxx *wcd9xxx)
 {
 	int ret = 0;
+
 	if (wcd9xxx->sruntime_tx == NULL) {
-	pr_err("Channel not enabled yet. returning\n");
-	return -EINVAL;
+		pr_err("Channel not enabled yet. returning\n");
+		return -EINVAL;
 	}
 
 	/* free the ports allocated to the stream */
@@ -338,6 +339,7 @@ int wcd9xxx_disconnect_port_tx(struct wcd9xxx *wcd9xxx)
 
 	if (ret != 0)
 		pr_err("slim_stream_disable failed :returned val = %d\n", ret);
+
 	return ret;
 }
 EXPORT_SYMBOL_GPL(wcd9xxx_disconnect_port_tx);

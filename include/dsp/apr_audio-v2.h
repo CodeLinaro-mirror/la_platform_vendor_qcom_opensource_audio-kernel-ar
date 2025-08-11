@@ -659,7 +659,6 @@ struct adm_cmd_set_pp_params {
 
 struct dsp_stream_callback_list {
 	struct list_head list;
-	struct msm_adsp_event_data event;
 };
 
 struct dsp_stream_callback_prtd {

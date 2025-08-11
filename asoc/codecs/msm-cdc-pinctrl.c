@@ -44,20 +44,24 @@ static struct msm_cdc_pinctrl_info *msm_cdc_pinctrl_get_gpiodata(
 	struct msm_cdc_pinctrl_info *gpio_data;
 
 	if (!np) {
+
 		pr_err_ratelimited("%s: device node is null\n", __func__);
 		return NULL;
 	}
 
 	pdev = of_find_device_by_node(np);
 	if (!pdev) {
+
 		pr_err_ratelimited("%s: platform device not found!\n", __func__);
 		return NULL;
 	}
 
 	gpio_data = dev_get_drvdata(&pdev->dev);
-	if (!gpio_data)
+	if (!gpio_data){
 		dev_err_ratelimited(&pdev->dev, "%s: cannot find cdc gpio info\n",
 			__func__);
+
+	}
 
 	return gpio_data;
 }
@@ -229,7 +233,7 @@ static int msm_cdc_pinctrl_probe(struct platform_device *pdev)
 	u32 chip_wakeup_default_val[MAX_GPIOS] = {0};
 	u32 i = 0, temp = 0;
 	int count = 0;
-
+//printk("%s enter line=%d\n", __func__,__LINE__);
 	gpio_data = devm_kzalloc(&pdev->dev,
 				 sizeof(struct msm_cdc_pinctrl_info),
 				 GFP_KERNEL);
@@ -337,13 +341,15 @@ cdc_rst:
 			goto err_lookup_state;
 		}
 	}
-
+//printk("%s exit line=%d \n", __func__,__LINE__);
 	dev_set_drvdata(&pdev->dev, gpio_data);
 	return 0;
 
 err_lookup_state:
+//	printk("%s exit err line=%d \n", __func__,__LINE__);
 	devm_pinctrl_put(gpio_data->pinctrl);
 err_pctrl_get:
+//	printk("%s exit err line=%d \n", __func__,__LINE__);
 	devm_kfree(&pdev->dev, gpio_data);
 	return ret;
 }

@@ -183,8 +183,8 @@ static void wcd_spi_reinit_xfer(struct spi_transfer *xfer)
 {
 	xfer->tx_buf = NULL;
 	xfer->rx_buf = NULL;
-	xfer->delay_usecs = 0;
 	xfer->len = 0;
+	xfer->delay.value=WCD_SPI_CLKREQ_DELAY_USECS;
 }
 
 static bool wcd_spi_is_suspended(struct wcd_spi_priv *wcd_spi)
@@ -515,8 +515,7 @@ static int wcd_spi_cmd_clkreq(struct spi_device *spi)
 	wcd_spi_reinit_xfer(xfer);
 	xfer->tx_buf = tx_buf;
 	xfer->len = WCD_SPI_CMD_CLKREQ_LEN;
-	xfer->delay_usecs = WCD_SPI_CLKREQ_DELAY_USECS;
-
+	xfer->delay.value=WCD_SPI_CLKREQ_DELAY_USECS;
 	return spi_sync(spi, &wcd_spi->msg1);
 }
 
@@ -1478,7 +1477,7 @@ static int wcd_spi_component_bind(struct device *dev,
 	spi_message_add_tail(&wcd_spi->xfer2[1], &wcd_spi->msg2);
 
 	/* Pre-allocate the buffers */
-	wcd_spi->tx_buf = dma_zalloc_coherent(&spi->dev,
+	wcd_spi->tx_buf = dma_alloc_coherent(&spi->dev,
 					      WCD_SPI_RW_MAX_BUF_SIZE,
 					      &wcd_spi->tx_dma, GFP_KERNEL);
 	if (!wcd_spi->tx_buf) {
@@ -1486,7 +1485,7 @@ static int wcd_spi_component_bind(struct device *dev,
 		goto done;
 	}
 
-	wcd_spi->rx_buf = dma_zalloc_coherent(&spi->dev,
+	wcd_spi->rx_buf = dma_alloc_coherent(&spi->dev,
 					      WCD_SPI_RW_MAX_BUF_SIZE,
 					      &wcd_spi->rx_dma, GFP_KERNEL);
 	if (!wcd_spi->rx_buf) {
@@ -1580,7 +1579,7 @@ err_ret:
 	return ret;
 }
 
-static int wcd_spi_remove(struct spi_device *spi)
+static void wcd_spi_remove(struct spi_device *spi)
 {
 	struct wcd_spi_priv *wcd_spi = spi_get_drvdata(spi);
 
@@ -1592,7 +1591,6 @@ static int wcd_spi_remove(struct spi_device *spi)
 	devm_kfree(&spi->dev, wcd_spi);
 	spi_set_drvdata(spi, NULL);
 
-	return 0;
 }
 
 #ifdef CONFIG_PM

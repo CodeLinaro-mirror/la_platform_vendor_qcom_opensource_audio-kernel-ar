@@ -270,7 +270,7 @@ struct wcd9xxx_codec_dai_data {
 	u32 rate;				/* sample rate          */
 	u32 bit_width;				/* sit width 16,24,32   */
 	struct list_head wcd9xxx_ch_list;	/* channel list         */
-
+	unsigned int direction;             /* Direction of stream */
 	unsigned long ch_mask;
 	wait_queue_head_t dai_wait;
 	bool bus_down_in_recovery;
@@ -335,7 +335,7 @@ struct wcd9xxx {
 	struct device_node *wcd_rst_np;
 
 	int (*read_dev)(struct wcd9xxx *wcd9xxx, unsigned short reg,
-			int bytes,u8 *dest, bool interface_reg);
+			int bytes, u8 *dest, bool interface_reg);
 	int (*write_dev)(struct wcd9xxx *wcd9xxx, unsigned short reg,
 			int bytes, u8 *src, bool interface_reg);
 	int (*multi_reg_write)(struct wcd9xxx *wcd9xxx, const void *data,
