@@ -21,13 +21,13 @@ KBUILD_OPTIONS += CONFIG_ARCH_SDXECHO=y
 endif
 
 subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
-subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
 
 obj-m := ipc/
 obj-m += dsp/
 obj-m += soc/
 obj-m += asoc/
 obj-m += asoc/codecs/
+
 obj-m += asoc/codecs/wcd934x/
 obj-m += asoc/codecs/lpass-cdc/
 
@@ -41,17 +41,27 @@ all:
 modules_install:
 	$(MAKE) INSTALL_MOD_STRIP=1 -C $(KERNEL_SRC) M=$(M) modules_install
 
-else
-M=$(PWD)
-AUDIO_ROOT=$(KERNEL_SRC)/$(M)
+endif
 
-KBUILD_OPTIONS+=  AUDIO_ROOT=$(AUDIO_ROOT)
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), sa535m))
+AUDIO_ROOT=$(PWD)
 
-all: modules
+obj-m := ipc/
+obj-m += dsp/
+obj-m += soc/
+obj-m += asoc/
+obj-m += asoc/codecs/
+KBUILD_OPTIONS := AUDIO_ROOT=$(PWD)
+KBUILD_OPTIONS += MODNAME=audio
+
+subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
+
+all:
+	$(MAKE) -C $(KERNEL_SRC) M=$(shell pwd) modules $(KBUILD_OPTIONS)
+
+modules_install:
+	$(MAKE) INSTALL_MOD_STRIP=1 -C $(KERNEL_SRC) M=$(shell pwd) modules_install
 
 clean:
 	$(MAKE) -C $(KERNEL_SRC) M=$(M) clean
-
-%:
-	$(MAKE) -C $(KERNEL_SRC) M=$(M) $@ $(KBUILD_OPTIONS)
 endif
