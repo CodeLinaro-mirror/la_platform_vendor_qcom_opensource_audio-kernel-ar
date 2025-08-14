@@ -1,6 +1,6 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -575,6 +575,7 @@ static void gpr_remove(struct rpmsg_device *rpdev)
 	struct device *dev = &rpdev->dev;
 
 	wakeup_source_unregister(gpr_priv->wsource);
+	cancel_work_sync(&gpr_priv->notifier_reg_work);
 	snd_event_client_deregister(&rpdev->dev);
 	dev_info(dev, "%s: deregistering via subsys_notif_register for domain_id(%d)",
 		__func__, gpr_priv->dest_domain_id );
