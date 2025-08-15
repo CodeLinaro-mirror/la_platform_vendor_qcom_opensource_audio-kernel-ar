@@ -100,7 +100,7 @@ static int regmap_swr_gather_write(void *context,
 		return -EINVAL;
 	}
 
-	mutex_lock(&swr_rw_lock);
+        mutex_lock(&swr_rw_lock);
 	ret = regmap_swr_reg_address_get(swr, &reg_addr, reg, reg_size);
 	if (ret < 0) {
 		mutex_unlock(&swr_rw_lock);
@@ -184,7 +184,7 @@ static int regmap_swr_write(void *context, const void *data, size_t count)
 	struct device *dev = context;
 	struct swr_device *swr = to_swr_device(dev);
 	struct regmap *map = dev_get_regmap(dev, NULL);
-	int addr_bytes = 0;
+        int addr_bytes = 0;
 
 	if (map == NULL) {
 		dev_err_ratelimited(dev, "%s: regmap is NULL\n", __func__);
@@ -232,7 +232,7 @@ static int regmap_swr_read(void *context,
 			__func__, reg_size);
 		return -EINVAL;
 	}
-
+	
 	mutex_lock(&swr_rw_lock);
 	ret = regmap_swr_reg_address_get(swr, &reg_addr, reg, reg_size);
 	if (ret < 0) {

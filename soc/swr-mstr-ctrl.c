@@ -1049,6 +1049,7 @@ static int swrm_cmd_fifo_wr_cmd(struct swr_mstr_ctrl *swrm, u8 cmd_data,
 	 * Check for outstanding cmd wrt. write fifo depth to avoid
 	 * overflow.
 	 */
+	usleep_range(500, 550);
 	swrm_wait_for_fifo_avail(swrm, SWRM_WR_CHECK_AVAIL);
 	swr_master_write(swrm, SWRM_CMD_FIFO_WR_CMD(swrm->ee_val), val);
 	/*
@@ -1653,12 +1654,14 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 
 			if (len < SWRM_MAX_PORT_REG) {
 				/* Only wite MSB if SI > 0xFF */
+				if ((port_req->sinterval >> 8)& 0xFF) {
 				reg[len] = SWRM_CMD_FIFO_WR_CMD(swrm->ee_val);
 				val[len++] = SWR_REG_VAL_PACK(
 						(port_req->sinterval >> 8) & 0xFF,
 						port_req->dev_num, get_cmd_id(swrm),
 						SWRS_DP_SAMPLE_CONTROL_2_BANK(slv_port_id,
 									bank));
+				}
 			}
 
 			if (agg_slv_port_offset1[port_req->dev_num][slv_port_id] == 0)
@@ -3783,7 +3786,8 @@ static int swrm_runtime_resume(struct device *dev)
 			}
 			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
 			swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
-			swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
+			if (swrm->version > SWRM_VERSION_1_5)
+				swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
 			swrm_master_init(swrm);
 			/* wait for hw enumeration to complete */
 			usleep_range(100, 105);

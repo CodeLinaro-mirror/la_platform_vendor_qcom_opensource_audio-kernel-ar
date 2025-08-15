@@ -71,7 +71,7 @@ KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
 
-ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4 vienna lahaina),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4 vienna),true)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 endif
 
@@ -509,7 +509,20 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
-
+ifeq ($(call is-board-platform-in-list, lahaina),true)
+###########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := hdmi_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/hdmi_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+LOCAL_REQUIRED_MODULES    := msm-ext-disp-module-symvers
+LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
+endif
 ifeq ($(call is-board-platform-in-list, bengal holi blair lahaina),true)
 ###########################################################
 include $(CLEAR_VARS)

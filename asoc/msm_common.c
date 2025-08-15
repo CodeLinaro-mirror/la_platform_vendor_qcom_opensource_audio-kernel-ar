@@ -46,7 +46,11 @@ struct snd_card_pdata {
 #define DIR_SZ 10
 
 #define MAX_CODEC_DAI 8
+#ifdef CONFIG_SND_SOC_SUN
 #define TDM_SLOT_WIDTH_BITS 16
+#else
+#define TDM_SLOT_WIDTH_BITS 32
+#endif
 #define TDM_MAX_SLOTS 8
 #define MI2S_NUM_CHANNELS 2
 

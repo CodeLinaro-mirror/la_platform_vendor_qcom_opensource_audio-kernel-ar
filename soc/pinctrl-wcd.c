@@ -3,7 +3,7 @@
  * Copyright (c) 2016-2017, 2019, The Linux Foundation. All rights reserved.
  */
 
-#include <linux/gpio.h>
+#include <linux/gpio/driver.h>
 #include <linux/module.h>
 #include <linux/of.h>
 #include <linux/pinctrl/pinconf-generic.h>

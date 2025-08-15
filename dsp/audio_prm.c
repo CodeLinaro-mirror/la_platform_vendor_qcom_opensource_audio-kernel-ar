@@ -45,7 +45,7 @@ static int audio_prm_callback(struct gpr_device *adev, void *data)
 	struct gpr_hdr *hdr = (struct gpr_hdr *)data;
 	uint32_t *payload =  GPR_PKT_GET_PAYLOAD(uint32_t, data);
 
-	//dev_err(&adev->dev, "%s: Payload %x", __func__, hdr->opcode);
+	dev_dbg(&adev->dev, "%s: Payload %x", __func__, hdr->opcode);
 	switch (hdr->opcode) {
 	case GPR_IBASIC_RSP_RESULT:
 		pr_err("%s: Failed response received",__func__);
