@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2017, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2025 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
 #include <linux/init.h>
@@ -71,6 +71,10 @@ static int audio_notifier_ssr_adsp_cb(struct notifier_block *this,
 static int audio_notifier_ssr_modem_cb(struct notifier_block *this,
 				     unsigned long opcode, void *data);
 static void audio_notifier_pdr_adsp_cb(int status, char *service_name, void *priv);
+static void audio_notifier_pdr_mdsp_root_cb(int status, char *service_name, void *priv);
+
+static int audio_notifier_ssr_cc_cb(struct notifier_block *this,
+				     unsigned long opcode, void *data);
 
 static struct notifier_block notifier_ssr_adsp_nb = {
 	.notifier_call  = audio_notifier_ssr_adsp_cb,
@@ -79,6 +83,11 @@ static struct notifier_block notifier_ssr_adsp_nb = {
 
 static struct notifier_block notifier_ssr_modem_nb = {
 	.notifier_call  = audio_notifier_ssr_modem_cb,
+	.priority = 0,
+};
+
+static struct notifier_block notifier_ssr_cc_nb = {
+	.notifier_call  = audio_notifier_ssr_cc_cb,
 	.priority = 0,
 };
 
@@ -96,6 +105,12 @@ static struct service_info service_data[AUDIO_NOTIFIER_MAX_SERVICES]
 		.domain_id = AUDIO_SSR_DOMAIN_MODEM,
 		.state = AUDIO_NOTIFIER_SERVICE_DOWN,
 		.hook.nb = &notifier_ssr_modem_nb
+	},
+	{
+		.name = "SSR_COMPANION_CHIP",
+		.domain_id = AUDIO_SSR_DOMAIN_CC,
+		.state = AUDIO_NOTIFIER_SERVICE_DOWN,
+		.hook.nb = &notifier_ssr_cc_nb
 	} },
 
 	{{
@@ -104,10 +119,27 @@ static struct service_info service_data[AUDIO_NOTIFIER_MAX_SERVICES]
 		.state = UNINIT_SERVICE,
 		.hook.cb = &audio_notifier_pdr_adsp_cb
 	},
+
 	{	/* PDR MODEM service not enabled */
 		.name = "INVALID",
 		.state = NO_SERVICE,
-		.hook.nb = NULL
+		.hook.cb = NULL
+	},
+	{	/* PDR CC service not enabled */
+		.name = "INVALID",
+		.state = NO_SERVICE,
+		.hook.cb = NULL
+	},
+	{	/* PDR CCDSP service not enabled */
+		.name = "INVALID",
+		.state = NO_SERVICE,
+		.hook.cb = NULL
+	},
+	{
+		.name = "PDR_MODEM_ROOT",
+		.domain_id = AUDIO_PDR_DOMAIN_MODEM_ROOT,
+		.state = UNINIT_SERVICE,
+		.hook.cb = &audio_notifier_pdr_mdsp_root_cb
 	} }
 };
 
@@ -125,6 +157,12 @@ static int audio_notifier_get_default_service(int domain)
 		service = AUDIO_NOTIFIER_PDR_SERVICE;
 		break;
 	case AUDIO_NOTIFIER_MODEM_DOMAIN:
+		service = AUDIO_NOTIFIER_SSR_SERVICE;
+		break;
+	case AUDIO_NOTIFIER_MODEM_ROOT_DOMAIN:
+		service = AUDIO_NOTIFIER_PDR_SERVICE;
+		break;
+	case AUDIO_NOTIFIER_CC_DOMAIN:
 		service = AUDIO_NOTIFIER_SSR_SERVICE;
 		break;
 	}
@@ -314,6 +352,7 @@ static int audio_notifier_reg_client(struct client_data *client_data)
 	int domain = client_data->domain;
 
 	service = audio_notifier_get_default_service(domain);
+
 	if (service < 0) {
 		pr_err_ratelimited("%s: service %d is incorrect\n", __func__, service);
 		ret = -EINVAL;
@@ -494,6 +533,11 @@ static void audio_notifier_pdr_adsp_cb(int status, char *service_name, void *pri
 	audio_notifier_service_cb(status, AUDIO_NOTIFIER_PDR_SERVICE, AUDIO_NOTIFIER_ADSP_DOMAIN);
 }
 
+static void audio_notifier_pdr_mdsp_root_cb(int status, char *service_name, void *priv)
+{
+	audio_notifier_service_cb(status, AUDIO_NOTIFIER_PDR_SERVICE, AUDIO_NOTIFIER_MODEM_ROOT_DOMAIN);
+}
+
 static int audio_notifier_ssr_adsp_cb(struct notifier_block *this,
 				     unsigned long opcode, void *data)
 {
@@ -510,6 +554,14 @@ static int audio_notifier_ssr_modem_cb(struct notifier_block *this,
 					AUDIO_NOTIFIER_MODEM_DOMAIN);
 }
 
+static int audio_notifier_ssr_cc_cb(struct notifier_block *this,
+				      unsigned long opcode, void *data)
+{
+	return audio_notifier_service_cb(opcode,
+					AUDIO_NOTIFIER_SSR_SERVICE,
+					AUDIO_NOTIFIER_CC_DOMAIN);
+}
+
 int audio_notifier_deregister(char *client_name)
 {
 	int ret = 0;
@@ -522,6 +574,7 @@ int audio_notifier_deregister(char *client_name)
 		ret = -EINVAL;
 		goto done;
 	}
+	mutex_lock(&notifier_mutex);
 	list_for_each_safe(ptr, next, &client_list) {
 		client_data = list_entry(ptr, struct client_data, list);
 		if (!strcmp(client_name, client_data->client_name)) {
@@ -538,6 +591,7 @@ int audio_notifier_deregister(char *client_name)
 			kfree(client_data);
 		}
 	}
+	mutex_unlock(&notifier_mutex);
 done:
 	return ret;
 }
@@ -651,7 +705,6 @@ static int audio_notify_probe(struct platform_device *pdev)
 	struct property *prop;
 	int size;
 	phandle rproc_phandle;
-
 	adsp_private = NULL;
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
@@ -680,6 +733,8 @@ static int audio_notify_probe(struct platform_device *pdev)
 
 	audio_notifier_init_service(AUDIO_NOTIFIER_PDR_SERVICE);
 	/* Do not return error since PDR enablement is not critical */
+	pr_err("IAMHERE: %s %d\n",__func__,__LINE__);
+
 	audio_notifier_late_init();
 
 	priv->notifier_probe_complete = true;
