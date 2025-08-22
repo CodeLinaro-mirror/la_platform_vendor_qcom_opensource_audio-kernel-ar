@@ -139,6 +139,11 @@ ifeq ($(KERNEL_BUILD), 0)
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sdxechoautoconf.h
 	endif
+	ifeq ($(TARGET_SUPPORT), sa535m)
+		include $(AUDIO_ROOT)/config/sa535mauto.conf
+		export
+		INCS    +=  -include $(AUDIO_ROOT)/config/sa535mautoconf.h
+	endif
 endif
 endif
 
