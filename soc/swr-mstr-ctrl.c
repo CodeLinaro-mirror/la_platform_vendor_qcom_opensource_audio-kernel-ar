@@ -3532,10 +3532,21 @@ static int swrm_probe(struct platform_device *pdev)
 	mutex_lock(&swrm->mlock);
 	swrm_clk_request(swrm, true);
 
+#ifdef CONFIG_SWRM_VER_4P0
+	swrm->rd_fifo_depth = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
+				& SWRM_COMP_PARAMS_RD_FIFO_DEPTH) >> 18);
+	swrm->wr_fifo_depth = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
+				& SWRM_COMP_PARAMS_WR_FIFO_DEPTH) >> 10);
+	swrm->num_auto_enum = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
+				& SWRM_COMP_PARAMS_AUTO_ENUM_SLAVES) >> 24);
+#else
 	swrm->rd_fifo_depth = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
 				& SWRM_COMP_PARAMS_RD_FIFO_DEPTH) >> 15);
 	swrm->wr_fifo_depth = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
 				& SWRM_COMP_PARAMS_WR_FIFO_DEPTH) >> 10);
+	swrm->num_auto_enum = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
+				& SWRM_COMP_PARAMS_AUTO_ENUM_SLAVES) >> 20);
+#endif
 
 	swrm_hw_ver = swr_master_read(swrm, SWRM_COMP_HW_VERSION);
 	if (swrm->version != swrm_hw_ver)
@@ -3543,8 +3554,6 @@ static int swrm_probe(struct platform_device *pdev)
 			 "%s: version specified in dtsi: 0x%x not match with HW read version 0x%x\n",
 			 __func__, swrm->version, swrm_hw_ver);
 
-	swrm->num_auto_enum = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
-                                & SWRM_COMP_PARAMS_AUTO_ENUM_SLAVES) >> 20);
 	ret = of_property_read_u32(swrm->dev->of_node, "qcom,swr-num-dev",
 				   &swrm->num_dev);
 	if (ret) {
