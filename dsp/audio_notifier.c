@@ -123,7 +123,12 @@ static struct service_info service_data[AUDIO_NOTIFIER_MAX_SERVICES]
 	{	/* PDR MODEM service not enabled */
 		.name = "INVALID",
 		.state = NO_SERVICE,
-		.hook.nb = NULL
+		.hook.cb = NULL
+	},
+	{	/* PDR CC service not enabled */
+		.name = "INVALID",
+		.state = NO_SERVICE,
+		.hook.cb = NULL
 	},
 	{	/* PDR CCDSP service not enabled */
 		.name = "INVALID",
@@ -135,11 +140,6 @@ static struct service_info service_data[AUDIO_NOTIFIER_MAX_SERVICES]
 		.domain_id = AUDIO_PDR_DOMAIN_MODEM_ROOT,
 		.state = UNINIT_SERVICE,
 		.hook.cb = &audio_notifier_pdr_mdsp_root_cb
-	},
-	{	/* PDR CC service not enabled */
-		.name = "INVALID",
-		.state = NO_SERVICE,
-		.hook.cb = NULL
 	} }
 };
 
@@ -352,6 +352,7 @@ static int audio_notifier_reg_client(struct client_data *client_data)
 	int domain = client_data->domain;
 
 	service = audio_notifier_get_default_service(domain);
+
 	if (service < 0) {
 		pr_err_ratelimited("%s: service %d is incorrect\n", __func__, service);
 		ret = -EINVAL;
@@ -573,6 +574,7 @@ int audio_notifier_deregister(char *client_name)
 		ret = -EINVAL;
 		goto done;
 	}
+	mutex_lock(&notifier_mutex);
 	list_for_each_safe(ptr, next, &client_list) {
 		client_data = list_entry(ptr, struct client_data, list);
 		if (!strcmp(client_name, client_data->client_name)) {
@@ -589,6 +591,7 @@ int audio_notifier_deregister(char *client_name)
 			kfree(client_data);
 		}
 	}
+	mutex_unlock(&notifier_mutex);
 done:
 	return ret;
 }
@@ -702,7 +705,6 @@ static int audio_notify_probe(struct platform_device *pdev)
 	struct property *prop;
 	int size;
 	phandle rproc_phandle;
-
 	adsp_private = NULL;
 	priv = devm_kzalloc(&pdev->dev, sizeof(*priv), GFP_KERNEL);
 	if (!priv) {
@@ -731,6 +733,8 @@ static int audio_notify_probe(struct platform_device *pdev)
 
 	audio_notifier_init_service(AUDIO_NOTIFIER_PDR_SERVICE);
 	/* Do not return error since PDR enablement is not critical */
+	pr_err("IAMHERE: %s %d\n",__func__,__LINE__);
+
 	audio_notifier_late_init();
 
 	priv->notifier_probe_complete = true;
