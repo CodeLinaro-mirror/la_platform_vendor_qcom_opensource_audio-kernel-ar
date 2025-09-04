@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -209,11 +209,13 @@ int of_register_swr_devices(struct swr_master *master)
 		}
 		info.addr = addr;
 		info.of_node = of_node_get(node);
+		master->num_dev++;
 		swr = swr_new_device(master, &info);
 		if (!swr) {
 			dev_err_ratelimited(&master->dev, "of_swr: Register failed %s\n",
 				node->full_name);
 			of_node_put(node);
+			master->num_dev--;
 			continue;
 		}
 	}
