@@ -4121,7 +4121,6 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 
         codec_reg_done = true;
 	msm_common_dai_link_init(rtd);
-	pr_err("kiran exit %s: line=%d\n", __func__,__LINE__);
 
 
 	 mbhc_calibration = def_wcd_mbhc_cal();
@@ -4348,7 +4347,6 @@ static struct snd_soc_dai_link msm_mi2s_dai_links[] = {
 	},
 };
 
-#if 1
 static struct snd_soc_dai_link msm_auxpcm_be_dai_links[] = {
  	/* Primary AUX PCM Backend DAI Links */
  	{
@@ -4438,8 +4436,6 @@ static struct snd_soc_dai_link msm_auxpcm_be_dai_links[] = {
  	},
 };
  
-#endif
-#if 1
 static struct snd_soc_dai_link msm_wsa_cdc_dma_be_dai_links[] = {
 	/* WSA CDC DMA Backend DAI Links */
 	{
@@ -4486,7 +4482,7 @@ static struct snd_soc_dai_link msm_wsa_cdc_dma_be_dai_links[] = {
         },
 
 };
-#endif
+
 static struct snd_soc_dai_link msm_rx_tx_cdc_dma_be_dai_links[] = {
 	/* RX CDC DMA Backend DAI Links */
 	{
