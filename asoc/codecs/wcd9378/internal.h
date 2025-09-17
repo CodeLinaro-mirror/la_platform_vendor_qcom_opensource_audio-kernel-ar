@@ -19,6 +19,7 @@
 #define SWR_SCP_HOST_CLK_DIV2_CTL_BANK 0xE0
 #define WCD9378_MAX_MICBIAS 3
 #define SIM_MIC_NUM	3
+#define WCD9378_ECID_REGS 16
 
 
 /* Convert from vout ctl to micbias voltage in mV */
@@ -146,6 +147,8 @@ struct wcd9378_priv {
 	/* wcd to swr dmic notification */
 	bool notify_swr_dmic;
 	struct blocking_notifier_head notifier;
+	u8 ecid_val[WCD9378_ECID_REGS];
+	struct snd_info_entry *ecid_entry;
 };
 
 struct wcd9378_micbias_setting {
