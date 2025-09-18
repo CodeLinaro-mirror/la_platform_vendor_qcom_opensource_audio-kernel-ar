@@ -392,6 +392,16 @@ static struct snd_soc_dai_link msm_common_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(usb_audio_tx),
 	},
+	{
+		.name = LPASS_BE_PCM_DUMMY_TX_0,
+		.stream_name = LPASS_BE_PCM_DUMMY_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(pcm_dummy_tx0),
+	},
 };
 
 static struct snd_soc_dai_link msm_wcn_btfm_be_dai_links[] = {
@@ -431,6 +441,19 @@ static struct snd_soc_dai_link msm_wcn_btfm_be_dai_links[] = {
  	},
 };
 
+static struct snd_soc_dai_link msm_ext_disp_be_dai_link[] = {
+/* DISP PORT BACK END DAI Link for DP0 */
+	{
+		.name = LPASS_BE_DISPLAY_PORT_RX_0,
+		.stream_name = LPASS_BE_DISPLAY_PORT_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(display_port),
+	},
+};
 
 static struct snd_soc_dai_link msm_wsa_cdc_dma_be_dai_links[] = {
 	/* WSA CDC DMA Backend DAI Links */
@@ -663,9 +686,7 @@ static struct snd_soc_dai_link msm_lahaina_dai_links[
 			ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_va_cdc_dma_be_dai_links) +
-#if 0
-			ARRAY_SIZE(ext_disp_be_dai_link) +
-#endif
+			ARRAY_SIZE(msm_ext_disp_be_dai_link) +
 			ARRAY_SIZE(msm_wcn_btfm_be_dai_links)];
 
 static int msm_populate_dai_link_component_of_node(
@@ -909,6 +930,18 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 					msm_tdm_dai_links,
 					sizeof(msm_tdm_dai_links));
 			total_links += ARRAY_SIZE(msm_tdm_dai_links);
+		}
+
+		//EXT-DISPLAY DAI Links
+		rc = of_property_read_u32(dev->of_node,
+					"qcom,ext-disp-audio-rx", &val);
+		if (!rc && val) {
+			dev_dbg(dev, "%s(): ext disp audio support present\n",
+					__func__);
+			memcpy(msm_lahaina_dai_links + total_links,
+					msm_ext_disp_be_dai_link,
+					sizeof(msm_ext_disp_be_dai_link));
+			total_links += ARRAY_SIZE(msm_ext_disp_be_dai_link);
 		}
 
 		rc = of_property_read_u32(dev->of_node, "qcom,wcn-btfm", &val);
