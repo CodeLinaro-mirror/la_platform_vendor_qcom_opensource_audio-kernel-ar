@@ -206,6 +206,9 @@ audio_modules.register(
         ],
 	"CONFIG_SND_SOC_ALOR": [
             "audio_machine.c"
+        ],
+	"CONFIG_SND_SOC_CHORA": [
+            "audio_machine.c"
         ]
     },
     deps = [":%b_spf_core_dlkm",

@@ -32,13 +32,17 @@ ifeq ($(call is-board-platform-in-list,canoe alor whale),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_CANOE=m
 endif
 
+ifeq ($(call is-board-platform-in-list,chora),true)
+AUDIO_SELECT  := CONFIG_SND_SOC_CHORA=m
+endif
+
 ifeq ($(ENABLE_AUDIO_LEGACY_TECHPACK),true)
 include $(call all-subdir-makefiles)
 LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale chora),true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -419,7 +423,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
-ifeq ($(call is-board-platform-in-list, sun canoe alor whale),true)
+ifeq ($(call is-board-platform-in-list, sun canoe alor whale chora),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
