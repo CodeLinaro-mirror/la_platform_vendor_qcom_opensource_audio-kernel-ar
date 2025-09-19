@@ -27,7 +27,6 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/snd_event_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd_core_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/mbhc_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/sdca_registers_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/machine_dlkm.ko
@@ -57,6 +56,10 @@ endif
 ifeq (,$(call is-board-platform-in-list2,niobe pitti))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd939x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd939x_slave_dlkm.ko
+endif
+
+ifneq (,$(call is-board-platform-in-list2,pitti volcano))
+AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/sdca_registers_dlkm.ko
 endif
 
 ifneq (,$(call is-board-platform-in-list2, pitti))
