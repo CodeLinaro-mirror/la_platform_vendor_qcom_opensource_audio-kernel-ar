@@ -1450,8 +1450,9 @@ static void wcd939x_wcd_mbhc_calc_impedance(struct wcd_mbhc *mbhc, uint32_t *zl,
 	struct wcd939x_mbhc_zdet_param *zdet_param_ptr = &zdet_param;
 	s16 d1[] = {0, 30, 30, 6};
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
-	uint32_t cached_regs[4][2] = {{WCD_USBSS_EXT_LIN_EN, 0}, {WCD_USBSS_EXT_SW_CTRL_1, 0},
-				      {WCD_USBSS_MG1_BIAS, 0}, {WCD_USBSS_MG2_BIAS, 0}};
+	uint32_t ext_lin_en[1][2] = {{WCD_USBSS_EXT_LIN_EN, 0}};
+	uint32_t cached_regs[3][2] = {{WCD_USBSS_EXT_SW_CTRL_1, 0}, {WCD_USBSS_MG1_BIAS, 0},
+				      {WCD_USBSS_MG2_BIAS, 0}};
 	uint32_t l_3_6V_regs[4][2] = {{WCD_USBSS_EXT_LIN_EN, 0x00}, {WCD_USBSS_EXT_SW_CTRL_1, 0x00},
 				      {WCD_USBSS_MG1_BIAS, 0x0E}, {WCD_USBSS_MG2_BIAS, 0x0E}};
 	uint32_t diff_regs[2][2] = {{WCD_USBSS_EXT_LIN_EN, 0x00}, {WCD_USBSS_EXT_SW_CTRL_1, 0x00}};
@@ -1479,6 +1480,7 @@ static void wcd939x_wcd_mbhc_calc_impedance(struct wcd_mbhc *mbhc, uint32_t *zl,
 
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 	/* Cache relevant USB-SS registers */
+	wcd_usbss_register_update(ext_lin_en, WCD_USBSS_READ, ARRAY_SIZE(ext_lin_en));
 	wcd_usbss_register_update(cached_regs, WCD_USBSS_READ, ARRAY_SIZE(cached_regs));
 	/* Disable 2k pulldown on MG for improved measurement */
 	wcd_usbss_register_update(l_3_6V_regs, WCD_USBSS_WRITE, ARRAY_SIZE(l_3_6V_regs));
@@ -1880,6 +1882,8 @@ zdet_complete:
 				   WCD939X_MBHC_ELECT, 0x80, 0x80);
 
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
+	if (!wcd939x_mbhc_hph_pa_on_status(component))
+		wcd_usbss_register_update(ext_lin_en, WCD_USBSS_WRITE, ARRAY_SIZE(ext_lin_en));
 	wcd_usbss_register_update(cached_regs, WCD_USBSS_WRITE, ARRAY_SIZE(cached_regs));
 #endif
 
