@@ -776,6 +776,10 @@ static int audio_pkt_platform_driver_probe(struct platform_device *pdev)
 	if (!audpkt_dev)
 		return -ENOMEM;
 
+	if (!audio_pkt_ilctxt)
+		audio_pkt_ilctxt =
+			ipc_log_context_create(AUDIO_PKT_IPC_LOG_PAGE_CNT, "audio-pkt", 0);
+
 	ret = alloc_chrdev_region(&audpkt_dev->audio_pkt_major, 0,
 				  MINOR_NUMBER_COUNT,AUDPKT_DRIVER_NAME);
 	if (ret < 0) {
@@ -887,6 +891,8 @@ static int audio_pkt_platform_driver_remove(struct platform_device *adev)
 	cancel_work_sync(&audio_pkt_skb_backup_work);
 	skb_queue_purge(&audio_pkt_backup_buffers);
 	AUDIO_PKT_INFO("Audio Packet Port Driver Removed\n");
+
+	audio_pkt_ilctxt = NULL;
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
