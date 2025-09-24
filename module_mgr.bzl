@@ -56,7 +56,7 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
     enabled_modules = _get_enabled_module_objs(registry, modules)
     options = _combine_target_module_options(enabled_modules, config_options)
     headers = select({
-        "//build/kernel/kleaf:socrepo_true": [
+        "//build/qcom_build_extensions:qtisocrepo_true": [
             "//soc-repo:all_headers",
             "//soc-repo:{}_{}/drivers/firmware/qcom/qcom-scm".format(target, variant),
             "//soc-repo:{}_{}/drivers/pinctrl/qcom/pinctrl-msm".format(target, variant),
@@ -68,11 +68,11 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
             "//soc-repo:{}_{}/kernel/trace/qcom_ipc_logging".format(target, variant),
             "//soc-repo:{}_{}/drivers/soc/qcom/socinfo".format(target, variant),
         ] + registry.hdrs,
-        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"] + registry.hdrs,
+        "//build/qcom_build_extensions:qtisocrepo_false": ["//msm-kernel:all_headers"] + registry.hdrs,
     })
     kernel_build = select({
-        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_{}_base_kernel".format(target, variant),
-        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
+        "//build/qcom_build_extensions:qtisocrepo_true": "//soc-repo:{}_{}_base_kernel".format(target, variant),
+        "//build/qcom_build_extensions:qtisocrepo_false": "//msm-kernel:{}_{}".format(target, variant),
     })
 
     submodule_rules = []
