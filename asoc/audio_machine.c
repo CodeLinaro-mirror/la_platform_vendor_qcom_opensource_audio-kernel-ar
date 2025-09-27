@@ -1619,10 +1619,10 @@ static struct snd_soc_dai_link msm_stub_dai_links[
 			 ARRAY_SIZE(msm_stub_be_dai_links)];
 
 static const struct of_device_id canoe_asoc_machine_of_match[]  = {
-	{ .compatible = "qcom,canoe-asoc-snd",
-	  .data = "codec"},
-	{ .compatible = "qcom,canoe-asoc-snd-stub",
-	  .data = "stub_codec"},
+	{ .compatible = "qcom,canoe-asoc-snd", .data = "codec"},
+	{ .compatible = "qcom,canoe-asoc-snd-stub", .data = "stub_codec"},
+	{ .compatible = "qcom,art-asoc-snd", .data = "codec"},
+	{ .compatible = "qcom,art-asoc-snd-stub", .data = "stub_codec"},
 	{},
 };
 
