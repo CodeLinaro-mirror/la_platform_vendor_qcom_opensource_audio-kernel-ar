@@ -204,7 +204,10 @@ audio_modules.register(
         "CONFIG_SND_SOC_CANOE": [
             "audio_machine.c"
         ],
-	"CONFIG_SND_SOC_ALOR": [
+        "CONFIG_SND_SOC_ART": [
+            "audio_machine.c"
+        ],
+        "CONFIG_SND_SOC_ALOR": [
             "audio_machine.c"
         ]
     },
