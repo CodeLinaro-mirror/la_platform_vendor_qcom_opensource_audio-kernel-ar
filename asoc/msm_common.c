@@ -249,15 +249,53 @@ done:
 	return ret;
 }
 
+/* QAIF interface indices (preserve original numeric values) */
+enum qaif_intf_index {
+	QAIF_AUD_INTF4 = 0,
+	QAIF_AUD_INTF5 = 1,
+	QAIF_AUD_INTF3 = 2,
+	QAIF_AUD_INTF0 = 3,
+	QAIF_AUD_INTF1 = 4,
+	QAIF_AUD_INTF2 = 5,
+	QAIF_VA_INTF0  = 6,
+};
+
 static int get_mi2s_tdm_auxpcm_intf_index(const char *stream_name)
 {
 
 	if (!strnstr(stream_name, "TDM", strlen(stream_name)) &&
 	    !strnstr(stream_name, "MI2S", strlen(stream_name)) &&
-	    !strnstr(stream_name, "AUXPCM", strlen(stream_name)))
+	    !strnstr(stream_name, "AUXPCM", strlen(stream_name)) &&
+	    !strnstr(stream_name, "QAIF", strlen(stream_name)))
 		return -EINVAL;
 
-	if (strnstr(stream_name, "LPAIF_RXTX", strlen(stream_name)))
+	/* Check for QAIF interfaces */
+	if (strnstr(stream_name, "QAIF", strlen(stream_name))) {
+		if (strnstr(stream_name, "QAIF_VA", strlen(stream_name)))
+			return QAIF_VA_INTF0;
+		else if (strnstr(stream_name, "QAIF_AUD", strlen(stream_name))) {
+			if (strnstr(stream_name, "RX-0", strlen(stream_name)) ||
+			    strnstr(stream_name, "TX-0", strlen(stream_name)))
+				return QAIF_AUD_INTF0 ;
+			else if (strnstr(stream_name, "RX-1", strlen(stream_name)) ||
+				 strnstr(stream_name, "TX-1", strlen(stream_name)))
+				return QAIF_AUD_INTF1;
+			else if (strnstr(stream_name, "RX-2", strlen(stream_name)) ||
+				 strnstr(stream_name, "TX-2", strlen(stream_name)))
+				return QAIF_AUD_INTF2;
+			else if (strnstr(stream_name, "RX-3", strlen(stream_name)) ||
+				 strnstr(stream_name, "TX-3", strlen(stream_name)))
+				return QAIF_AUD_INTF3;
+			else if (strnstr(stream_name, "RX-4", strlen(stream_name)) ||
+				 strnstr(stream_name, "TX-4", strlen(stream_name)))
+				return QAIF_AUD_INTF4;
+			else if (strnstr(stream_name, "RX-5", strlen(stream_name)) ||
+				 strnstr(stream_name, "TX-5", strlen(stream_name)))
+				return QAIF_AUD_INTF5;
+		}
+	}
+	/* Check for LPAIF interfaces */
+	else if (strnstr(stream_name, "LPAIF_RXTX", strlen(stream_name)))
 		return QUAT_MI2S_TDM_AUXPCM;
 	else if (strnstr(stream_name, "LPAIF_WSA", strlen(stream_name)))
 		return SEN_MI2S_TDM_AUXPCM;
@@ -359,6 +397,40 @@ static int get_tdm_clk_id(int index)
 	return clk_id;
 }
 
+static int get_aud_intf_clk_id(enum qaif_intf_index index)
+{
+	int clk_id = -EINVAL;
+
+	switch (index) {
+	case QAIF_AUD_INTF0:
+		clk_id = CLOCK_ID_AUD_INTF0_IBIT;
+		break;
+	case QAIF_AUD_INTF1:
+		clk_id = CLOCK_ID_AUD_INTF1_IBIT;
+		break;
+	case QAIF_AUD_INTF2:
+		clk_id = CLOCK_ID_AUD_INTF2_IBIT;
+		break;
+	case QAIF_AUD_INTF3:
+		clk_id = CLOCK_ID_AUD_INTF3_IBIT;
+		break;
+	case QAIF_AUD_INTF4:
+		clk_id = CLOCK_ID_AUD_INTF4_IBIT;
+		break;
+	case QAIF_AUD_INTF5:
+		clk_id = CLOCK_ID_AUD_INTF5_IBIT;
+		break;
+	case QAIF_VA_INTF0:
+		clk_id = CLOCK_ID_AUD_VA_INTF0_IBIT;
+		break;
+	default:
+		pr_err("%s: Invalid QAIF interface index: %d\n", __func__, (int)index);
+		break;
+	}
+	pr_debug("%s: aud intf clk id: 0x%x\n", __func__, clk_id);
+	return clk_id;
+}
+
 int mi2s_tdm_hw_vote_req(struct msm_common_pdata *pdata, int enable)
 {
 	int ret = 0;
@@ -450,6 +522,40 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 1);
 				if (ret < 0) {
 					pr_err("%s: prm lpass tdm clk cfg set failed ret %d\n",
+						__func__, ret);
+					goto done;
+				}
+			} else if ((strnstr(stream_name, "QAIF", strlen(stream_name)))) {
+				slots = pdata->tdm_max_slots;
+				rate = params_rate(params);
+
+				ret = get_aud_intf_clk_id((enum qaif_intf_index)index);
+				if ( ret < 0)
+					goto done;
+
+				if (index == SEN_MI2S_TDM_AUXPCM || index == 4)
+					slots = 0x04;
+
+				intf_clk_cfg.clk_id = ret;
+				intf_clk_cfg.clk_freq_in_hz = rate * slot_width * slots;
+				intf_clk_cfg.clk_attri = pdata->tdm_clk_attribute[index];
+				intf_clk_cfg.clk_root = 0;
+
+				if (pdata->is_audio_hw_vote_required[index]  &&
+					(is_fractional_sample_rate(rate) ||
+					(index == QUIN_MI2S_TDM_AUXPCM))) {
+					ret = mi2s_tdm_hw_vote_req(pdata, 1);
+					if (ret < 0) {
+						pr_err("%s lpass audio hw vote enable failed %d\n",
+							__func__, ret);
+						goto done;
+					}
+				}
+				pr_debug("%s: qaif clk_id :%d clk freq %d\n", __func__,
+					intf_clk_cfg.clk_id, intf_clk_cfg.clk_freq_in_hz);
+				ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 1);
+				if (ret < 0) {
+					pr_err("%s: prm lpass qaif clk cfg set failed ret %d\n",
 						__func__, ret);
 					goto done;
 				}
@@ -588,6 +694,15 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 					if (ret < 0)
 						pr_err("%s: prm tdm clk cfg set failed ret %d\n",
 						__func__, ret);
+				}
+			} else if ((strnstr(stream_name, "QAIF", strlen(stream_name)))) {
+				ret = get_aud_intf_clk_id((enum qaif_intf_index)index);
+				if (ret > 0) {
+					intf_clk_cfg.clk_id = ret;
+					ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 0);
+					if (ret < 0)
+						pr_err("%s: prm qaif clk cfg disable failed ret %d\n",
+							__func__, ret);
 				}
 			} else if((strnstr(stream_name, "MI2S", strlen(stream_name)))) {
 				ret = get_mi2s_clk_id(index);
