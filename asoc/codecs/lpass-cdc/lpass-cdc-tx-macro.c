@@ -1095,30 +1095,34 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		}
 		usleep_range(5000, 5050);
 #ifdef CONFIG_BOLERO_VER_2P85
-		snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
-		snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
-		snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
-		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
-		/* enable active detection for amic case */
-		if (is_amic_enabled(component, decimator))
-			snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x1);
-		if (tx_priv->adapt_tuning_registers > 0 &&
-				tx_priv->adapt_tuning_registers <= MAX_TUNING_REG_VALUE_PAIRS) {
-			if (!tx_priv->bcs_enable) {
-				for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
-					snd_soc_component_update_bits(component,
-					(tx_priv->tuning_reg_values[i] +
-					 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
-					 0xFF, tx_priv->tuning_reg_values[i + 1]);
-				}
-			} else {
-				for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
-					snd_soc_component_update_bits(component,
-					(tx_priv->tuning_reg_values[i] +
-					LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
-					0xFF, tx_priv->tuning_reg_values[i + 2]);
+		if (tx_priv->adapt_tuning_registers > 0) {
+			snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
+			snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
+			snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
+			/* enable active detection for amic case */
+			if (is_amic_enabled(component, decimator))
+				snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x1);
+			if (tx_priv->adapt_tuning_registers <= MAX_TUNING_REG_VALUE_PAIRS) {
+				if (!tx_priv->bcs_enable) {
+					for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
+						snd_soc_component_update_bits(component,
+						(tx_priv->tuning_reg_values[i] +
+						 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
+						 0xFF, tx_priv->tuning_reg_values[i + 1]);
+					}
+				} else {
+					for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
+						snd_soc_component_update_bits(component,
+						(tx_priv->tuning_reg_values[i] +
+						LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
+						0xFF, tx_priv->tuning_reg_values[i + 2]);
+					}
 				}
 			}
+		} else {
+			//Disable adapt block
+			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
 		}
 #endif
 		snd_soc_component_update_bits(component,
