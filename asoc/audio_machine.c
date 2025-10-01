@@ -1409,6 +1409,27 @@ static struct snd_soc_dai_link msm_tdm_sen_dai_links[] = {
 
 static struct snd_soc_dai_link wsa885x_tdm_dai_links[] = {
 	{
+		.name = LPASS_BE_QUIN_TDM_RX_0,
+		.stream_name = LPASS_BE_QUIN_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(quin_tdm_wsa885x_i2c_rx),
+	},
+	{
+		.name = LPASS_BE_QUIN_TDM_TX_0,
+		.stream_name = LPASS_BE_QUIN_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(quin_tdm_wsa885x_i2c_tx),
+	},
+	{
 		.name = LPASS_BE_SEN_TDM_RX_0,
 		.stream_name = LPASS_BE_SEN_TDM_RX_0,
 		.playback_only = 1,
@@ -1429,6 +1450,7 @@ static struct snd_soc_dai_link wsa885x_tdm_dai_links[] = {
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_tx),
 	},
+#ifndef SND_SOC_CONFIG_QAIF
 	{
 		.name = LPASS_BE_SEN_TDM_RX_1,
 		.stream_name = LPASS_BE_SEN_TDM_RX_1,
@@ -1451,6 +1473,7 @@ static struct snd_soc_dai_link wsa885x_tdm_dai_links[] = {
 		.ignore_pmdown_time = 1,
 		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_rx_virt_c2),
 	},
+#endif
 };
 
 static struct snd_soc_dai_link msm_canoe_dai_links[
