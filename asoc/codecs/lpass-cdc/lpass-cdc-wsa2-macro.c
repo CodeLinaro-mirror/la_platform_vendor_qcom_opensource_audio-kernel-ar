@@ -3138,15 +3138,31 @@ static const struct snd_kcontrol_new aif_cps_mixer[] = {
 			lpass_cdc_wsa2_macro_cps_feed_mixer_put),
 };
 
+static const struct snd_soc_dapm_route wsa2_v4_audio_map[] = {
+	{"WSA2 AIF_PCM PB", NULL, "WSA2_MCLK"},
+	{"WSA2_HAPT OUT", NULL, "WSA2 AIF_PCM PB"},
+};
+
+static const struct snd_soc_dapm_widget lpass_cdc_wsa2_macro_v4_dapm_widgets[] = {
+	SND_SOC_DAPM_OUTPUT("WSA2_HAPT OUT"),
+
+	SND_SOC_DAPM_AIF_IN("WSA2 AIF_PCM PB", "WSA2_AIF1_PCM Playback", 0,
+		SND_SOC_NOPM, 0, 0),
+
+	SND_SOC_DAPM_SUPPLY_S("WSA2_MCLK", 0, SND_SOC_NOPM, 0, 0,
+	lpass_cdc_wsa2_macro_mclk_event, SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
+};
+
 static const struct snd_soc_dapm_widget lpass_cdc_wsa2_macro_dapm_widgets[] = {
+	SND_SOC_DAPM_AIF_IN("WSA2 AIF_PCM PB", "WSA2_AIF1_PCM Playback", 0,
+		SND_SOC_NOPM, 0, 0),
+
 	SND_SOC_DAPM_AIF_IN("WSA2 AIF1 PB", "WSA2_AIF1 Playback", 0,
 		SND_SOC_NOPM, 0, 0),
 
 	SND_SOC_DAPM_AIF_IN("WSA2 AIF_MIX1 PB", "WSA2_AIF_MIX1 Playback", 0,
 		SND_SOC_NOPM, 0, 0),
 
-	SND_SOC_DAPM_AIF_IN("WSA2 AIF_PCM PB", "WSA2_AIF1_PCM Playback", 0,
-		SND_SOC_NOPM, 0, 0),
 
 	SND_SOC_DAPM_AIF_OUT_E("WSA2 AIF_VI", "WSA2_AIF_VI Capture", 0,
 		SND_SOC_NOPM, LPASS_CDC_WSA2_MACRO_AIF_VI, 0,
@@ -3816,19 +3832,37 @@ static int lpass_cdc_wsa2_macro_init(struct snd_soc_component *component)
 		return -EINVAL;
 	}
 
+#ifdef CONFIG_BOLERO_VER_4P0
+	ret = snd_soc_dapm_new_controls(dapm, lpass_cdc_wsa2_macro_v4_dapm_widgets,
+					ARRAY_SIZE(lpass_cdc_wsa2_macro_v4_dapm_widgets));
+	if (ret < 0) {
+		dev_err(wsa2_dev, "%s: Failed to add controls for wsa2_v4\n", __func__);
+		return ret;
+	}
+#else
 	ret = snd_soc_dapm_new_controls(dapm, lpass_cdc_wsa2_macro_dapm_widgets,
 					ARRAY_SIZE(lpass_cdc_wsa2_macro_dapm_widgets));
 	if (ret < 0) {
 		dev_err(wsa2_dev, "%s: Failed to add controls\n", __func__);
 		return ret;
 	}
+#endif
 
+#ifdef CONFIG_BOLERO_VER_4P0
+	ret = snd_soc_dapm_add_routes(dapm, wsa2_v4_audio_map,
+					ARRAY_SIZE(wsa2_v4_audio_map));
+	if (ret < 0) {
+		dev_err(wsa2_dev, "%s: Failed to add routes for wsa2_v4\n", __func__);
+		return ret;
+	}
+#else
 	ret = snd_soc_dapm_add_routes(dapm, wsa2_audio_map,
 					ARRAY_SIZE(wsa2_audio_map));
 	if (ret < 0) {
 		dev_err(wsa2_dev, "%s: Failed to add routes\n", __func__);
 		return ret;
 	}
+#endif
 
 	ret = snd_soc_dapm_new_widgets(dapm->card);
 	if (ret < 0) {
@@ -3836,12 +3870,14 @@ static int lpass_cdc_wsa2_macro_init(struct snd_soc_component *component)
 		return ret;
 	}
 
+#ifndef CONFIG_BOLERO_VER_4P0
 	ret = snd_soc_add_component_controls(component, lpass_cdc_wsa2_macro_snd_controls,
 				   ARRAY_SIZE(lpass_cdc_wsa2_macro_snd_controls));
 	if (ret < 0) {
 		dev_err(wsa2_dev, "%s: Failed to add snd_ctls\n", __func__);
 		return ret;
 	}
+#endif
 
 	snd_soc_dapm_ignore_suspend(dapm, "WSA2_AIF1_PCM Playback");
 	snd_soc_dapm_ignore_suspend(dapm, "WSA2_HAPT OUT");
