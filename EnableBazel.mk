@@ -39,7 +39,7 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/hdmi_dlkm.ko
 endif
 
-ifeq ($(call is-board-platform-in-list,sun canoe alor),true)
+ifeq ($(call is-board-platform-in-list,sun canoe alor whale),true)
 LOCAL_MODULE_DDK_BUILD := true
 
 LOCAL_MODULE_KO_DIRS := dsp/q6_notifier_dlkm.ko
