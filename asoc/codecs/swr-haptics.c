@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/device.h>
@@ -567,6 +567,7 @@ static int swr_haptics_parse_port_mapping(struct swr_device *sdev)
 {
 	struct swr_haptics_dev *swr_hap = swr_get_dev_data(sdev);
 	u32 port_cfg[NUM_SWR_PORT_DT_PARAMS];
+	u32 val = 0;
 	int rc;
 
 	if (!swr_hap) {
@@ -593,6 +594,14 @@ static int swr_haptics_parse_port_mapping(struct swr_device *sdev)
 			__func__, swr_hap->port.port_id,
 			swr_hap->port.ch_mask, swr_hap->port.ch_rate,
 			swr_hap->port.num_ch, swr_hap->port.port_type);
+
+	/* Check for haptic visense support */
+	if (of_find_property(sdev->dev.of_node, "qcom,hap-visense-supported", NULL)) {
+		rc = of_property_read_u32(sdev->dev.of_node, "qcom,hap-visense-supported",
+								&val);
+		pr_debug("%s qcom,hap-visense-supported = %d ",__func__, val);
+		vi_sense_supported = val;
+	}
 
 	if (vi_sense_supported) {
 
