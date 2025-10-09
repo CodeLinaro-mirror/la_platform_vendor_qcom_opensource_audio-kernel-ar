@@ -681,6 +681,7 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_CDC_WSA_CLK_RST_CTRL_MCLK_CONTROL, 0x00},
 	{ LPASS_CDC_WSA_CLK_RST_CTRL_FS_CNT_CONTROL, 0x00},
 	{ LPASS_CDC_WSA_CLK_RST_CTRL_SWR_CONTROL, 0x00},
+#ifndef CONFIG_BOLERO_VER_4P0
 	{ LPASS_CDC_WSA_TOP_TOP_CFG0, 0x00},
 	{ LPASS_CDC_WSA_TOP_TOP_CFG1, 0x00},
 	{ LPASS_CDC_WSA_TOP_FREQ_MCLK, 0x00},
@@ -979,6 +980,7 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_CDC_WSA_PBR_CFG21, 0x00},
 	{ LPASS_CDC_WSA_PBR_CFG22, 0x00},
 	{ LPASS_CDC_WSA_PBR_CFG23, 0x00},
+#endif
 
 	/* VA macro */
 	{ LPASS_CDC_VA_CLK_RST_CTRL_MCLK_CONTROL, 0x00},
@@ -1065,6 +1067,7 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_CDC_WSA2_CLK_RST_CTRL_MCLK_CONTROL, 0x00},
 	{ LPASS_CDC_WSA2_CLK_RST_CTRL_FS_CNT_CONTROL, 0x00},
 	{ LPASS_CDC_WSA2_CLK_RST_CTRL_SWR_CONTROL, 0x00},
+#ifndef CONFIG_BOLERO_VER_4P0
 	{ LPASS_CDC_WSA2_TOP_TOP_CFG0, 0x00},
 	{ LPASS_CDC_WSA2_TOP_TOP_CFG1, 0x00},
 	{ LPASS_CDC_WSA2_TOP_FREQ_MCLK, 0x00},
@@ -1363,6 +1366,7 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_CDC_WSA2_PBR_CFG21, 0x00},
 	{ LPASS_CDC_WSA2_PBR_CFG22, 0x00},
 	{ LPASS_CDC_WSA2_PBR_CFG23, 0x00},
+#endif
 };
 
 static bool lpass_cdc_is_readable_register(struct device *dev,
@@ -1380,6 +1384,20 @@ static bool lpass_cdc_is_readable_register(struct device *dev,
 				       reg);
 	if (macro_id < 0 || !priv->macros_supported[macro_id])
 		return false;
+
+#ifdef CONFIG_BOLERO_VER_4P0
+	if (macro_id == WSA_MACRO || macro_id == WSA2_MACRO)
+	{
+		switch (reg) {
+		case LPASS_CDC_WSA2_CLK_RST_CTRL_MCLK_CONTROL:
+		case LPASS_CDC_WSA2_CLK_RST_CTRL_FS_CNT_CONTROL:
+		case LPASS_CDC_WSA2_CLK_RST_CTRL_SWR_CONTROL:
+			return true;
+		default:
+			return false;
+		}
+	}
+#endif
 
 	reg_tbl = lpass_cdc_reg_access[macro_id];
 	reg_offset = (reg - macro_id_base_offset[macro_id])/4;
@@ -1405,6 +1423,20 @@ static bool lpass_cdc_is_writeable_register(struct device *dev,
 				       reg);
 	if (macro_id < 0 || !priv->macros_supported[macro_id])
 		return false;
+
+#ifdef CONFIG_BOLERO_VER_4P0
+	if (macro_id == WSA_MACRO || macro_id == WSA2_MACRO)
+	{
+		switch (reg) {
+		case LPASS_CDC_WSA2_CLK_RST_CTRL_MCLK_CONTROL:
+		case LPASS_CDC_WSA2_CLK_RST_CTRL_FS_CNT_CONTROL:
+		case LPASS_CDC_WSA2_CLK_RST_CTRL_SWR_CONTROL:
+			return true;
+		default:
+			return false;
+		}
+	}
+#endif
 
 	reg_tbl = lpass_cdc_reg_access[macro_id];
 	reg_offset = (reg - macro_id_base_offset[macro_id])/4;
@@ -1434,6 +1466,7 @@ static bool lpass_cdc_is_volatile_register(struct device *dev,
 	case LPASS_CDC_TX_TOP_CSR_SWR_MIC5_CTL:
 	case LPASS_CDC_TX_TOP_CSR_SWR_MIC0_CTL:
 	case LPASS_CDC_TX_TOP_CSR_SWR_MIC1_CTL:
+#ifndef CONFIG_BOLERO_VER_4P0
 	case LPASS_CDC_WSA_VBAT_BCL_VBAT_GAIN_MON_VAL:
 	case LPASS_CDC_WSA_INTR_CTRL_PIN1_STATUS0:
 	case LPASS_CDC_WSA_INTR_CTRL_PIN2_STATUS0:
@@ -1444,6 +1477,7 @@ static bool lpass_cdc_is_volatile_register(struct device *dev,
 	case LPASS_CDC_WSA2_INTR_CTRL_PIN2_STATUS0:
 	case LPASS_CDC_WSA2_COMPANDER0_CTL6:
 	case LPASS_CDC_WSA2_COMPANDER1_CTL6:
+#endif
 	case LPASS_CDC_RX_TOP_HPHL_COMP_RD_LSB:
 	case LPASS_CDC_RX_TOP_HPHL_COMP_WR_LSB:
 	case LPASS_CDC_RX_TOP_HPHL_COMP_RD_MSB:
