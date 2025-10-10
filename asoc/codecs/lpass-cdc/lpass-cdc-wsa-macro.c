@@ -4078,6 +4078,7 @@ static int lpass_cdc_wsa_macro_probe(struct platform_device *pdev)
 				__func__, "qcom,thermal-max-state");
 			wsa_priv->thermal_max_state =
 					LPASS_CDC_WSA_MACRO_THERMAL_MAX_STATE;
+			ret = 0;
 		} else {
 			wsa_priv->thermal_max_state = thermal_max_state;
 		}
@@ -4100,6 +4101,7 @@ static int lpass_cdc_wsa_macro_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "%s: could not find %s entry in dt\n",
 			__func__, "qcom,noise-gate-mode");
 		wsa_priv->noise_gate_mode = IDLE_DETECT;
+		ret = 0;
 	} else {
 		if (noise_gate_mode >= IDLE_DETECT && noise_gate_mode <= NG3)
 			wsa_priv->noise_gate_mode = noise_gate_mode;
