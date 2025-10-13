@@ -31,7 +31,7 @@
 #include "msm-audio-defs.h"
 #include "msm_common.h"
 #include "sa510m_dailink.h"
-//#include <soc/qcom/boot_stats.h>
+#include <soc/qcom/boot_stats.h>
 
 #define DRV_NAME "sdx-asoc-snd"
 #define __CHIPSET__ "LAHAINA "
@@ -1478,7 +1478,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 			__func__, ret);
 
 	is_initial_boot = true;
-	//update_marker("M - DRIVER Audio Ready");
+	update_marker("M - DRIVER Audio Ready");
 
 	return 0;
 err:
