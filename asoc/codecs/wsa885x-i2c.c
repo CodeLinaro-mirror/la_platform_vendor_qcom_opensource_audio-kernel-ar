@@ -211,6 +211,10 @@
 /* PLL Status Register Bits */
 #define WSA885X_PLL_LOCK_BIT            0x01    /* PLL lock status bit (bit 0) */
 
+/* FU21 volume support */
+#define FU21_VOL_STEPS 124
+static const DECLARE_TLV_DB_SCALE(fu21_digital_gain, -8400, 100, 0);
+
 static const char *const supply_name[] = {
 	"vdd-io",
 	"vdd-1p8",
@@ -292,6 +296,7 @@ struct wsa885x_i2c_priv {
 	struct gpio_desc *intr_pin;
 	atomic_t open_count;
 	uint32_t batt_conf;
+	int stereo_voldB; /* in dB, -84..+40, encoded as signed 8-bit in MSB register */
 };
 
 static const struct regmap_irq wsa885x_irqs[WSA885X_IRQ_MAX] = {
@@ -716,6 +721,13 @@ static int codec_hw_params(struct snd_pcm_substream *substream,
 	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_CS24_SAMPLERATEINDEX,
 				 cs24_sample_rate_idx);
 
+	/* Program FU21 volume with current dB value (MSB) and zero LSB, then commit */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+	regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
+
 	return 0;
 }
 
@@ -947,10 +959,10 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 		/* Set posture number for speaker configuration */
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER, 0x01);
 
-		/* Set volume to maximum (0x00 = max volume) for both channels */
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, 0x00);
+		/* Apply requested volume */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, wsa885x->stereo_voldB);
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, wsa885x->stereo_voldB);
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
 
 		/* Commit SDCA (Smart Device Class Audio) changes */
@@ -1467,6 +1479,36 @@ static void wsa885x_regulator_disable(void *data)
 	regulator_bulk_disable(SUPPLIES_NUM, data);
 }
 
+/* Stereo FU21 Gain Offset control */
+static int wsa885x_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
+						  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct wsa885x_i2c_priv *wsa885x =
+		snd_soc_component_get_drvdata(component);
+
+	/* UI range 0..124 maps to dB = value - 84; return slider value */
+	ucontrol->value.integer.value[0] = wsa885x->stereo_voldB + 84;
+	return 0;
+}
+
+static int wsa885x_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
+						  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct wsa885x_i2c_priv *wsa885x =
+		snd_soc_component_get_drvdata(component);
+	long val = ucontrol->value.integer.value[0];
+
+	if (val < 0 || val > FU21_VOL_STEPS) {
+		dev_err(component->dev, "%s: Invalid range, Val: %ld\n", __func__, val);
+		return -EINVAL;
+	}
+	wsa885x->stereo_voldB = (int)val - 84;
+	dev_dbg(component->dev, "%s: Volume dB: %d\n", __func__, wsa885x->stereo_voldB);
+	return 0;
+}
+
 /**
  * wsa885x_i2c_usage_modes_get() - Get current usage mode setting
  * @kcontrol: ALSA control structure
@@ -1572,12 +1614,18 @@ static int wsa885x_i2c_rx_slot_mask_put(struct snd_kcontrol *kcontrol,
 
 static const struct snd_kcontrol_new wsa885x_snd_controls[] = {
 	SOC_SINGLE_EXT("OT23 Usage Mode", SND_SOC_NOPM, 0, 8, 0,
-				   wsa885x_i2c_usage_modes_get,
-				   wsa885x_i2c_usage_modes_put),
+			   wsa885x_i2c_usage_modes_get,
+			   wsa885x_i2c_usage_modes_put),
+
+	SOC_SINGLE_EXT_TLV("SA1 FU21 Stereo Gain Offset dB", SND_SOC_NOPM,
+			   0, FU21_VOL_STEPS, 0,
+			   wsa885x_stereo_gain_offset_get,
+			   wsa885x_stereo_gain_offset_put,
+			   fu21_digital_gain),
 
 	SOC_SINGLE_EXT("Rx Slot Mask", SND_SOC_NOPM, 0, 4, 0,
-				   wsa885x_i2c_rx_slot_mask_get,
-				   wsa885x_i2c_rx_slot_mask_put),
+			   wsa885x_i2c_rx_slot_mask_get,
+			   wsa885x_i2c_rx_slot_mask_put),
 };
 
 static const struct snd_soc_component_driver wsa885x_i2c_component = {
@@ -1586,9 +1634,9 @@ static const struct snd_soc_component_driver wsa885x_i2c_component = {
 	.remove = wsa885x_component_remove,
 	.controls = wsa885x_snd_controls,
 	.num_controls = ARRAY_SIZE(wsa885x_snd_controls),
-	.dapm_widgets = NULL, // Add DAPM widgets if needed
+	.dapm_widgets = NULL,
 	.num_dapm_widgets = 0,
-	.dapm_routes = NULL, // Add DAPM routes if needed
+	.dapm_routes = NULL,
 	.num_dapm_routes = 0,
 };
 
@@ -1813,6 +1861,7 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 
 	wsa885x->client = client;
 	wsa885x->dev = dev;
+
 	wsa885x->regmap = devm_regmap_init_i2c(client, &regmap_cfg);
 	atomic_set(&wsa885x->open_count, 0);
 
@@ -1820,6 +1869,8 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 		return PTR_ERR(wsa885x->regmap);
 
 	wsa885x->dev = dev;
+	/* Default stereo volume: -84 dB */
+	wsa885x->stereo_voldB = -84;
 
 	/* Check for wsa885x version version property to determine which table to use */
 	const char *init_table_prop = "wsa885x-init-table";
