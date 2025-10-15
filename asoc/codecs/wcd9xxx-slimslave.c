@@ -219,7 +219,6 @@ int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 	u16 payload = 0;
 	u16 codec_port;
 	int ret = 0;
-	int i=0;
 	struct wcd9xxx_ch *tx;
 	int i = 0;
 	struct slim_stream_config sconfig_tx;

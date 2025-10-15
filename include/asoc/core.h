@@ -274,7 +274,6 @@ struct wcd9xxx_codec_dai_data {
 	unsigned long ch_mask;
 	wait_queue_head_t dai_wait;
 	bool bus_down_in_recovery;
-	u32 direction;             /* Direction of stream */
 };
 
 #define WCD9XXX_CH(xport, xshift) \
