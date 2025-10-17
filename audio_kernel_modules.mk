@@ -11,6 +11,7 @@ endif
 
 ifeq ($(BUILD_AUDIO_MODULES),true)
 ifneq ($(TARGET_BOARD_AUTO),true)
+ifeq (,$(call is-board-platform-in-list2,lahaina))
 ifneq (,$(call is-board-platform-in-list2,$(TARGET_BOARD_PLATFORM)))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/spf_core_dlkm.ko \
@@ -81,6 +82,7 @@ endif
 ifneq (,$(call is-board-platform-in-list2, holi blair))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
+endif
 endif
 endif
 else

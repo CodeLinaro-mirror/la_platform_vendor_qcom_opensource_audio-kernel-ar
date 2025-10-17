@@ -1,3 +1,5 @@
+ifeq (,$(call is-board-platform-in-list2,lahaina))
+ $(warning "#### Not building for lahaina  ####")
 # Build audio kernel driver
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/spf_core_dlkm.ko \
@@ -74,4 +76,5 @@ ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm msmnil
 PRODUCT_PACKAGES  += $(KERNEL_MODULES_OUT)/machine_dlkm.ko \
         $(KERNEL_MODULES_OUT)/stub_dlkm.ko
 endif   #msmnile
+endif
 endif
