@@ -37,7 +37,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list,sun canoe alor whale), true)
+ifeq ($(call is-board-platform-in-list,sun canoe alor whale art), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko \
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd9378_dlkm.ko \
