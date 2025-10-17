@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015, 2018-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _SWRM_REGISTERS_H
@@ -104,7 +104,31 @@
 #define SWRM_MCP_STATUS                           (SWRM_BASE+0x104C)
 #define SWRM_MCP_SLV_STATUS                       (SWRM_BASE+0x1090)
 
+#ifdef CONFIG_SWRM_VER_4P0
+#define SWRM_DP_PORT_CONTROL(n)           (SWRM_BASE+0x1120+0x100*n)
+#define SWRM_DP_PORT_CTRL_BANK(n, m)      (SWRM_BASE+0x1124+0x100*n+0x40*m)
+#define SWRM_DP_PORT_CTRL_2_BANK(n, m)    (SWRM_BASE+0x1128+0x100*n+0x40*m)
+#define SWRM_DP_BLOCK_CTRL_1(n)           (SWRM_BASE+0x112C+0x100*n)
+#define SWRM_DP_BLOCK_CTRL2_BANK(n, m)    (SWRM_BASE+0x1130+0x100*n+0x40*m)
+#define SWRM_DP_PORT_HCTRL_BANK(n, m)     (SWRM_BASE+0x1134+0x100*n+0x40*m)
+#define SWRM_DP_BLOCK_CTRL3_BANK(n, m)    (SWRM_BASE+0x1138+0x100*n+0x40*m)
+#define SWRM_DP_SAMPLECTRL2_BANK(n, m)    (SWRM_BASE+0x113C+0x100*n+0x40*m)
 
+
+#define SWRM_DOUT_DP_INT_STATUS(n)          (SWRM_BASE+0x1100+0x100*n)
+#define SWRM_DOUT_DP_INT_CLEAR(n)           (SWRM_BASE+0x1108+0x100*n)
+#define SWRM_DOUT_DP_FEATURES_EN(n)         (SWRM_BASE+0x114C+0x100*n)
+#define SWRM_DOUT_DP_SILENCE_TONE_CFG(n)    (SWRM_BASE+0x1150+0x100*n)
+#define SWRM_DOUT_DP_PCM_PORT_CTRL(n)       (SWRM_BASE+0x1154+0x100*n)
+
+#define SWRM_DIN_DP_INT_STATUS(n)         (SWRM_BASE+0x1100+0x100*n)
+#define SWRM_DIN_DP_INT_CLEAR(n)          (SWRM_BASE+0x1108+0x100*n)
+#define SWRM_DIN_DP_FEATURES_EN(n)        (SWRM_BASE+0x114C+0x100*n)
+#define SWRM_DIN_DP_PCM_PORT_CTRL(n)      (SWRM_BASE+0x1154+0x100*n)
+
+#define SWRM_DP_FLOW_CTRL_M_VALID_SAMPLE(n)	(SWRM_BASE+0x1180+0x100*n)
+#define SWRM_DP_FLOW_CTRL_N_REPEAT_PERIOD(n)    (SWRM_BASE+0x1184+0x100*n)
+#else
 #define SWRM_DP_PORT_CONTROL(n)           (SWRM_BASE+0x1020+0x100*n)
 #define SWRM_DP_PORT_CTRL_BANK(n, m)      (SWRM_BASE+0x1024+0x100*n+0x40*m)
 #define SWRM_DP_PORT_CTRL_2_BANK(n, m)    (SWRM_BASE+0x1028+0x100*n+0x40*m)
@@ -126,9 +150,9 @@
 #define SWRM_DIN_DP_FEATURES_EN(n)        (SWRM_BASE+0x104C+0x100*n)
 #define SWRM_DIN_DP_PCM_PORT_CTRL(n)      (SWRM_BASE+0x1054+0x100*n)
 
-#define SWRM_DP_FLOW_CTRL_M_VALID_SAMPLE(n)	(SWRM_BASE+0x1080+0x100*n)
+#define SWRM_DP_FLOW_CTRL_M_VALID_SAMPLE(n)     (SWRM_BASE+0x1080+0x100*n)
 #define SWRM_DP_FLOW_CTRL_N_REPEAT_PERIOD(n)    (SWRM_BASE+0x1084+0x100*n)
-
+#endif
 #define SWRM_DP_PORT_CONTROL__FLOW_MODE_PUSH (0x8)
 #define SWRM_DP_PORT_CONTROL__FLOW_MODE_PULL (0x10)
 #define SWRM_DOUT_DP_PCM_PORT_CTRL__SELF_GEN_SUB_RATE_EN (0x4)
