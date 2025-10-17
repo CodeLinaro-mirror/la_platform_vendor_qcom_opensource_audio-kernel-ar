@@ -16,8 +16,9 @@ ifeq ($(TARGET_USES_AUDIOLITE), true)
 endif
 
 ifeq ($(AUDIO_DLKM_ENABLE), true)
-  include vendor/qcom/opensource/audio-kernel/audio_kernel_modules.mk
+  #include vendor/qcom/opensource/audio-kernel/audio_kernel_modules.mk
   ifeq ($(ENABLE_AUDIO_LEGACY_TECHPACK),true)
+    $(warning "#### ENABLE_AUDIO_LEGACY_TECHPACK for elite audio ####")
     include vendor/qcom/opensource/audio-kernel/legacy/audio_kernel_modules.mk
   endif
   BOARD_VENDOR_KERNEL_MODULES += $(AUDIO_KERNEL_MODULES)
