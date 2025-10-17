@@ -36,6 +36,6 @@ struct swr_mstr_port_map {
 	struct port_params *swr_port_params;
 };
 
-#define SWR_MSTR_PORT_LEN      13 /* Number of master ports */
+#define SWR_MSTR_PORT_LEN      16 /* Number of master ports */
 
 #endif /* _LINUX_SWR_COMMON_H */

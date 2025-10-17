@@ -96,6 +96,12 @@
 #define SWRM_TX_PCM_IN 58
 #define HIFI_PCM_L 59
 #define HIFI_PCM_R 60
+#define PR_A 61
+#define UT_A 62
+#define MM_A 63
+#define VO_A 64
+#define PCMI 65
+#define SWRM_RX_TX1 66
 
 // BT SWR PORT defines
 #define BT_AUDIO_RX1 101

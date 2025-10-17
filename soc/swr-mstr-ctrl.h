@@ -33,7 +33,7 @@
 
 #define SWR_NAME	"swr-mgr"
 
-#define SWR_MSTR_PORT_LEN	13 /* Number of master ports */
+#define SWR_MSTR_PORT_LEN	16 /* Number of master ports */
 
 #define SWRM_VERSION_1_0 0x01010000
 #define SWRM_VERSION_1_2 0x01030000
