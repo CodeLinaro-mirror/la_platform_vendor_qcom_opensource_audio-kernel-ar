@@ -1916,6 +1916,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 	/* SWR MIC ROUTING*/
 	/* DEC0 */
 	{"TX DEC0 MUX", "SWR_MIC", "TX SMIC MUX0"},
+	{"TX DEC0 MUX", "RX_SWR_MIC", "TX SMIC MUX0"},
+
 	{"TX SMIC MUX0", "ZERO", "TX WSA MUX0"},
 	{"TX SMIC MUX0", "SWR_MIC0", "TX WSA MUX0"},
 	{"TX SMIC MUX0", "SWR_MIC1", "TX WSA MUX0"},
@@ -1940,6 +1942,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 
 	/* DEC1 */
 	{"TX DEC1 MUX", "SWR_MIC", "TX SMIC MUX1"},
+	{"TX DEC1 MUX", "RX_SWR_MIC", "TX SMIC MUX1"},
+
 	{"TX SMIC MUX1", "ZERO", "TX WSA MUX1"},
 	{"TX SMIC MUX1", "SWR_MIC0", "TX WSA MUX1"},
 	{"TX SMIC MUX1", "SWR_MIC1", "TX WSA MUX1"},
@@ -1964,6 +1968,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 
 	/* DEC2 */
 	{"TX DEC2 MUX", "SWR_MIC", "TX SMIC MUX2"},
+	{"TX DEC2 MUX", "RX_SWR_MIC", "TX SMIC MUX2"},
+
 	{"TX SMIC MUX2", "ZERO", "TX WSA MUX2"},
 	{"TX SMIC MUX2", "SWR_MIC0", "TX WSA MUX2"},
 	{"TX SMIC MUX2", "SWR_MIC1", "TX WSA MUX2"},
@@ -1988,6 +1994,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 
 	/* DEC3 */
 	{"TX DEC3 MUX", "SWR_MIC", "TX SMIC MUX3"},
+	{"TX DEC3 MUX", "RX_SWR_MIC", "TX SMIC MUX3"},
+
 	{"TX SMIC MUX3", "ZERO", "TX WSA MUX3"},
 	{"TX SMIC MUX3", "SWR_MIC0", "TX WSA MUX3"},
 	{"TX SMIC MUX3", "SWR_MIC1", "TX WSA MUX3"},
@@ -2012,6 +2020,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 
 	/* DEC4 */
 	{"TX DEC4 MUX", "SWR_MIC", "TX SMIC MUX4"},
+	{"TX DEC4 MUX", "RX_SWR_MIC", "TX SMIC MUX4"},
+
 	{"TX SMIC MUX4", "ZERO", "TX WSA MUX4"},
 	{"TX SMIC MUX4", "SWR_MIC0", "TX WSA MUX4"},
 	{"TX SMIC MUX4", "SWR_MIC1", "TX WSA MUX4"},
@@ -2036,6 +2046,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 
 	/* DEC5 */
 	{"TX DEC5 MUX", "SWR_MIC", "TX SMIC MUX5"},
+	{"TX DEC5 MUX", "RX_SWR_MIC", "TX SMIC MUX5"},
+
 	{"TX SMIC MUX5", "ZERO", "TX WSA MUX5"},
 	{"TX SMIC MUX5", "SWR_MIC0", "TX WSA MUX5"},
 	{"TX SMIC MUX5", "SWR_MIC1", "TX WSA MUX5"},
@@ -2060,6 +2072,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 
 	/* DEC6 */
 	{"TX DEC6 MUX", "SWR_MIC", "TX SMIC MUX6"},
+	{"TX DEC6 MUX", "RX_SWR_MIC", "TX SMIC MUX6"},
+
 	{"TX SMIC MUX6", "ZERO", "TX WSA MUX6"},
 	{"TX SMIC MUX6", "SWR_MIC0", "TX WSA MUX6"},
 	{"TX SMIC MUX6", "SWR_MIC1", "TX WSA MUX6"},
@@ -2084,6 +2098,8 @@ static const struct snd_soc_dapm_route tx_audio_map[] = {
 
 	/* DEC7 */
 	{"TX DEC7 MUX", "SWR_MIC", "TX SMIC MUX7"},
+	{"TX DEC7 MUX", "RX_SWR_MIC", "TX SMIC MUX7"},
+
 	{"TX SMIC MUX7", "ZERO", "TX WSA MUX7"},
 	{"TX SMIC MUX7", "SWR_MIC0", "TX WSA MUX7"},
 	{"TX SMIC MUX7", "SWR_MIC1", "TX WSA MUX7"},
