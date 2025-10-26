@@ -888,7 +888,8 @@ static int swr_haptics_remove(struct swr_device *sdev)
 	}
 clean:
 	snd_soc_unregister_component(&sdev->dev);
-	mutex_destroy(&swr_hap->play_lock);
+	if (!swr_hap)
+		mutex_destroy(&swr_hap->play_lock);
 	swr_set_dev_data(sdev, NULL);
 	return rc;
 }
