@@ -1603,9 +1603,15 @@ static const struct snd_kcontrol_new name##_mux = \
 #define LPASS_CDC_VA_MACRO_DAPM_MUX(name, shift, kctl) \
 		SND_SOC_DAPM_MUX(name, SND_SOC_NOPM, shift, 0, &kctl##_mux)
 
+#ifdef CONFIG_BOLERO_VER_4P0
 static const char * const adc_mux_text[] = {
-	"MSM_DMIC", "SWR_MIC"
+	"VA_DMIC", "SWR_MIC", "RX_SWR_MIC"
 };
+#else
+static const char * const adc_mux_text[] = {
+	"VA_DMIC", "SWR_MIC"
+};
+#endif
 
 LPASS_CDC_VA_MACRO_DAPM_ENUM(va_dec0, LPASS_CDC_VA_INP_MUX_ADC_MUX0_CFG1,
 		   0, adc_mux_text);
@@ -1637,11 +1643,18 @@ LPASS_CDC_VA_MACRO_DAPM_ENUM_EXT(va_dmic3, LPASS_CDC_VA_INP_MUX_ADC_MUX3_CFG0,
 			4, dmic_mux_text, snd_soc_dapm_get_enum_double,
 			lpass_cdc_va_macro_put_dec_enum);
 
+#ifdef CONFIG_BOLERO_VER_4P0
+static const char * const smic_mux_text[] = {
+	"ZERO", "SWR_MIC0", "SWR_MIC1", "SWR_MIC2", "SWR_MIC3",
+	"SWR_MIC4", "SWR_MIC5", "SWR_MIC6", "SWR_MIC7",
+};
+#else
 static const char * const smic_mux_text[] = {
 	"ZERO", "SWR_MIC0", "SWR_MIC1", "SWR_MIC2", "SWR_MIC3",
 	"SWR_MIC4", "SWR_MIC5", "SWR_MIC6", "SWR_MIC7",
 	"SWR_MIC8", "SWR_MIC9", "SWR_MIC10", "SWR_MIC11"
 };
+#endif
 
 LPASS_CDC_VA_MACRO_DAPM_ENUM_EXT(va_smic0, LPASS_CDC_VA_INP_MUX_ADC_MUX0_CFG0,
 			0, smic_mux_text, snd_soc_dapm_get_enum_double,
@@ -1658,6 +1671,22 @@ LPASS_CDC_VA_MACRO_DAPM_ENUM_EXT(va_smic2, LPASS_CDC_VA_INP_MUX_ADC_MUX2_CFG0,
 LPASS_CDC_VA_MACRO_DAPM_ENUM_EXT(va_smic3, LPASS_CDC_VA_INP_MUX_ADC_MUX3_CFG0,
 			0, smic_mux_text, snd_soc_dapm_get_enum_double,
 			lpass_cdc_va_macro_put_dec_enum);
+
+#ifdef CONFIG_BOLERO_VER_4P0
+static const char * const psel_mux_text[] = {
+	"PORT0", "PORT1", "PORT2", "PORT3", "PORT4"
+};
+
+LPASS_CDC_VA_MACRO_DAPM_ENUM(va_psel_mux0, LPASS_CDC_VA_INP_MUX_ADC_MUX0_CFG2,
+			0, psel_mux_text);
+LPASS_CDC_VA_MACRO_DAPM_ENUM(va_psel_mux1, LPASS_CDC_VA_INP_MUX_ADC_MUX1_CFG2,
+			0, psel_mux_text);
+LPASS_CDC_VA_MACRO_DAPM_ENUM(va_psel_mux2, LPASS_CDC_VA_INP_MUX_ADC_MUX2_CFG2,
+			0, psel_mux_text);
+LPASS_CDC_VA_MACRO_DAPM_ENUM(va_psel_mux3, LPASS_CDC_VA_INP_MUX_ADC_MUX3_CFG2,
+			0, psel_mux_text);
+#endif
+
 
 static const struct snd_kcontrol_new va_aif1_cap_mixer[] = {
 	SOC_SINGLE_EXT("DEC0", SND_SOC_NOPM, LPASS_CDC_VA_MACRO_DEC0, 1, 0,
@@ -1730,6 +1759,13 @@ static const struct snd_soc_dapm_widget lpass_cdc_va_macro_dapm_widgets[] = {
 	LPASS_CDC_VA_MACRO_DAPM_MUX("VA SMIC MUX2", 0, va_smic2),
 	LPASS_CDC_VA_MACRO_DAPM_MUX("VA SMIC MUX3", 0, va_smic3),
 
+#ifdef CONFIG_BOLERO_VER_4P0
+	LPASS_CDC_VA_MACRO_DAPM_MUX("VA PORT SEL MUX0", 0, va_psel_mux0),
+	LPASS_CDC_VA_MACRO_DAPM_MUX("VA PORT SEL MUX1", 0, va_psel_mux1),
+	LPASS_CDC_VA_MACRO_DAPM_MUX("VA PORT SEL MUX2", 0, va_psel_mux2),
+	LPASS_CDC_VA_MACRO_DAPM_MUX("VA PORT SEL MUX3", 0, va_psel_mux3),
+#endif
+
 	SND_SOC_DAPM_INPUT("VA SWR_INPUT"),
 
 	SND_SOC_DAPM_SUPPLY("VA MIC BIAS", SND_SOC_NOPM, 0, 0,
@@ -1784,6 +1820,7 @@ static const struct snd_soc_dapm_widget lpass_cdc_va_macro_dapm_widgets[] = {
 
 };
 
+#ifdef CONFIG_BOLERO_VER_4P0
 static const struct snd_soc_dapm_route va_audio_map[] = {
 	{"VA_AIF1 CAP", NULL, "VA_MCLK"},
 	{"VA_AIF2 CAP", NULL, "VA_MCLK"},
@@ -1819,6 +1856,154 @@ static const struct snd_soc_dapm_route va_audio_map[] = {
 	{"VA DMIC MUX0", "DMIC7", "VA DMIC7"},
 
 	{"VA DEC0 MUX", "SWR_MIC", "VA SMIC MUX0"},
+	{"VA DEC0 MUX", "RX_SWR_MIC", "VA SMIC MUX0"},
+
+	{"VA SMIC MUX0", "ZERO", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC0", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC1", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC2", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC3", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC4", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC5", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC6", "VA PORT SEL MUX0"},
+	{"VA SMIC MUX0", "SWR_MIC7", "VA PORT SEL MUX0"},
+
+	{"VA PORT SEL MUX0", "PORT0", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX0", "PORT1", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX0", "PORT2", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX0", "PORT3", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX0", "PORT4", "VA SWR_INPUT"},
+
+	{"VA DEC1 MUX", "MSM_DMIC", "VA DMIC MUX1"},
+	{"VA DMIC MUX1", "DMIC0", "VA DMIC0"},
+	{"VA DMIC MUX1", "DMIC1", "VA DMIC1"},
+	{"VA DMIC MUX1", "DMIC2", "VA DMIC2"},
+	{"VA DMIC MUX1", "DMIC3", "VA DMIC3"},
+	{"VA DMIC MUX1", "DMIC4", "VA DMIC4"},
+	{"VA DMIC MUX1", "DMIC5", "VA DMIC5"},
+	{"VA DMIC MUX1", "DMIC6", "VA DMIC6"},
+	{"VA DMIC MUX1", "DMIC7", "VA DMIC7"},
+
+	{"VA DEC1 MUX", "SWR_MIC", "VA SMIC MUX1"},
+	{"VA DEC1 MUX", "RX_SWR_MIC", "VA SMIC MUX1"},
+
+	{"VA SMIC MUX1", "ZERO", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC0", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC0", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC1", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC2", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC3", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC4", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC5", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC6", "VA PORT SEL MUX1"},
+	{"VA SMIC MUX1", "SWR_MIC7", "VA PORT SEL MUX1"},
+
+	{"VA PORT SEL MUX1", "PORT0", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX1", "PORT1", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX1", "PORT2", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX1", "PORT3", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX1", "PORT4", "VA SWR_INPUT"},
+
+	{"VA DEC2 MUX", "MSM_DMIC", "VA DMIC MUX2"},
+	{"VA DMIC MUX2", "DMIC0", "VA DMIC0"},
+	{"VA DMIC MUX2", "DMIC1", "VA DMIC1"},
+	{"VA DMIC MUX2", "DMIC2", "VA DMIC2"},
+	{"VA DMIC MUX2", "DMIC3", "VA DMIC3"},
+	{"VA DMIC MUX2", "DMIC4", "VA DMIC4"},
+	{"VA DMIC MUX2", "DMIC5", "VA DMIC5"},
+	{"VA DMIC MUX2", "DMIC6", "VA DMIC6"},
+	{"VA DMIC MUX2", "DMIC7", "VA DMIC7"},
+
+	{"VA DEC2 MUX", "SWR_MIC", "VA SMIC MUX2"},
+	{"VA DEC2 MUX", "RX_SWR_MIC", "VA SMIC MUX2"},
+
+	{"VA SMIC MUX2", "ZERO", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC0", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC1", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC2", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC3", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC4", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC5", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC6", "VA PORT SEL MUX2"},
+	{"VA SMIC MUX2", "SWR_MIC7", "VA PORT SEL MUX2"},
+
+	{"VA PORT SEL MUX2", "PORT0", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX2", "PORT1", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX2", "PORT2", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX2", "PORT3", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX2", "PORT4", "VA SWR_INPUT"},
+
+	{"VA DEC3 MUX", "MSM_DMIC", "VA DMIC MUX3"},
+	{"VA DMIC MUX3", "DMIC0", "VA DMIC0"},
+	{"VA DMIC MUX3", "DMIC1", "VA DMIC1"},
+	{"VA DMIC MUX3", "DMIC2", "VA DMIC2"},
+	{"VA DMIC MUX3", "DMIC3", "VA DMIC3"},
+	{"VA DMIC MUX3", "DMIC4", "VA DMIC4"},
+	{"VA DMIC MUX3", "DMIC5", "VA DMIC5"},
+	{"VA DMIC MUX3", "DMIC6", "VA DMIC6"},
+	{"VA DMIC MUX3", "DMIC7", "VA DMIC7"},
+
+	{"VA DEC3 MUX", "SWR_MIC", "VA SMIC MUX3"},
+	{"VA DEC3 MUX", "RX_SWR_MIC", "VA SMIC MUX3"},
+
+	{"VA SMIC MUX3", "ZERO", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC0", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC1", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC2", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC3", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC4", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC5", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC6", "VA PORT SEL MUX3"},
+	{"VA SMIC MUX3", "SWR_MIC7", "VA PORT SEL MUX3"},
+
+	{"VA PORT SEL MUX3", "PORT0", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX3", "PORT1", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX3", "PORT2", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX3", "PORT3", "VA SWR_INPUT"},
+	{"VA PORT SEL MUX3", "PORT4", "VA SWR_INPUT"},
+
+	{"VA SWR_INPUT", NULL, "VA_SWR_PWR"},
+
+	{"VA SWR_INPUT", NULL, "VA_SWR_CLK"},
+
+};
+#else
+static const struct snd_soc_dapm_route va_audio_map[] = {
+	{"VA_AIF1 CAP", NULL, "VA_MCLK"},
+	{"VA_AIF2 CAP", NULL, "VA_MCLK"},
+	{"VA_AIF3 CAP", NULL, "VA_MCLK"},
+
+	{"VA_AIF1 CAP", NULL, "VA_AIF1_CAP Mixer"},
+	{"VA_AIF2 CAP", NULL, "VA_AIF2_CAP Mixer"},
+	{"VA_AIF3 CAP", NULL, "VA_AIF3_CAP Mixer"},
+
+	{"VA_AIF1_CAP Mixer", "DEC0", "VA DEC0 MUX"},
+	{"VA_AIF1_CAP Mixer", "DEC1", "VA DEC1 MUX"},
+	{"VA_AIF1_CAP Mixer", "DEC2", "VA DEC2 MUX"},
+	{"VA_AIF1_CAP Mixer", "DEC3", "VA DEC3 MUX"},
+
+	{"VA_AIF2_CAP Mixer", "DEC0", "VA DEC0 MUX"},
+	{"VA_AIF2_CAP Mixer", "DEC1", "VA DEC1 MUX"},
+	{"VA_AIF2_CAP Mixer", "DEC2", "VA DEC2 MUX"},
+	{"VA_AIF2_CAP Mixer", "DEC3", "VA DEC3 MUX"},
+
+	{"VA_AIF3_CAP Mixer", "DEC0", "VA DEC0 MUX"},
+	{"VA_AIF3_CAP Mixer", "DEC1", "VA DEC1 MUX"},
+	{"VA_AIF3_CAP Mixer", "DEC2", "VA DEC2 MUX"},
+	{"VA_AIF3_CAP Mixer", "DEC3", "VA DEC3 MUX"},
+
+	{"VA DEC0 MUX", "MSM_DMIC", "VA DMIC MUX0"},
+	{"VA DMIC MUX0", "DMIC0", "VA DMIC0"},
+	{"VA DMIC MUX0", "DMIC1", "VA DMIC1"},
+	{"VA DMIC MUX0", "DMIC2", "VA DMIC2"},
+	{"VA DMIC MUX0", "DMIC3", "VA DMIC3"},
+	{"VA DMIC MUX0", "DMIC4", "VA DMIC4"},
+	{"VA DMIC MUX0", "DMIC5", "VA DMIC5"},
+	{"VA DMIC MUX0", "DMIC6", "VA DMIC6"},
+	{"VA DMIC MUX0", "DMIC7", "VA DMIC7"},
+
+	{"VA DEC0 MUX", "SWR_MIC", "VA SMIC MUX0"},
+	{"VA SMIC MUX0", "ZERO", "VA SWR_INPUT"},
 	{"VA SMIC MUX0", "SWR_MIC0", "VA SWR_INPUT"},
 	{"VA SMIC MUX0", "SWR_MIC1", "VA SWR_INPUT"},
 	{"VA SMIC MUX0", "SWR_MIC2", "VA SWR_INPUT"},
@@ -1843,6 +2028,7 @@ static const struct snd_soc_dapm_route va_audio_map[] = {
 	{"VA DMIC MUX1", "DMIC7", "VA DMIC7"},
 
 	{"VA DEC1 MUX", "SWR_MIC", "VA SMIC MUX1"},
+	{"VA SMIC MUX1", "ZERO", "VA SWR_INPUT"},
 	{"VA SMIC MUX1", "SWR_MIC0", "VA SWR_INPUT"},
 	{"VA SMIC MUX1", "SWR_MIC1", "VA SWR_INPUT"},
 	{"VA SMIC MUX1", "SWR_MIC2", "VA SWR_INPUT"},
@@ -1867,6 +2053,7 @@ static const struct snd_soc_dapm_route va_audio_map[] = {
 	{"VA DMIC MUX2", "DMIC7", "VA DMIC7"},
 
 	{"VA DEC2 MUX", "SWR_MIC", "VA SMIC MUX2"},
+	{"VA SMIC MUX2", "ZERO", "VA SWR_INPUT"},
 	{"VA SMIC MUX2", "SWR_MIC0", "VA SWR_INPUT"},
 	{"VA SMIC MUX2", "SWR_MIC1", "VA SWR_INPUT"},
 	{"VA SMIC MUX2", "SWR_MIC2", "VA SWR_INPUT"},
@@ -1891,6 +2078,7 @@ static const struct snd_soc_dapm_route va_audio_map[] = {
 	{"VA DMIC MUX3", "DMIC7", "VA DMIC7"},
 
 	{"VA DEC3 MUX", "SWR_MIC", "VA SMIC MUX3"},
+	{"VA SMIC MUX3", "ZERO", "VA SWR_INPUT"},
 	{"VA SMIC MUX3", "SWR_MIC0", "VA SWR_INPUT"},
 	{"VA SMIC MUX3", "SWR_MIC1", "VA SWR_INPUT"},
 	{"VA SMIC MUX3", "SWR_MIC2", "VA SWR_INPUT"},
@@ -1909,6 +2097,7 @@ static const struct snd_soc_dapm_route va_audio_map[] = {
 	{"VA SWR_INPUT", NULL, "VA_SWR_CLK"},
 
 };
+#endif
 
 static const char * const dec_mode_mux_text[] = {
 	"ADC_DEFAULT", "ADC_LOW_PWR", "ADC_HIGH_PERF",
