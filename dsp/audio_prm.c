@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/slab.h>
@@ -23,6 +23,11 @@
 #define MAX_RETRY_COUNT 3
 #define APM_READY_WAIT_DURATION 2
 #define GPR_SEND_PKT_APM_TIMEOUT_MS 0
+
+#define DEBUG_TOKEN_MASK 0xFFFFF000
+#define DEBUG_TOKEN_SHIFT 12
+#define INSERT_DEBUG_TOKEN(x, value) ((x) = (x) | ((value) << DEBUG_TOKEN_SHIFT))
+#define REMOVE_DEBUG_TOKEN(x) ((x) = ((x) & ~DEBUG_TOKEN_MASK))
 
 struct audio_prm {
 	struct gpr_device *adev;
@@ -88,6 +93,7 @@ static int prm_gpr_send_pkt(struct gpr_pkt *pkt, wait_queue_head_t *wait)
 {
 	int ret = 0;
 	int retry;
+	static uint32_t debug_token;
 
 	mutex_lock(&g_prm.lock);
 	pr_debug("%s: enter",__func__);
@@ -114,6 +120,11 @@ static int prm_gpr_send_pkt(struct gpr_pkt *pkt, wait_queue_head_t *wait)
 		pr_info("%s: apm ready check done\n", __func__);
 	}
 	g_prm.resp_received = false;
+
+	INSERT_DEBUG_TOKEN(pkt->hdr.token, debug_token);
+	++debug_token;
+	pr_info("prm sending pkt with token 0x%x, opcode 0x%x\n", pkt->hdr.token, pkt->hdr.opcode);
+
 	ret = gpr_send_pkt(g_prm.adev, pkt);
 	if (ret < 0) {
 		pr_err("%s: packet not transmitted %d\n", __func__, ret);
@@ -136,6 +147,10 @@ static int prm_gpr_send_pkt(struct gpr_pkt *pkt, wait_queue_head_t *wait)
 			ret = 0;
 		}
 	}
+
+	pr_info("rcvd pkt token : 0x%x\n", pkt->hdr.token);
+	REMOVE_DEBUG_TOKEN(pkt->hdr.token);
+
 	pr_debug("%s: exit",__func__);
 	mutex_unlock(&g_prm.lock);
 	return ret;
