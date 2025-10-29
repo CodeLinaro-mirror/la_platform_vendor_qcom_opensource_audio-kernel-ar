@@ -1,6 +1,5 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -11,7 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -24,6 +24,7 @@
 #include <ipc/gpr-lite.h>
 #include <linux/rpmsg.h>
 #include <linux/of.h>
+#include <linux/version.h>
 
 #include <soc/snd_event.h>
 #include <dsp/audio_notifier.h>
@@ -390,7 +391,11 @@ static int gpr_callback(struct rpmsg_device *rpdev, void *buf,
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static int gpr_device_match(struct device *dev, const struct device_driver *drv)
+#else
 static int gpr_device_match(struct device *dev, struct device_driver *drv)
+#endif
 {
 	struct gpr_device *adev = to_gpr_device(dev);
 	struct gpr_driver *adrv = to_gpr_driver(drv);
