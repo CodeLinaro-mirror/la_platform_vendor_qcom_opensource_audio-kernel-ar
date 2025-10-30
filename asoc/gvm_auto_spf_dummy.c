@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -22,7 +22,6 @@
 #include <sound/info.h>
 #include <dsp/audio_notifier.h>
 #include "msm_dailink.h"
-#include <soc/qcom/boot_stats.h>
 #include "msm_common.h"
 #include <linux/cdev.h>
 #include <linux/err.h>
@@ -797,7 +796,7 @@ int msm_audio_ssr_register(struct cdev *virt_sndcard_ctl)
 		pr_err("%s: Cannot add the device to the system\n", __func__);
 		goto err;
 	}
-	dev_class = class_create(THIS_MODULE, "SSR");
+	dev_class = class_create("SSR");
 	if (IS_ERR(dev_class)) {
 		pr_err("%s: Cannot create the struct class\n", __func__);
 		goto err;
@@ -968,14 +967,13 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int msm_asoc_machine_remove(struct platform_device *pdev)
+static void msm_asoc_machine_remove(struct platform_device *pdev)
 {
 	/* kobject_put decrease the kref count, once the count reaches 0.
 	 * Kobject core will automatically clean up the memory allocated by kobject.
 	 * The snd_card_sysfs_release release will help clean up memory allocated by us
 	 */
 	kobject_put(&snd_card_pdata->snd_card_kobj);
-	return 0;
 }
 
 static struct platform_driver gvm_asoc_machine_driver = {
