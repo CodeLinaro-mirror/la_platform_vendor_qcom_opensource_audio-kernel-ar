@@ -111,6 +111,11 @@ static int auto_suspend_timer = 500;
 module_param(auto_suspend_timer, int, 0664);
 MODULE_PARM_DESC(auto_suspend_timer, "timer for auto suspend");
 
+/* pm runtime auto suspend timer for BT in msecs */
+static int auto_suspend_timer_bt = 100;
+module_param(auto_suspend_timer_bt, int, 0664);
+MODULE_PARM_DESC(auto_suspend_timer_bt, "timer for BT auto suspend");
+
 static DEFINE_MUTEX(enumeration_lock);
 enum {
 	SWR_NOT_PRESENT, /* Device is detached/not present on the bus */
@@ -3673,7 +3678,14 @@ static int swrm_probe(struct platform_device *pdev)
 		}
 	}
 
-	pm_runtime_set_autosuspend_delay(&pdev->dev, auto_suspend_timer);
+	if (swrm->master_id == MASTER_ID_BT) {
+		pm_runtime_set_autosuspend_delay(&pdev->dev, auto_suspend_timer_bt);
+		dev_info(&pdev->dev, "%s: Setting auto_suspend_timer_bt to %d ms\n",
+				 __func__, auto_suspend_timer_bt);
+	} else {
+		pm_runtime_set_autosuspend_delay(&pdev->dev, auto_suspend_timer);
+	}
+
 	pm_runtime_use_autosuspend(&pdev->dev);
 	pm_runtime_set_active(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
@@ -3932,9 +3944,15 @@ exit:
 	if (swrm_clk_req_err || aud_core_err || hw_core_err)
 		pm_runtime_set_autosuspend_delay(&pdev->dev,
 				ERR_AUTO_SUSPEND_TIMER_VAL);
-	else
+	else if (swrm->master_id == MASTER_ID_BT) {
+		pm_runtime_set_autosuspend_delay(&pdev->dev,
+				auto_suspend_timer_bt);
+		dev_info(&pdev->dev, "%s: Setting auto_suspend_timer_bt to %d ms\n",
+			__func__, auto_suspend_timer_bt);
+	} else
 		pm_runtime_set_autosuspend_delay(&pdev->dev,
 				auto_suspend_timer);
+
 	if (swrm->req_clk_switch)
 		swrm->req_clk_switch = false;
 	mutex_unlock(&swrm->reslock);
