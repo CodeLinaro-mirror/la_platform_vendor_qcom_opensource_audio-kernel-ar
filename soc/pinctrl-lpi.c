@@ -513,7 +513,11 @@ static int lpi_gpio_get(struct gpio_chip *chip, unsigned int pin)
 	return value;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 7)
+static int lpi_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
+#else
 static void lpi_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
+#endif
 {
 	struct lpi_gpio_state *state = gpiochip_get_data(chip);
 	unsigned long config;
@@ -521,6 +525,10 @@ static void lpi_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
 	config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
 
 	lpi_config_set(state->ctrl, pin, &config, 1);
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 7)
+	return 0;
+#endif
 }
 
 static int lpi_notifier_service_cb(struct notifier_block *this,
@@ -696,7 +704,11 @@ static const struct gpio_chip lpi_gpio_template = {
 	.direction_input	= lpi_gpio_direction_input,
 	.direction_output	= lpi_gpio_direction_output,
 	.get			= lpi_gpio_get,
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 7)
+	.set_rv			= lpi_gpio_set,
+#else
 	.set			= lpi_gpio_set,
+#endif
 	.request		= gpiochip_generic_request,
 	.free			= gpiochip_generic_free,
 	.dbg_show		= lpi_gpio_dbg_show,
