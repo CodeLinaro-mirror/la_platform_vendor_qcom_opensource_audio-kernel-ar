@@ -221,6 +221,8 @@ audio_modules.register(
             ":%b_wsa884x_dlkm",
             ":%b_snd_event_dlkm",
             ":%b_wcd9378_dlkm",
+            ":%b_wcd937x_dlkm",
+            ":%b_wcd938x_dlkm",
 	],
 )
 # >>>> ASOC/CODEC MODULES <<<<
@@ -279,6 +281,7 @@ audio_modules.register(
     config_option = "CONFIG_SND_SOC_SWR_DMIC",
     srcs = ["swr-dmic.c"],
     deps = [":%b_wcd939x_dlkm",
+            ":%b_wcd937x_dlkm",
             ":%b_swr_dlkm",
 	   ],
 
@@ -492,12 +495,18 @@ audio_modules.register(
         "wcd937x-tables.c",
         "wcd937x-mbhc.c",
     ],
+    deps = [":%b_wcd_core_dlkm",
+            ":%b_swr_dlkm",
+            ":%b_wcd9xxx_dlkm",
+            ":%b_mbhc_dlkm",
+           ],
 )
 audio_modules.register(
     name = "wcd937x_slave_dlkm",
     path = ASOC_CODECS_PATH + "/wcd937x",
     config_option = "CONFIG_SND_SOC_WCD937X_SLAVE",
-    srcs = ["wcd937x_slave.c"]
+    srcs = ["wcd937x_slave.c"],
+    deps = [":%b_swr_dlkm"],
 )
 # >>>> WCD938X MODULES <<<<
 audio_modules.register(

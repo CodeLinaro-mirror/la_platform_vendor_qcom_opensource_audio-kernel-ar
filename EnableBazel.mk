@@ -1,4 +1,4 @@
-ifeq ($(call is-board-platform-in-list,pineapple),true)
+ifeq ($(call is-board-platform-in-list,pineapple parrot),true)
 LOCAL_MODULE_DDK_BUILD := true
 
 LOCAL_MODULE_KO_DIRS := dsp/q6_notifier_dlkm.ko
@@ -84,7 +84,7 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/sdca/simple_amp_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa885x_i2c_dlkm.ko
 endif
 
-ifeq ($(call is-board-platform-in-list,blair),true)
+ifeq ($(call is-board-platform-in-list,blair parrot),true)
 LOCAL_MODULE_DDK_BUILD := true
 
 LOCAL_MODULE_KO_DIRS := dsp/q6_notifier_dlkm.ko
@@ -114,4 +114,13 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_slave_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_wsa2_macro_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_wsa_macro_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_va_macro_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_tx_macro_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_rx_macro_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa883x/wsa883x_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/sdca_registers_dlkm.ko
 endif
