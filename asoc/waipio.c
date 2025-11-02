@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -14,7 +14,9 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/of_device.h>
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 #include <linux/soc/qcom/fsa4480-i2c.h>
+#endif
 #include <linux/pm_qos.h>
 #include <sound/control.h>
 #include <sound/core.h>
@@ -33,6 +35,8 @@
 #include "codecs/wcd938x/wcd938x-mbhc.h"
 #include "codecs/wsa883x/wsa883x.h"
 #include "codecs/wcd938x/wcd938x.h"
+#include "codecs/wcd937x/wcd937x-mbhc.h"
+#include "codecs/wcd937x/wcd937x.h"
 #include "codecs/lpass-cdc/lpass-cdc.h"
 #include <bindings/audio-codec-port-types.h>
 #include "codecs/lpass-cdc/lpass-cdc-wsa-macro.h"
@@ -60,6 +64,13 @@
 #define STEREO_SPEAKER  2
 #define QUAD_SPEAKER    4
 
+#define ADD_WAIPIO_DAI_LINK(dai_links, link_arr, total_links) \
+{ \
+	memcpy(dai_links + total_links, link_arr, sizeof(link_arr)); \
+	total_links += ARRAY_SIZE(link_arr); \
+}
+#define MAX_NAME_LEN	40
+
 struct msm_asoc_mach_data {
 	struct snd_info_entry *codec_root;
 	struct msm_common_pdata *common_pdata;
@@ -67,16 +78,19 @@ struct msm_asoc_mach_data {
 	struct device_node *dmic01_gpio_p; /* used by pinctrl API */
 	struct device_node *dmic23_gpio_p; /* used by pinctrl API */
 	struct device_node *dmic45_gpio_p; /* used by pinctrl API */
+	struct device_node *dmic67_gpio_p; /* used by pinctrl API */
 	struct pinctrl *usbc_en2_gpio_p; /* used by pinctrl API */
 	bool is_afe_config_done;
 	struct device_node *fsa_handle;
 	struct clk *lpass_audio_hw_vote;
 	int core_audio_vote_count;
 	u32 wsa_max_devs;
+	int wsa881x_support;
 	int wcd_disabled;
 	int (*get_dev_num)(struct snd_soc_component *);
 	int backend_used;
 	struct prm_earpa_hw_intf_config upd_config;
+	int wsa_hac_enabled; /* four wsa connected to single wsa master */
 };
 
 static bool is_initial_boot;
@@ -85,6 +99,7 @@ static struct snd_soc_card snd_soc_card_waipio_msm;
 static int dmic_0_1_gpio_cnt;
 static int dmic_2_3_gpio_cnt;
 static int dmic_4_5_gpio_cnt;
+static int dmic_6_7_gpio_cnt;
 
 static void *def_wcd_mbhc_cal(void);
 
@@ -118,6 +133,7 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 	.moisture_duty_cycle_en = true,
 };
 
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool active)
 {
 	struct snd_soc_card *card = component->card;
@@ -129,6 +145,12 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 
 	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
 }
+#else
+static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool active)
+{
+	return false;
+}
+#endif
 
 static void msm_parse_upd_configuration(struct platform_device *pdev,
 					struct msm_asoc_mach_data *pdata)
@@ -173,6 +195,7 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 	int val1 = 0, val2 = 0, ret = 0;
 	u8  dev_num = 0;
 	struct snd_soc_component *component = NULL;
+	struct snd_soc_card *card = NULL;
 	struct msm_asoc_mach_data *pdata = NULL;
 
 	if (!rtd) {
@@ -180,6 +203,7 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 		return;
 	}
 
+	card = rtd->card;
 	pdata = snd_soc_card_get_drvdata(rtd->card);
 	if (!pdata) {
 		pr_err("%s: pdata is NULL\n", __func__);
@@ -201,6 +225,9 @@ static void msm_set_upd_config(struct snd_soc_pcm_runtime *rtd)
 					"wsa-codec.1");
 				return;
 			}
+		} else {
+			pr_info("%s wsa_max_devs are NULL\n", __func__);
+			return;
 		}
 	} else {
 		component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
@@ -319,6 +346,11 @@ static int msm_dmic_event(struct snd_soc_dapm_widget *w,
 		dmic_gpio_cnt = &dmic_4_5_gpio_cnt;
 		dmic_gpio = pdata->dmic45_gpio_p;
 		break;
+	case 6:
+	case 7:
+		dmic_gpio_cnt = &dmic_6_7_gpio_cnt;
+		dmic_gpio = pdata->dmic67_gpio_p;
+		break;
 	default:
 		dev_err(component->dev, "%s: Invalid DMIC Selection\n",
 			__func__);
@@ -373,15 +405,21 @@ static const struct snd_soc_dapm_widget msm_int_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Digital Mic3", msm_dmic_event),
 	SND_SOC_DAPM_MIC("Digital Mic4", msm_dmic_event),
 	SND_SOC_DAPM_MIC("Digital Mic5", msm_dmic_event),
-	SND_SOC_DAPM_MIC("Digital Mic6", NULL),
-	SND_SOC_DAPM_MIC("Digital Mic7", NULL),
+	SND_SOC_DAPM_MIC("Digital Mic6", msm_dmic_event),
+	SND_SOC_DAPM_MIC("Digital Mic7", msm_dmic_event),
 };
 
+#ifndef CONFIG_AUDIO_BTFM_PROXY
 static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 {
 	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
 	unsigned int tx_ch[WCN_CDC_SLIM_TX_CH_MAX]  = {159, 160};
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 7, 0))
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
+#else
 	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+#endif
+
     int ret = 0;
 
 	ret = snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
@@ -392,7 +430,7 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 	msm_common_dai_link_init(rtd);
     return ret;
 }
-
+#endif
 static struct snd_info_entry *msm_snd_info_create_subdir(struct module *mod,
 				const char *name,
 				struct snd_info_entry *parent)
@@ -526,8 +564,8 @@ static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	/* DISP PORT BACK END DAI Link */
 	{
-		.name = LPASS_BE_DISPLAY_PORT_RX,
-		.stream_name = LPASS_BE_DISPLAY_PORT_RX,
+		.name = LPASS_BE_DISPLAY_PORT_RX_0,
+		.stream_name = LPASS_BE_DISPLAY_PORT_RX_0,
 		.playback_only = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST},
@@ -1250,6 +1288,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	struct msm_asoc_mach_data *pdata;
 	int ret = 0;
 	void *mbhc_calibration;
+	bool is_wcd937x = false;
 
 	 pdata = snd_soc_card_get_drvdata(card);
 	if (!pdata)
@@ -1258,25 +1297,38 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	if (pdata->wcd_disabled)
 		return 0;
 
+	if (pdata->wsa_hac_enabled)
+		return 0;
+
 	rtd = snd_soc_get_pcm_runtime(card, &card->dai_link[0]);
 	if (!rtd) {
 		dev_err(card->dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[0]);
+			__func__, card->dai_link[0].name);
 		return -EINVAL;
 	}
 
 	component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
 	if (!component) {
-		pr_err("%s component is NULL\n", __func__);
-		return -EINVAL;
+		component = snd_soc_rtdcom_lookup(rtd, WCD937X_DRV_NAME);
+		if (!component) {
+			pr_err("%s component is NULL\n", __func__);
+			return -EINVAL;
+		} else {
+			is_wcd937x = true;
+		}
 	}
 
 	mbhc_calibration = def_wcd_mbhc_cal();
 	if (!mbhc_calibration)
 		return -ENOMEM;
 	wcd_mbhc_cfg.calibration = mbhc_calibration;
-	ret = wcd938x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+
+	if (!is_wcd937x)
+		ret = wcd938x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+	else
+		ret = wcd937x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+
 	if (ret) {
 		dev_err(component->dev, "%s: mbhc hs detect failed, err:%d\n",
 			__func__, ret);
@@ -1552,9 +1604,11 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 
 	component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
 	if (!component) {
-		pr_err("%s could not find component for %s\n",
-			__func__, WCD938X_DRV_NAME);
-		return -EINVAL;
+		component = snd_soc_rtdcom_lookup(rtd, WCD937X_DRV_NAME);
+		if (!component) {
+			pr_err("%s component is NULL\n", __func__);
+			return -EINVAL;
+		}
 	}
 	dapm = snd_soc_component_get_dapm(component);
 	card = component->card->snd_card;
@@ -1580,19 +1634,26 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 		}
 		pdata->codec_root = entry;
 	}
-	wcd938x_info_create_codec_entry(pdata->codec_root, component);
+	if(!strncmp(component->driver->name, WCD937X_DRV_NAME,
+			strlen(WCD937X_DRV_NAME))){
+		wcd937x_info_create_codec_entry(pdata->codec_root, component);
+		codec_variant = wcd937x_get_codec_variant(component);
+		dev_dbg(component->dev, "%s: variant %d\n",__func__, codec_variant);
+	} else {
+		wcd938x_info_create_codec_entry(pdata->codec_root, component);
 
-	codec_variant = wcd938x_get_codec_variant(component);
-	dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
-	if (codec_variant == WCD9385)
-		ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, true);
-	else
-		ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, false);
+		codec_variant = wcd938x_get_codec_variant(component);
+		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
+		if (codec_variant == WCD9385)
+			ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, true);
+		else
+			ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, false);
 
-	if (ret < 0) {
-		dev_err(component->dev, "%s: set fir capability failed: %d\n",
-			__func__, ret);
-		return ret;
+		if (ret < 0) {
+			dev_err(component->dev, "%s: set fir capability failed: %d\n",
+				__func__, ret);
+			return ret;
+		}
 	}
 done:
 	codec_reg_done = true;
@@ -1632,7 +1693,7 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 	if (!rtd_wcd) {
 		dev_dbg(dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[0]);
+			__func__, card->dai_link[0].name);
 	}
 
 	if (pdata->wsa_max_devs > 0) {
@@ -1641,7 +1702,7 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 		if (!rtd_wsa) {
 			dev_dbg(dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)]);
+			__func__, card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)].name);
 		}
 	}
 	/* set UPD configuration */
@@ -1883,7 +1944,11 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void msm_asoc_machine_remove(struct platform_device *pdev)
+#else
 static int msm_asoc_machine_remove(struct platform_device *pdev)
+#endif
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct msm_asoc_mach_data *pdata = NULL;
@@ -1899,7 +1964,9 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	snd_event_master_deregister(&pdev->dev);
 	snd_soc_unregister_card(card);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static struct platform_driver waipio_asoc_machine_driver = {
