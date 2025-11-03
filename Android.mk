@@ -4,7 +4,7 @@ ifeq ($(AUDIO_DLKM_ENABLE), true)
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(call is-board-platform-in-list,taro parrot),true)
+ifeq ($(call is-board-platform-in-list,taro),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_WAIPIO=m
 endif
 
@@ -42,7 +42,7 @@ LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro parrot kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale art), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale art), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -253,7 +253,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
-ifneq ($(call is-board-platform-in-list, bengal holi blair parrot),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := swr_dmic_dlkm.ko
@@ -356,8 +356,6 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-
-ifneq ($(call is-board-platform-in-list, parrot),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -366,8 +364,8 @@ LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/lpass_bt_swr_dlkm.ko
 LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+
 ########################### WSA884x CODEC  ###########################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -377,7 +375,6 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
 
 ########################### WSA883x CODEC  ###########################
 include $(CLEAR_VARS)
@@ -407,7 +404,6 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-ifneq ($(call is-board-platform-in-list, parrot),true)
 ########################### WCD939x CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -447,7 +443,6 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
-ifneq ($(call is-board-platform-in-list, parrot),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -488,8 +483,8 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
-endif
-ifneq ($(call is-board-platform-in-list, bengal holi blair parrot),true)
+
+ifeq ($(call is-board-platform-in-list, bengal holi blair),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -535,7 +530,6 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
 ########################### WCD937x CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
