@@ -26,6 +26,7 @@
 #include <soc/snd_event.h>
 #include "msm_dailink.h"
 #include "msm_common.h"
+#include <linux/bootmarker_kernel.h>
 
 
 #define DRV_NAME "spf-asoc-snd"
@@ -298,7 +299,7 @@ static int modem_notifier_service_cb(struct notifier_block *this,
 		mutex_lock(&dsps_state.lock);
 		if (get_combined_dsps_state_l() == SUBSYS_UP) {
 			set_combined_subsystem_state_l(SUBSYS_DOWN);
-			pr_info("%s: setting snd_card to ONLINE\n", __func__);
+			pr_info("%s: setting snd_card to OFFLINE\n", __func__);
 			snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
 		}
 		mutex_unlock(&dsps_state.lock);
@@ -410,6 +411,7 @@ static int msm_audio_adsp_ssr_register(struct device *dev)
 
 	ret = snd_event_master_register(dev, &auto_adsp_ssr_ops,
 					ssr_clients, NULL);
+
 	if (!ret)
 		snd_event_notify(dev, SND_EVENT_UP);
 
@@ -419,19 +421,30 @@ static int msm_audio_adsp_ssr_register(struct device *dev)
 static int auto_adsp_notifier_service_cb(struct notifier_block *this,
 					 unsigned long opcode, void *ptr)
 {
-	pr_debug("%s: Service opcode 0x%lx\n", __func__, opcode);
+	pr_info("%s: Service opcode 0x%lx\n", __func__, opcode);
 
 	switch (opcode) {
 	case AUDIO_NOTIFIER_SERVICE_DOWN:
-		snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
+		mutex_lock(&dsps_state.lock);
+		if (get_combined_dsps_state_l() == SUBSYS_UP) {
+			set_combined_subsystem_state_l(SUBSYS_DOWN);
+			pr_info("%s: setting snd_card to OFFLINE\n", __func__);
+			snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
+		}
+		mutex_unlock(&dsps_state.lock);
 		break;
 	case AUDIO_NOTIFIER_SERVICE_UP:
-		snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+		mutex_lock(&dsps_state.lock);
+		set_subsys_state_l(SUBSYS_DOMAIN_ADSP, SUBSYS_UP);
+		if (get_combined_dsps_state_l() == SUBSYS_UP) {
+			pr_info("%s: setting snd_card to ONLINE\n", __func__);
+			snd_card_notify_user(SND_CARD_STATUS_ONLINE);
+		}
+		mutex_unlock(&dsps_state.lock);
 		break;
 	default:
 		break;
 	}
-
 	return NOTIFY_OK;
 }
 
@@ -1534,6 +1547,12 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	dev_err(&pdev->dev, "%s: audio_reach\n",
 		__func__);
 
+#if (IS_ENABLED(CONFIG_BOOTMARKER_PROXY))
+	bootmarker_place_marker("M - DRIVER Audio Init");
+#else
+	dev_err(&pdev->dev, "M - DRIVER Audio Init\n");
+#endif
+
 	match = of_match_node(asoc_machine_of_match, pdev->dev.of_node);
 	if (!match) {
 		dev_err(&pdev->dev, "%s: No DT match found for sound card\n",
@@ -1636,6 +1655,13 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		card->name);
 	pr_err("Sound card %s registered\n",
 		card->name);
+
+#if (IS_ENABLED(CONFIG_BOOTMARKER_PROXY))
+	bootmarker_place_marker("M - DRIVER Audio Ready");
+#else
+	dev_err(&pdev->dev, "M - DRIVER Audio Ready\n");
+#endif
+
 	spdev = pdev;
 
 #ifdef CONFIG_MSM_COUPLED_SSR
@@ -1647,15 +1673,16 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		pr_err("%s: Registration with modem PDR failed ret = %d\n",
 			__func__, ret);
 #endif
+
 	ret = msm_audio_adsp_ssr_register(&pdev->dev);
 	if (ret)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
 			__func__, ret);
 
 	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
-        ret = audio_notifier_register("auto_spf", AUDIO_NOTIFIER_ADSP_DOMAIN,
-                                       &service_nb);
 
+	ret = audio_notifier_register("auto_spf", AUDIO_NOTIFIER_ADSP_DOMAIN,
+                                   &service_nb);
 	return 0;
 err:
 	msm_release_mclk_pinctrl(pdev);
@@ -1688,6 +1715,7 @@ static int audio_pinctrl_dummy_remove(struct platform_device *pdev)
 static struct platform_driver audio_pinctrl_dummy_driver = {
 	.driver = {
 		.name = DRV_PINCTRL_NAME,
+		.owner = THIS_MODULE,
 		.of_match_table = audio_pinctrl_dummy_match,
 		.suppress_bind_attrs = true,
 	},
@@ -1698,6 +1726,7 @@ static struct platform_driver audio_pinctrl_dummy_driver = {
 static struct platform_driver asoc_machine_driver = {
 	.driver = {
 		.name = DRV_NAME,
+		.owner = THIS_MODULE,
 		.pm = &snd_soc_pm_ops,
 		.of_match_table = asoc_machine_of_match,
 		.suppress_bind_attrs = true,
