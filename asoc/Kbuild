@@ -209,6 +209,10 @@ ifdef CONFIG_SND_SOC_VIENNA
 	MACHINE_OBJS += vienna.o
 endif
 
+ifdef CONFIG_SND_SOC_CANOE
+	MACHINE_OBJS += audio_machine.o
+endif
+
 # for PINEAPPLE sound card driver
 ifdef CONFIG_SND_SOC_PINEAPPLE
 	MACHINE_OBJS += pineapple.o
@@ -319,6 +323,9 @@ obj-$(CONFIG_SND_SOC_KALAMA) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_VIENNA) += machine_dlkm.o
+machine_dlkm-y := $(MACHINE_OBJS)
+
+obj-$(CONFIG_SND_SOC_CANOE) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_PINEAPPLE) += machine_dlkm.o
