@@ -206,6 +206,9 @@ audio_modules.register(
         ],
 	"CONFIG_SND_SOC_ALOR": [
             "audio_machine.c"
+        ],
+	"CONFIG_SND_SOC_CHORA": [
+            "audio_machine.c"
         ]
     },
     deps = [":%b_spf_core_dlkm",
@@ -603,5 +606,6 @@ audio_modules.register(
     config_option = "CONFIG_SND_SOC_WSA885X_I2C",
     srcs = [
         "wsa885x-i2c.c",
-    ]
+    ],
+    deps = [":%b_gpr_dlkm"],
 )

@@ -159,20 +159,20 @@ void update_ch_per_substream(int ch, void *substream)
 	int sidx = get_matching_stream_index_or_first_available(substream);
 
 	if (sidx < 0 || sidx >= NUM_AGG_STREAMS) {
-		pr_err("%s: Invalid stream ID: %d\n", __func__, sidx);
+		pr_err("qmp %s: Invalid stream ID: %d\n", __func__, sidx);
 		return;
 	}
 
 	if (ch) {
 		num_chs[sidx]++;
-		pr_debug("%s, %d Channel(s) added\n", __func__, num_chs[sidx]);
+		pr_debug("qmp %s: %d Channel(s) added\n", __func__, num_chs[sidx]);
 	} else {
 		/*
 		 * to remove the channels from the substream we do it in one go, unlike
 		 * the addition where each channel is added one by one
 		 */
 		num_chs[sidx] = 0;
-		pr_debug("%s, Channel(s) reset to %d\n", __func__, num_chs[sidx]);
+		pr_debug("qmp %s: Channel(s) reset to %d\n", __func__, num_chs[sidx]);
 	}
 }
 EXPORT_SYMBOL_GPL(update_ch_per_substream);
@@ -221,13 +221,13 @@ int stream_agg_add_channel(void *substream, uint32_t channels,
 		return -EINVAL;
 
 	if (channels > MAX_CHANNELS) {
-		pr_err("unsupported channels %d\n", channels);
+		pr_err("qmp %s: unsupported channels %d\n", __func__, channels);
 		return -EINVAL;
 	}
 
 	get_master_port_info(mport_type, &m_dp, &m_dp_ch);
 	if (m_dp == 0) {
-		pr_err("unsupported master port type %d\n", mport_type);
+		pr_err("qmp %s: unsupported master port type %d\n", __func__, mport_type);
 		return -EINVAL;
 	}
 	mutex_lock(&agg_lock);
@@ -237,7 +237,8 @@ int stream_agg_add_channel(void *substream, uint32_t channels,
 	 */
 	sidx = get_matching_stream_index_or_first_available(substream);
 	if (sidx < 0) {
-		pr_err("matching stream %pK not found or max streams reached\n", substream);
+		pr_err("qmp %s: matching stream %pK not found or max streams reached\n",
+		__func__, substream);
 		mutex_unlock(&agg_lock);
 		return -EINVAL;
 	}
@@ -253,8 +254,8 @@ int stream_agg_add_channel(void *substream, uint32_t channels,
 	 * slave/channels if connecting to same master
 	 */
 	if (!validate_ch_link(&aggregator_[sidx], m_dp, m_dp_ch)) {
-		pr_err("link: [stream:%pK, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] add failed\n",
-				substream, m_dp, m_dp_ch, dev_num, slv_port_id);
+		pr_err("qmp %s: link: [stream:%pK, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] add failed\n",
+				__func__, substream, m_dp, m_dp_ch, dev_num, slv_port_id);
 		mutex_unlock(&agg_lock);
 		return -EINVAL;
 	}
@@ -297,8 +298,8 @@ int stream_agg_add_channel(void *substream, uint32_t channels,
 
 	++aggregator_[sidx].links;
 
-	pr_debug("link: [stream %pK, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] added\n",
-			substream, link->m_dp, m_dp_ch, link->s_dev_num, link->s_dp);
+	pr_debug("qmp %s: link: [stream %pK, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] added\n",
+			__func__, substream, link->m_dp, m_dp_ch, link->s_dev_num, link->s_dp);
 	mutex_unlock(&agg_lock);
 	return 0;
 }
@@ -363,8 +364,8 @@ static void assign_offset1(int sidx)
 		/* assign offset1 from the lower channel number to higher channel */
 		for_each_set_bit(bit, &temp_mask, 8) {
 			mask = BIT(bit);
-			pr_debug("(ch) mask : %d, master port overall channel mask: %lu\n",
-					mask, temp_mask);
+			pr_debug("qmp %s: (ch) mask : %d, master port overall channel mask: %lu\n",
+					__func__, mask, temp_mask);
 			for_each_channel_link(ch, _link) {
 				if (BIT(sidx) & ch->sid) {
 					if ((ch->m_dp == m_dp) &&
@@ -373,8 +374,8 @@ static void assign_offset1(int sidx)
 						ch->s_offset1 = base_offset1 + 1;
 						ch->offset1_assigned = 1;
 						base_offset1 += 1;
-						pr_debug("offset1 %d updated for m_dp:%d, m_dp_ch:CH%d, s_dev:%d, s_dp:%d, substream:%pK\n",
-								ch->s_offset1, ch->m_dp,
+						pr_debug("qmp %s: offset1 %d updated for m_dp:%d, m_dp_ch:CH%d, s_dev:%d, s_dp:%d, substream:%pK\n",
+								__func__, ch->s_offset1, ch->m_dp,
 								ffs(ch->m_dp_ch), ch->s_dev_num,
 								ch->s_dp, agg->private_data);
 					}
@@ -468,22 +469,22 @@ int stream_agg_prepare_channel(void *substream, u8 mport_type,
 
 	get_master_port_info(mport_type, &m_dp, &m_dp_ch);
 	if (m_dp == 0) {
-		pr_debug("unsupported master port type %d\n", mport_type);
+		pr_debug("qmp %s: unsupported master port type %d\n", __func__, mport_type);
 		return -EINVAL;
 	}
 
 	mutex_lock(&agg_lock);
 	sidx = retrieve_agg_stream_instance_index(substream);
 	if (sidx < 0) {
-		pr_err("substream: %pK not found\n", substream);
+		pr_err("qmp %s: substream: %pK not found\n", __func__, substream);
 		mutex_unlock(&agg_lock);
 		return -EINVAL;
 	}
 
 	ch = lookup_channel(sidx, m_dp, m_dp_ch);
 	if (!ch) {
-		pr_err("substream %pK port_type: %d,m_dp:%d,m_dp_ch:BIT(%d) not found, cannot prepare\n",
-				substream, mport_type, m_dp, m_dp_ch);
+		pr_err("qmp %s: substream %pK port_type: %d,m_dp:%d,m_dp_ch:BIT(%d) not found, cannot prepare\n",
+				__func__, substream, mport_type, m_dp, m_dp_ch);
 		mutex_unlock(&agg_lock);
 		return -EINVAL;
 	}
@@ -495,20 +496,20 @@ int stream_agg_prepare_channel(void *substream, u8 mport_type,
 	 * that some other stream already prepared the channel.
 	 */
 	if (hweight8(ch->m_dp_ch_prepared) > 1) {
-		pr_debug("link: m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] already prepared\n",
-				m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
+		pr_debug("qmp %s: link: m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] already prepared\n",
+				__func__, m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
 	} else {
 		rc = swr_connect_port(ch->peripheral, &ch->s_dp, 1, &ch_mask,
 				&agg->channel_rate, &num_ch, &port_type);
-		pr_debug("link: [stream %p, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] prepared\n",
-				substream, m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
+		pr_debug("qmp %s: link: [stream %p, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] prepared\n",
+				__func__, substream, m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
 	}
 
 	rc = 0;
 	prepare_cnt = get_ch_prepare_count(sidx);
 	if (prepare_cnt == agg->num_channels) {
-		pr_debug("all channels %d in stream %pK are prepared\n",
-				agg->num_channels, substream);
+		pr_debug("qmp %s: all channels %d in stream %pK are prepared\n",
+				__func__, agg->num_channels, substream);
 
 		/* one or more NEW channels might have been prepared, but not enabled */
 		enable_pending_ch = get_ch_not_enabled(sidx);
@@ -551,40 +552,40 @@ int stream_agg_remove_channel(void *substream, u8 mport_type,
 
 	get_master_port_info(mport_type, &m_dp, &m_dp_ch);
 	if (m_dp == 0) {
-		pr_err("channel not found, cannot remove, mport_type:%d, slv dev_num:%d, slv port:%d\n",
-				mport_type, dev_num, slv_port_id);
+		pr_err("qmp %s: channel not found, cannot remove, mport_type:%d, slv dev_num:%d, slv port:%d\n",
+				__func__, mport_type, dev_num, slv_port_id);
 		return -EINVAL;
 	}
 
 	mutex_lock(&agg_lock);
 	sidx = retrieve_agg_stream_instance_index(substream);
 	if (sidx < 0) {
-		pr_err("substream: %pK not found\n", substream);
+		pr_err("qmp %s: substream: %pK not found\n", __func__, substream);
 		mutex_unlock(&agg_lock);
 		return -EINVAL;
 	}
 	ch = lookup_channel(sidx, m_dp, m_dp_ch);
 	if (!ch) {
-		pr_err("substream %pK port_type: %d,m_dp:%d,m_dp_ch:BIT(%d) not found, cannot remove\n",
-				substream, mport_type, m_dp, m_dp_ch);
+		pr_err("qmp %s: substream %pK port_type: %d,m_dp:%d,m_dp_ch:BIT(%d) not found, cannot remove\n",
+				__func__, substream, mport_type, m_dp, m_dp_ch);
 		mutex_unlock(&agg_lock);
 		return -EINVAL;
 	}
 
 	ch->m_dp_ch_prepared &= ~BIT(sidx);
 	if (hweight8(ch->m_dp_ch_prepared) >= 1) {
-		pr_debug("link: m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] in use\n",
-				m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
+		pr_debug("qmp %s: link: m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] in use\n",
+				__func__, m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
 	} else {
 		rc = swr_disconnect_port(ch->peripheral, &ch->s_dp, 1, &ch_mask, &port_type);
-		pr_debug("link: [stream %p, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] unprepared\n",
-				substream, m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
+		pr_debug("qmp %s: link: [stream %p, m_dp:%d, m_dp_ch:BIT(%d)] <--- [s_dev:%d s_dp:%d] unprepared\n",
+				__func__, substream, m_dp, m_dp_ch, ch->s_dev_num, ch->s_dp);
 	}
 	unprepare_cnt = get_ch_unprepare_count(sidx);
 	agg = &aggregator_[sidx];
 	if (unprepare_cnt == agg->num_channels) {
-		pr_debug("all channels %d in stream %pK are unprepared\n",
-				agg->num_channels, substream);
+		pr_debug("qmp %s: all channels %d in stream %pK are unprepared\n",
+				__func__, agg->num_channels, substream);
 
 		disable_pending_ch = get_ch_not_disabled(sidx);
 		if (disable_pending_ch) {
@@ -600,7 +601,7 @@ int stream_agg_remove_channel(void *substream, u8 mport_type,
 				kfree(ch);
 			}
 		}
-		pr_debug("all channels in stream %pK removed\n", substream);
+		pr_debug("qmp %s: all channels in stream %pK removed\n", __func__, substream);
 		agg->num_channels = 0;
 		update_ch_per_substream(agg->num_channels, substream);
 		agg->private_data = NULL;
@@ -612,4 +613,3 @@ int stream_agg_remove_channel(void *substream, u8 mport_type,
 	return rc;
 }
 EXPORT_SYMBOL_GPL(stream_agg_remove_channel);
-

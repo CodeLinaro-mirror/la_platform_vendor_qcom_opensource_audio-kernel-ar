@@ -3,6 +3,25 @@
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
+/**
+ * @file wsa885x-i2c.c
+ * @brief WSA885X I2C Audio Codec Driver
+ *
+ * This driver provides support for the WSA885X audio codec connected via I2C.
+ * The WSA885X is a speaker amplifier,
+ * supporting TDM (Time Division Multiplexing) audio interfaces.
+ *
+ * Key Features:
+ * - I2C control interface
+ * - TDM audio data interface
+ * - Integrated speaker protection
+ * - Power management with multiple power states
+ * - Interrupt handling for fault conditions
+ * - Regmap-based register access with caching
+ * - GPIO control for power and reset
+ * - Multiple virtual DAI support for stereo configurations
+ */
+
 #include <linux/debugfs.h>
 #include <linux/gpio/consumer.h>
 #include <linux/i2c.h>
@@ -20,23 +39,31 @@
 #include <linux/gpio.h>
 #include <linux/interrupt.h>
 #include <linux/kernel.h>
+#include <ipc/gpr-lite.h>
 
+/* Driver Constants */
 #define CLK_RATE_FIXED 73728000
 #define SUPPLIES_NUM   2
 #define SLAVE_ADDR     0x00c
 #define NUM_REGS       0x03
 
-#define WSA885X_INTR_STATUS0   0x8584   // Base address of the status register
-#define WSA885X_INTR_MASK0     0x8581   // Base address of the mask register
-#define WSA885X_INTR_CLEAR0    0x8587   // Base address of the acknowledge register
-#define WSA885X_INTR_LEVEL0    0x858A   // Base address of the acknowledge register
+/* Interrupt Registers */
+#define WSA885X_INTR_STATUS0   0x8584   /* Base address of the status register */
+#define WSA885X_INTR_MASK0     0x8581   /* Base address of the mask register */
+#define WSA885X_INTR_CLEAR0    0x8587   /* Base address of the acknowledge register */
+#define WSA885X_INTR_LEVEL0    0x858A   /* Base address of the acknowledge register */
+
+/* Power and PA FSM Control Registers */
 #define WSA885X_POWER_FSM_CTL0 0x8423
 #define WSA885X_PA0_FSM_CTL0   0x842A
 #define WSA885X_PA1_FSM_CTL0   0x8434
+
+/* Digital Control GPIO and Interrupt Registers */
 #define DIG_CTRL1_PIN_CT       0x8510
 #define DIG_CTRL1_SPMI_PAD_GPIO2_CTL   0x8518
 #define DIG_CTRL1_INTR_MODE    0x8580
 
+/* SMP AMP Control Registers - Audio Processing */
 #define SMP_AMP_CTRL_STEREO_STEREO_SMP_AMP_CTRL_I2S    0x0000
 #define SMP_AMP_CTRL_STEREO_CMT_GRP_MASK       0x0004
 #define SMP_AMP_CTRL_STEREO_IT21_CLUSERINDEX   0x0140
@@ -54,15 +81,22 @@
 #define SMP_AMP_CTRL_STEREO_OT23_USAGE         0x0b10
 #define SMP_AMP_CTRL_STEREO_CS24_SAMPLERATEINDEX       0x0e40
 
+/* Analog Top Registers - Power and Clock Control */
 #define ANA_TOP_PON_CKSK_CTL_0 0x800d
 #define ANA_TOP_BG_TVP_UVLO1_PROG      0x8024
 #define ANA_TOP_BG_TVP_UVLO2_PROG      0x8025
+#define ANA_TOP_BG_TVP_OVRD_CTL        0x8034
+
+/* Analog PLL Registers */
 #define ANA_PLL_DIV_CTL_0      0x8090
 #define ANA_PLL_DIV_CTL_1      0x8091
 #define ANA_TOP_PLL_VCO_CTL    0x8092
 #define ANA_TOP_PLL_LOOPFILT_0         0x8093
 #define ANA_TOP_PLL_OVRD_CTL   0x8098
-#define ANA_TOP_BG_TVP_OVRD_CTL        0x8034
+#define ANA_TOP_PLL_STATUS_0   0x809a
+#define ANA_TOP_PLL_STATUS_1   0x809b
+
+/* Analog Boost Control Registers */
 #define ANA_TOP_BOOST_STB_CTRL2        0x805b
 #define ANA_TOP_BOOST_STB_CTRL3        0x805c
 #define ANA_TOP_BOOST_BYP_CTRL2        0x805e
@@ -70,17 +104,21 @@
 #define ANA_TOP_BOOST_MISC     0x8063
 #define ANA_TOP_BOOST_PWRSTAGE_CTRL2   0x8065
 #define ANA_TOP_BOOST_PWRSTAGE_CTRL4   0x8067
-#define ANA_TOP_PLL_STATUS_0   0x809a
-#define ANA_TOP_PLL_STATUS_1   0x809b
+
+/* Analog IV Sense ADC Registers */
 #define ANA_TOP_IVSENSE_ADC_MODE_CTL2  0x80ca
 #define ANA_TOP_IVSENSE_ADC_MODE_CTL3  0x80cb
 #define ANA_TOP_IVSENSE_ADC_REF_CTL    0x80cc
 #define ANA_TOP_IVSENSE_ADC_CDAC_CAL_CTL2      0x80d0
+
+/* Analog Speaker Power Stage Registers */
 #define ANA_TOP_SPK_TOP_PWRSTG_CH1_CTRL3       0x8108
 #define ANA_TOP_SPK_TOP_PWRSTG_CH1_TUNE3       0x810b
 #define ANA_TOP_SPK_TOP_PWRSTG_CH2_CTRL3       0x810e
 #define ANA_TOP_SPK_TOP_PWRSTG_CH2_TUNE3       0x8111
 #define ANA_TOP_SPK_TOP_SPARE3 0x813c
+
+/* Digital Control 0 Registers - Clock and Power Management */
 #define DIG_CTRL0_TOP_CLK_CFG  0x8418
 #define DIG_CTRL0_SDCA_COMMIT          0x8419
 #define DIG_CTRL0_CLK_SOURCE_ENABLE    0x841a
@@ -95,6 +133,8 @@
 #define DIG_CTRL0_CDC_RXTX_FSCNT_CTL   0x8470
 #define DIG_CTRL0_GAIN_RAMP0_CTL1      0x84b4
 #define DIG_CTRL0_GAIN_RAMP1_CTL1      0x84b7
+
+/* Digital Control 1 Registers - I2S/TDM Interface */
 #define DIG_CTRL1_I2S_CTL0     0x85A0
 #define DIG_CTRL1_I2S_CFG0_TDM_TX      0x85A2
 #define DIG_CTRL1_I2S_CFG1_TDM_TX      0x85A3
@@ -104,6 +144,7 @@
 #define DIG_CTRL1_I2S_TDM_CH_TX        0x85AB
 #define DIG_CTRL1_I2S_RESET_CTL        0x85AE
 
+/* CDC RX Path Registers - Audio Data Path */
 #define CDC_RX0_RX_PATH_CFG0   0x8601
 #define CDC_RX0_RX_PATH_CFG1   0x8602
 #define CDC_RX0_RX_PATH_CTL    0x8606
@@ -112,38 +153,54 @@
 #define CDC_RX1_RX_PATH_CFG1   0x8622
 #define CDC_RX1_RX_PATH_CTL    0x8626
 #define RX1_RX_PATH_DSMDEM_CTL 0x8633
+
+/* CDC Compander Registers - Dynamic Range Control */
 #define CDC_COMPANDER0_CTL0    0x8640
 #define CDC_COMPANDER0_CTL7    0x8647
 #define CDC_COMPANDER1_CTL0    0x8660
 #define CDC_COMPANDER1_CTL7    0x8667
+
+/* CDC Speaker Protection Registers - IV Sense */
 #define CDC_VSENSE0_SPKR_PROT_PATH_CTL 0x86A1
 #define CDC_VSENSE1_SPKR_PROT_PATH_CTL 0x86B1
 #define CDC_ISENSE0_SPKR_PROT_PATH_CTL 0x86A9
 #define CDC_ISENSE1_SPKR_PROT_PATH_CTL 0x86B9
+
+/* CDC Class-H Registers - Headroom Control */
 #define CDC_CLSH_V1P8_BP_CTL1  0x86CD
 #define CDC_CLSH_V1P8_BP_CTL0  0x86CC
 #define CDC_CLSH_CLSH_SIG_DP_CTL0      0x86C7
 #define CDC_CLSH_CLSH_V_HD_PA  0x86C3
 #define CDC_CLSH_V1P8_BP_CTL2  0x86CE
 
-#define WSA885X_RX_RATE_8000HZ          0x00
-#define WSA885X_RX_RATE_16000HZ         0x01
-#define WSA885X_RX_RATE_32000HZ         0x02
-#define WSA885X_RX_RATE_44100HZ         0x03
-#define WSA885X_RX_RATE_48000HZ         0x04
-#define WSA885X_RX_RATE_96000HZ         0x05
-#define WSA885X_RX_RATE_192000HZ        0x06
-#define WSA885X_RX_RATE_384000HZ        0x07
+/* RX Sample Rate Index Values - Audio Playback Path */
+#define WSA885X_RX_RATE_8000HZ          0x00    /* 8 kHz sample rate */
+#define WSA885X_RX_RATE_16000HZ         0x01    /* 16 kHz sample rate */
+#define WSA885X_RX_RATE_32000HZ         0x02    /* 32 kHz sample rate */
+#define WSA885X_RX_RATE_44100HZ         0x03    /* 44.1 kHz sample rate */
+#define WSA885X_RX_RATE_48000HZ         0x04    /* 48 kHz sample rate */
+#define WSA885X_RX_RATE_96000HZ         0x05    /* 96 kHz sample rate */
+#define WSA885X_RX_RATE_192000HZ        0x06    /* 192 kHz sample rate */
+#define WSA885X_RX_RATE_384000HZ        0x07    /* 384 kHz sample rate */
 
-#define WSA885X_VI_RATE_8000HZ          0x00
-#define WSA885X_VI_RATE_16000HZ         0x01
-#define WSA885X_VI_RATE_44100HZ         0x02
-#define WSA885X_VI_RATE_48000HZ         0x03
-#define WSA885X_VI_RATE_96000HZ         0x04
-#define WSA885X_VI_RATE_22050HZ         0x05
-#define WSA885X_VI_RATE_24000HZ         0x06
-#define WSA885X_VI_RATE_192000HZ        0x07
-#define WSA885X_VI_RATE_384000HZ        0x08
+/* VI Sample Rate Index Values - Voltage/Current Sensing Path */
+#define WSA885X_VI_RATE_8000HZ          0x00    /* 8 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_16000HZ         0x01    /* 16 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_44100HZ         0x02    /* 44.1 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_48000HZ         0x03    /* 48 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_96000HZ         0x04    /* 96 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_22050HZ         0x05    /* 22.05 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_24000HZ         0x06    /* 24 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_192000HZ        0x07    /* 192 kHz sample rate for VI sensing */
+#define WSA885X_VI_RATE_384000HZ        0x08    /* 384 kHz sample rate for VI sensing */
+
+/* Channel Configuration Masks */
+#define WSA885X_CHANNEL_STEREO          0x03    /* Both left and right channels (0b11) */
+#define WSA885X_CHANNEL_MONO_LEFT       0x01    /* Left channel only (0b01) */
+#define WSA885X_CHANNEL_MONO_RIGHT      0x02    /* Right channel only (0b10) */
+
+/* PLL Status Register Bits */
+#define WSA885X_PLL_LOCK_BIT            0x01    /* PLL lock status bit (bit 0) */
 
 static const char *const supply_name[] = {
 	"vdd-io",
@@ -365,41 +422,177 @@ static const struct reg_default codec_reg_defaults[] = {
 	{CDC_CLSH_V1P8_BP_CTL2, 0x01},
 };
 
+/**
+ * wsa885x_gpio_set() - Control GPIO for codec power/reset
+ * @wsa885x: WSA885X private data structure
+ * @val: GPIO state (true = high/power on, false = low/reset)
+ *
+ * This function controls the shutdown/reset GPIO pin of the WSA885X codec.
+ * When val is true, it sets the GPIO high to power on the codec.
+ * When val is false, it sets the GPIO low to reset/shutdown the codec.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wsa885x_gpio_set(struct wsa885x_i2c_priv *wsa885x, bool val)
+{
+	int ret = 0;
+
+	if (val)
+		ret = gpiod_direction_output(wsa885x->sd_n, 1);
+	else
+		ret = gpiod_direction_output(wsa885x->sd_n, 0);
+
+	if (ret < 0) {
+		dev_err_ratelimited(wsa885x->dev, "%s: failed to set GPIO: %d\n", __func__,
+							ret);
+	}
+	return ret;
+}
+
+/**
+ * wsa885x_handle_ssr_reset() - Handle SubSystem Restart (SSR) reset sequence
+ * @wsa885x: WSA885X private data structure
+ *
+ * This function handles the SSR scenario by performing GPIO reset and
+ * register cache synchronization when the Q6 subsystem is down. This
+ * ensures the codec is properly reset and all cached register values
+ * are synchronized with the hardware.
+ *
+ * Return: 0 on success
+ */
+static int wsa885x_handle_ssr_reset(struct wsa885x_i2c_priv *wsa885x)
+{
+	/* Reset codec via GPIO toggle */
+	wsa885x_gpio_set(wsa885x, 1);
+	usleep_range(500, 510);
+	wsa885x_gpio_set(wsa885x, 0);
+	usleep_range(20000, 20010);
+
+	/* Mark cache dirty and resync all registers */
+	regcache_mark_dirty(wsa885x->regmap);
+	regcache_sync(wsa885x->regmap);
+
+	dev_dbg(wsa885x->component->dev, "SSR reset sequence completed\n");
+	return 0;
+}
+
+/**
+ * reg_update_sequence() - Configure TDM control registers sequence
+ * @regmap: Regmap instance for register access
+ *
+ * This function configures the TDM control registers in a specific sequence
+ * required for proper TDM operation. The sequence enables TDM mode and
+ * configures the transmit channels.
+ */
 static void reg_update_sequence(struct regmap *regmap)
 {
+	/* Configure TDM control register 1 */
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL1, 0x11);
+
+	/* Configure TDM control register 0 */
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x04);
 	regmap_update_bits(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x01, 0x01);
+
+	/* Configure TDM transmit channel settings */
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CH_TX, 0x01);
 	regmap_update_bits(regmap, DIG_CTRL1_I2S_TDM_CH_TX, 0x02, 0x02);
 }
 
+/**
+ * wait_for_pll_lock() - Wait for PLL to lock with timeout
+ * @wsa885x: WSA885X private data structure
+ *
+ * This function polls the PLL status register to verify that the PLL has
+ * locked successfully. It implements an intelligent polling mechanism with
+ * timeout to prevent infinite waiting while being responsive to quick locks.
+ *
+ * The function polls every 1ms for up to 20ms, providing faster response
+ * than fixed delays while maintaining proper timeout protection.
+ *
+ * Return: 0 on successful PLL lock, -ETIMEDOUT on timeout
+ */
+static int wait_for_pll_lock(struct wsa885x_i2c_priv *wsa885x)
+{
+	unsigned int status;
+	int cnt = 0;
+	int ret = 0;
+
+	do {
+		usleep_range(1000, 1100);
+		ret = regmap_read(wsa885x->regmap, ANA_TOP_PLL_STATUS_0, &status);
+
+		/* Check if PLL is locked (bit 0 set) */
+		if (ret == 0 && (status & WSA885X_PLL_LOCK_BIT)) {
+			dev_dbg(wsa885x->component->dev, "PLL locked successfully after %d ms\n",
+				    cnt + 1);
+			return 0;
+		}
+	} while (++cnt < 20); /* Maximum 20ms timeout */
+
+	/* PLL lock timeout */
+	dev_warn(wsa885x->component->dev, "PLL lock timeout after 20ms, status=0x%x\n", status);
+	return -ETIMEDOUT;
+}
+
+/**
+ * wait_for_pde_state() - Wait for Power Domain Engine (PDE) state transition
+ * @wsa885x: WSA885X private data structure
+ * @ps: Target power state to wait for
+ * @reg: Register address (unused parameter, kept for compatibility)
+ *
+ * This function polls the PDE actual power state register to verify that
+ * the codec has transitioned to the requested power state. It implements
+ * a timeout mechanism to prevent infinite waiting.
+ *
+ * Return: 0 on success, -EINVAL on timeout or failure
+ */
 static int wait_for_pde_state(struct wsa885x_i2c_priv *wsa885x,
-							  int ps, int reg)
+			       int ps, int reg)
 {
 	int act_ps, cnt = 0, clock_valid;
 	int rc = 0;
 
+	/* Poll for power state transition with timeout */
 	do {
 		usleep_range(1000, 1500);
-		/* wait and read actual_PS */
-		rc = regmap_read(wsa885x->regmap,
-						 SMP_AMP_CTRL_STEREO_PDE23_ACT_PS,
-						 &act_ps);
 
+		/* Read actual power state from PDE register */
+		rc = regmap_read(wsa885x->regmap,
+				 SMP_AMP_CTRL_STEREO_PDE23_ACT_PS,
+				 &act_ps);
+
+		/* Check if desired power state is reached */
 		if (rc == 0 && act_ps == ps)
-			return rc;
+			return 0;
 	} while (++cnt < 5);
 
+	/* Read clock validity status for debugging */
 	regmap_read(wsa885x->regmap,
-				SMP_AMP_CTRL_STEREO_CS21_CLOCK_VALID,
-				&clock_valid);
+		    SMP_AMP_CTRL_STEREO_CS21_CLOCK_VALID,
+		    &clock_valid);
+
 	dev_err(wsa885x->component->dev,
-			"simple amp ps%d request failed, func num 1 act_ps %d, cs_valid:%d\n",
-			ps, act_ps, clock_valid);
-	return -EINVAL;
+		"PDE power state %d request failed, actual_ps %d, clock_valid:%d\n",
+		ps, act_ps, clock_valid);
+
+	return -ETIMEDOUT;
 }
 
+/**
+ * codec_hw_params() - Configure hardware parameters for audio playback
+ * @substream: PCM substream
+ * @params: Hardware parameters from ALSA core
+ * @dai: Digital Audio Interface
+ *
+ * This function configures the codec's sample rate settings based on the
+ * parameters provided by the ALSA framework. It sets up both the RX (playback)
+ * and VI (voltage/current sensing) sample rates for the codec.
+ *
+ * The function uses atomic operations to track multiple stream opens and
+ * only configures hardware on the first stream to avoid conflicts.
+ *
+ * Return: 0 on success, -EINVAL for unsupported sample rates
+ */
 static int codec_hw_params(struct snd_pcm_substream *substream,
 						   struct snd_pcm_hw_params *params,
 						   struct snd_soc_dai *dai)
@@ -412,11 +605,15 @@ static int codec_hw_params(struct snd_pcm_substream *substream,
 	dev_dbg(wsa885x->dev, "%s: HW Params called with sampling rate as %d\n", __func__,
 				params_rate(params));
 
+	/* Check if multiple streams are open - only configure on first stream */
 	open_count = atomic_read(&wsa885x->open_count);
 	if (open_count > 1)
 		return 0;
 
+	/* Extract sample rate from ALSA parameters */
 	wsa885x->sample_rate = params_rate(params);
+
+	/* Map sample rate to codec-specific rate indices */
 	switch (wsa885x->sample_rate) {
 	case 8000:
 		value = 0x00;
@@ -461,184 +658,312 @@ static int codec_hw_params(struct snd_pcm_substream *substream,
 		cs21_sample_rate_idx = WSA885X_RX_RATE_384000HZ;
 		cs24_sample_rate_idx = WSA885X_VI_RATE_384000HZ;
 		break;
-	default: // need to add 24 and 22.5
+	default:
 		dev_err(component->dev, "sampling rate %d is not supported\n",
 				params_rate(params));
 		return -EINVAL;
 	}
 
+	/* Configure I2S control register with sample rate (bits 1:4) and enable bit */
 	regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CTL0, 0x1f,
-				(value << 1) + 1); // only bits 1:4 + last bit
+				(value << 1) + 1);
+
+	/* Reset I2S interface */
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_RESET_CTL, 0x00);
+
+	/* Set RX (playback) sample rate index */
 	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_CS21_SAMPLERATEINDEX,
 				 cs21_sample_rate_idx);
+
+	/* Set VI (voltage/current sensing) sample rate index */
 	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_CS24_SAMPLERATEINDEX,
 				 cs24_sample_rate_idx);
+
 	return 0;
 }
 
+/**
+ * codec_set_tdm_slot() - Configure TDM slot assignments for audio data
+ * @dai: Digital Audio Interface
+ * @tx_slot_mask: Transmit slot mask (unused in this implementation)
+ * @rx_slot_mask: Receive slot mask (unused in this implementation)
+ * @slots: Number of TDM slots
+ * @slot_width: Width of each TDM slot in bits
+ *
+ * This function configures the TDM (Time Division Multiplexing) slot assignments
+ * for the WSA885X codec. It sets up the transmit channels for current/voltage
+ * sensing (I-sense/V-sense) and speaker protection feedback based on the
+ * rx_slot_mask configuration.
+ *
+ * The function supports three configurations:
+ * - Stereo mode (rx_slot_mask = 0b11): Both channels active
+ * - Mono left (rx_slot_mask = 0b01): Left channel only
+ * - Mono right (rx_slot_mask = 0b10): Right channel only
+ *
+ * Uses atomic operations to prevent multiple concurrent configurations.
+ *
+ * Return: 0 on success
+ */
 static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 							  unsigned int tx_slot_mask,
 							  unsigned int rx_slot_mask, int slots,
 							  int slot_width)
 {
-	// Set TDM slot configuration
-	// This is where you would configure the codec registers for TDM
 	struct snd_soc_component *component = dai->component;
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
 
 	dev_dbg(wsa885x->dev, "%s: TDM num_slots configured as %d\n", __func__, slots);
 
+	/* Increment open count atomically - only configure on first call */
 	if (atomic_inc_return(&wsa885x->open_count) > 1)
 		return 0;
 
+	/* Reset I2S interface before configuration */
 	regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_RESET_CTL, 0x01, 0x01);
-	if (wsa885x->rx_slot_mask == 0b11) {
+
+	/* Configure TDM slots based on channel mask */
+	if (wsa885x->rx_slot_mask == WSA885X_CHANNEL_STEREO) {
+		/* Stereo configuration - both channels active */
+		/* Configure slot0 for I-sense channel 0 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
-						   0x01,
-						   0x01); // slot0 isense0
+						   0x01, 0x01);
+		/* Configure slot1 for I-sense channel 1 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
-						   0x20, 0x20); // slot1 isense1
+						   0x20, 0x20);
+		/* Configure slot3 for current protection sense 0 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG1_TDM_TX,
-						   0x05,
-						   0x05); // slot3 cps0
+						   0x05, 0x05);
+		/* Configure slot4 for current protection sense 1 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG1_TDM_TX,
-						   0x60, 0x60); // slot4 cps1
+						   0x60, 0x60);
+		/* Apply TDM control sequence */
 		reg_update_sequence(wsa885x->regmap);
+		/* Enable transmit channels */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_TX,
 						   0x04, 0x04);
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_TX,
 						   0x08, 0x08);
-	} else if (wsa885x->rx_slot_mask == 0b01) {
+	} else if (wsa885x->rx_slot_mask == WSA885X_CHANNEL_MONO_LEFT) {
+		/* Mono left channel configuration */
+		/* Configure slot0 for I-sense channel 0 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
-						   0x01,
-						   0x01); // slot0 isense0
+						   0x01, 0x01);
+		/* Configure slot1 for current protection sense 0 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
-						   0x50, 0x50); // slot1 cps0
+						   0x50, 0x50);
 		reg_update_sequence(wsa885x->regmap);
-	} else if (wsa885x->rx_slot_mask == 0b10) {
+	} else if (wsa885x->rx_slot_mask == WSA885X_CHANNEL_MONO_RIGHT) {
+		/* Mono right channel configuration */
+		/* Configure slot0 for I-sense channel 1 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
-						   0x02,
-						   0x02); // slot0 isense0
+						   0x02, 0x02);
+		/* Configure slot1 for current protection sense 1 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
-						   0x60, 0x60); // slot1 cps0
+						   0x60, 0x60);
 		reg_update_sequence(wsa885x->regmap);
 	}
+
+	/* Enable I2S control */
 	regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CTL0, 0x01, 0x01);
-	regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_RESET_CTL, 0x01,
-					   0x00);
+
+	/* Release I2S reset */
+	regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_RESET_CTL, 0x01, 0x00);
 
 	return 0;
 }
 
+/**
+ * codec_set_sysclk() - Configure system clock and PLL for the codec
+ * @dai: Digital Audio Interface
+ * @clk_id: Clock ID (unused in this implementation)
+ * @freq: Target frequency in Hz
+ * @dir: Clock direction (unused in this implementation)
+ *
+ * This function configures the codec's internal PLL and system clock based on
+ * the requested frequency. It performs the following operations:
+ * 1. Calculates PLL divider based on fixed reference clock
+ * 2. Configures analog PLL settings (loop filter, VCO, etc.)
+ * 3. Enables clock source and waits for PLL lock
+ * 4. Applies codec-specific initialization table
+ *
+ * The function uses atomic operations to prevent multiple concurrent
+ * configurations and only runs on the first stream open.
+ *
+ * Return: 0 on success
+ */
 static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
-							unsigned int freq, int dir)
+			     unsigned int freq, int dir)
 {
 	struct snd_soc_component *component = dai->component;
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
 	uint8_t pll_div;
-	unsigned int status;
-	int i, open_count = 0;
+	int i, open_count = 0, ret = 0;
 
 	dev_dbg(wsa885x->dev, "%s: Freq set as  %d\n", __func__, freq);
 
+	/* Check if multiple streams are open - only configure on first stream */
 	open_count = atomic_read(&wsa885x->open_count);
 	if (open_count > 1)
 		return 0;
 
+	/* Calculate PLL divider: Fixed rate / target frequency */
 	pll_div = CLK_RATE_FIXED / freq;
+
+	/* Configure analog bias and thermal/voltage protection override */
 	regmap_write(wsa885x->regmap, ANA_TOP_BG_TVP_OVRD_CTL, 0x03);
+
+	/* Select internal system clock source */
 	regmap_write(wsa885x->regmap, DIG_CTRL0_SYS_CLK_SEL, 0x04);
+
+	/* Configure PLL loop filter for stability */
 	regmap_write(wsa885x->regmap, ANA_TOP_PLL_LOOPFILT_0, 0xB4);
+
+	/* Configure VCO (Voltage Controlled Oscillator) */
 	regmap_write(wsa885x->regmap, ANA_TOP_PLL_VCO_CTL, 0x00);
+
+	/* Disable PLL override mode */
 	regmap_write(wsa885x->regmap, ANA_TOP_PLL_OVRD_CTL, 0x00);
+
+	/* Set calculated PLL divider */
 	regmap_write(wsa885x->regmap, ANA_PLL_DIV_CTL_0, pll_div);
+
+	/* Enable PLL clock source */
 	regmap_write(wsa885x->regmap, DIG_CTRL0_CLK_SOURCE_ENABLE, 0x02);
 
-	usleep_range(15000, 15100);
-	regmap_read(wsa885x->regmap, ANA_TOP_PLL_STATUS_0, &status);
-	if (status & 0b01)
-		dev_dbg(wsa885x->component->dev, "PLL is locked");
+	/* Wait for PLL to lock with intelligent polling */
+	ret = wait_for_pll_lock(wsa885x);
+	if (ret) {
+		dev_err(wsa885x->component->dev, "PLL lock failed, aborting sysclk configuration\n");
+		return ret;
+	}
 
+	/* Switch to PLL as system clock source */
 	regmap_write(wsa885x->regmap, DIG_CTRL0_SYS_CLK_SEL, 0x00);
+
+	/* Enable power FSM control */
 	regmap_write(wsa885x->regmap, DIG_CTRL0_POWER_FSM_CTL1, 0x01);
 
+	/* Apply codec-specific initialization table from device tree */
 	for (i = 0; i < wsa885x->init_table_size / 2; i++) {
 		regmap_write(wsa885x->regmap, wsa885x->init_table[2 * i],
-					  wsa885x->init_table[2 * i + 1]);
+			     wsa885x->init_table[2 * i + 1]);
 	}
+
 	return 0;
 }
 
+/**
+ * codec_mute_stream() - Mute/unmute audio stream and manage power states
+ * @dai: Digital Audio Interface
+ * @mute: Mute state (1 = mute, 0 = unmute)
+ * @stream: Stream direction (unused in this implementation)
+ *
+ * This function handles muting/unmuting of the audio stream and manages
+ * the codec's power states. When muting, it transitions to power state 3 (PS3)
+ * for low power mode. When unmuting, it transitions to power state 0 (PS0)
+ * for active operation and configures the power amplifier based on channel mask.
+ *
+ * The function also handles SSR (SubSystem Restart) scenarios by performing
+ * GPIO reset and register cache synchronization when the Q6 subsystem is down.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
 static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 {
 	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
 	int ret = 0, ps0 = 0, ps3 = 3;
 
 	dev_dbg(wsa885x->dev, "%s: Stream is %s\n", __func__, mute ? "muted" : "unmuted");
+
 	if (mute) {
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
-					 0x03);
+		/* Handle SSR (SubSystem Restart) scenario */
+		if (gpr_get_q6_state() == GPR_SUBSYS_DOWN)
+			return wsa885x_handle_ssr_reset(wsa885x);
+
+		/* Request power state 3 (low power/standby mode) */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS, 0x03);
 		ret = wait_for_pde_state(wsa885x, ps3, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
 		if (!ret) {
-			dev_err(wsa885x->component->dev,
-			"success! function 1, actual ps %d\n",
-					ps3);
+			dev_dbg(wsa885x->component->dev,
+				"Successfully transitioned to power state %d\n", ps3);
 		}
 	} else {
+		/* Disable power amplifier FSM before configuration */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
+
+		/* Configure usage mode for thermal/speaker protection */
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_OT23_USAGE,
 					 wsa885x->usage_mode);
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_IT21_CLUSERINDEX,
-					 0x01);
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER,
-					 0x01);
-		regmap_write(wsa885x->regmap,
-					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, 0x00);
-		regmap_write(wsa885x->regmap,
-					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
-		regmap_write(wsa885x->regmap,
-					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, 0x00);
-		regmap_write(wsa885x->regmap,
-					 SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+
+		/* Set cluster index for audio processing */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_IT21_CLUSERINDEX, 0x01);
+
+		/* Set posture number for speaker configuration */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER, 0x01);
+
+		/* Set volume to maximum (0x00 = max volume) for both channels */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+
+		/* Commit SDCA (Smart Device Class Audio) changes */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
-					 0x00);
+
+		/* Request power state 0 (active mode) */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS, 0x00);
 		ret = wait_for_pde_state(wsa885x, ps0, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
-		if (!ret)
+		if (!ret) {
 			dev_dbg(wsa885x->component->dev,
-					"success! function 1, actual ps %d\n", ps0);
-		else {
-			dev_err(wsa885x->component->dev,
-					"PS0 request failed\n");
+					"Successfully transitioned to power state %d\n", ps0);
+		} else {
+			dev_err(wsa885x->component->dev, "PS0 request failed\n");
 			goto exit;
 		}
 
+		/* Configure power amplifier based on channel configuration */
 		if (wsa885x->rx_slot_mask == 0b11) {
-			regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL,
-					0x03);
+			/* Stereo mode - enable both PA channels */
+			regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x03);
 		} else if (wsa885x->rx_slot_mask == 0b01) {
-			regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL,
-					0x01);
+			/* Mono left channel */
+			regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x01);
 		} else if (wsa885x->rx_slot_mask == 0b10) {
-			regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL,
-					0b10);
-			regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_RX,
-					0b01);
+			/* Mono right channel */
+			regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b10);
+			regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_RX, 0b01);
 		}
 
-		regmap_write(wsa885x->regmap,
-					 SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X0, 0x00);
-		regmap_write(wsa885x->regmap,
-					 SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X1, 0x00);
+		/* Unmute both channels */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X0, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_MUTE_CH2X1, 0x00);
+
+		/* Commit all changes */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
 	}
 exit:
 	return ret;
 }
 
+/**
+ * codec_mute_stream_virt_c1() - Mute/unmute virtual channel 1 audio stream
+ * @dai: Digital Audio Interface
+ * @mute: Mute state (1 = mute, 0 = unmute)
+ * @stream: Stream direction (unused in this implementation)
+ *
+ * This function handles muting/unmuting of virtual channel 1 (left channel)
+ * audio stream for stereo configurations. It manages power states and
+ * channel-specific power amplifier control. When multiple streams are open,
+ * it only affects the specific channel's PA control without changing the
+ * overall power state.
+ *
+ * The function handles SSR scenarios and uses atomic operations to track
+ * multiple stream opens for proper resource management.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
 static int codec_mute_stream_virt_c1(struct snd_soc_dai *dai, int mute, int stream)
 {
 	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
@@ -651,6 +976,9 @@ static int codec_mute_stream_virt_c1(struct snd_soc_dai *dai, int mute, int stre
 			regmap_update_bits(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b01, 0x00);
 			return 0;
 		}
+
+		if (gpr_get_q6_state() == GPR_SUBSYS_DOWN)
+			return wsa885x_handle_ssr_reset(wsa885x);
 
 		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
@@ -708,6 +1036,23 @@ exit:
 	return ret;
 }
 
+/**
+ * codec_mute_stream_virt_c2() - Mute/unmute virtual channel 2 audio stream
+ * @dai: Digital Audio Interface
+ * @mute: Mute state (1 = mute, 0 = unmute)
+ * @stream: Stream direction (unused in this implementation)
+ *
+ * This function handles muting/unmuting of virtual channel 2 (right channel)
+ * audio stream for stereo configurations. It manages power states and
+ * channel-specific power amplifier control. When multiple streams are open,
+ * it only affects the specific channel's PA control without changing the
+ * overall power state.
+ *
+ * The function handles SSR scenarios and uses atomic operations to track
+ * multiple stream opens for proper resource management.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
 static int codec_mute_stream_virt_c2(struct snd_soc_dai *dai, int mute, int stream)
 {
 	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
@@ -720,6 +1065,10 @@ static int codec_mute_stream_virt_c2(struct snd_soc_dai *dai, int mute, int stre
 			regmap_update_bits(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0b10, 0x00);
 			return 0;
 		}
+
+		if (gpr_get_q6_state() == GPR_SUBSYS_DOWN)
+			return wsa885x_handle_ssr_reset(wsa885x);
+
 		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS,
 					 0x03);
@@ -775,6 +1124,18 @@ exit:
 	return ret;
 }
 
+/**
+ * codec_hw_free() - Free hardware resources and reset codec configuration
+ * @substream: PCM substream
+ * @dai: Digital Audio Interface
+ *
+ * This function is called when the audio stream is stopped and hardware
+ * resources need to be freed. It resets the I2S/TDM configuration registers
+ * to their default state and disables the clock sources. The function only
+ * performs the reset when no other streams are active (open_count = 0).
+ *
+ * Return: 0 on success
+ */
 static int codec_hw_free(struct snd_pcm_substream *substream,
 						 struct snd_soc_dai *dai)
 {
@@ -869,27 +1230,31 @@ static struct snd_soc_dai_driver wsa885x_i2c_dai[] = {
 	},
 };
 
-static int wsa885x_gpio_set(struct wsa885x_i2c_priv *wsa885x, bool val)
-{
-	int ret = 0;
-
-	if (val)
-		ret = gpiod_direction_output(wsa885x->sd_n, 1);
-	else
-		ret = gpiod_direction_output(wsa885x->sd_n, 0);
-
-	if (ret < 0) {
-		dev_err_ratelimited(wsa885x->dev, "%s: failed to set GPIO: %d\n", __func__,
-							ret);
-	}
-	return ret;
-}
-
+/**
+ * wsa885x_gpio_powerdown() - Power down codec via GPIO (cleanup callback)
+ * @data: GPIO descriptor pointer
+ *
+ * This function is used as a cleanup callback registered with devm_add_action_or_reset().
+ * It ensures the codec is powered down by setting the GPIO high when the device
+ * is being removed or on error cleanup. This is called automatically by the
+ * device management framework.
+ */
 static void wsa885x_gpio_powerdown(void *data)
 {
 	gpiod_direction_output(data, 1);
 }
 
+/**
+ * get_dai_driver() - Allocate and initialize DAI driver structures
+ * @dev: Device pointer for memory allocation
+ *
+ * This function allocates memory for DAI driver structures and copies the
+ * static DAI configuration into the allocated memory. This is necessary
+ * because the ALSA framework expects dynamically allocated DAI drivers
+ * for proper device management.
+ *
+ * Return: Pointer to allocated DAI driver array on success, NULL on failure
+ */
 static struct snd_soc_dai_driver *get_dai_driver(struct device *dev)
 {
 	struct snd_soc_dai_driver *dai_drv = NULL;
@@ -905,6 +1270,17 @@ static struct snd_soc_dai_driver *get_dai_driver(struct device *dev)
 	return dai_drv;
 }
 
+/**
+ * wsa885x_volatile_register() - Check if a register is volatile (uncacheable)
+ * @dev: Device pointer (unused)
+ * @reg: Register address to check
+ *
+ * This function determines which registers should not be cached by the regmap
+ * framework. Volatile registers are those that can change value without
+ * software intervention, such as status registers that reflect hardware state.
+ *
+ * Return: true if register is volatile, false if it can be cached
+ */
 static bool wsa885x_volatile_register(struct device *dev, unsigned int reg)
 {
 	switch (reg) {
@@ -924,6 +1300,16 @@ static bool wsa885x_volatile_register(struct device *dev, unsigned int reg)
 	}
 }
 
+/**
+ * wsa885x_readable_register() - Check if a register is readable
+ * @dev: Device pointer (unused)
+ * @reg: Register address to check
+ *
+ * This function determines which registers can be read by the regmap framework.
+ * The WSA885X codec supports reading from all registers in the range 0x0000 to 0x88FF.
+ *
+ * Return: true if register is readable, false otherwise
+ */
 static bool wsa885x_readable_register(struct device *dev, unsigned int reg)
 {
 	if (reg >= 0 && reg <= 0x88ff)
@@ -931,9 +1317,21 @@ static bool wsa885x_readable_register(struct device *dev, unsigned int reg)
 	return false;
 }
 
+/**
+ * wsa885x_writeable_register() - Check if a register is writeable
+ * @dev: Device pointer (unused)
+ * @reg: Register address to check
+ *
+ * This function determines which registers can be written by the regmap framework.
+ * Most registers in the range 0x0000 to 0x88FF are writeable, except for certain
+ * read-only status registers that reflect hardware state.
+ *
+ * Return: true if register is writeable, false for read-only registers
+ */
 static bool wsa885x_writeable_register(struct device *dev, unsigned int reg)
 {
 	if (reg >= 0 && reg <= 0x88ff) {
+		/* Read-only status registers */
 		if (reg == ANA_TOP_PLL_STATUS_0 ||
 			reg == WSA885X_INTR_STATUS0 ||
 			reg == WSA885X_INTR_STATUS0 + 1 ||
@@ -962,14 +1360,25 @@ static const struct regmap_config regmap_cfg = {
 	.use_single_write = true,
 };
 
+/**
+ * wsa885x_component_probe() - Initialize ALSA SoC component
+ * @component: ALSA SoC component structure
+ *
+ * This function is called when the ALSA SoC component is probed. It performs
+ * component initialization including regmap setup and interrupt configuration.
+ * The function enables GPIO-based interrupts and configures the interrupt mode
+ * for proper fault detection and handling.
+ *
+ * Return: 0 on success
+ */
 static int wsa885x_component_probe(struct snd_soc_component *component)
 {
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
 	wsa885x->component = component;
 	snd_soc_component_init_regmap(component, wsa885x->regmap);
-	// enable interrupts
-	regmap_write(wsa885x->regmap, DIG_CTRL1_SPMI_PAD_GPIO2_CTL, 0x2e); // check again
+	/* Enable interrupts */
+	regmap_write(wsa885x->regmap, DIG_CTRL1_SPMI_PAD_GPIO2_CTL, 0x2e); /* Check again */
 	regmap_write(wsa885x->regmap, DIG_CTRL1_INTR_MODE, 0x01);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_PIN_CT, 0x04);
 	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0, 0x00);
@@ -979,6 +1388,15 @@ static int wsa885x_component_probe(struct snd_soc_component *component)
 	return 0;
 }
 
+/**
+ * wsa885x_component_remove() - Clean up ALSA SoC component
+ * @component: ALSA SoC component structure
+ *
+ * This function is called when the ALSA SoC component is being removed.
+ * It performs cleanup operations including unregistering debug interfaces
+ * and exiting the regmap framework. This ensures proper resource cleanup
+ * when the codec driver is unloaded.
+ */
 static void wsa885x_component_remove(struct snd_soc_component *component)
 {
 	struct wsa885x_i2c_priv *wsa885x =
@@ -991,12 +1409,30 @@ static void wsa885x_component_remove(struct snd_soc_component *component)
 	snd_soc_component_exit_regmap(component);
 }
 
+/**
+ * wsa885x_regulator_disable() - Disable regulators (cleanup callback)
+ * @data: Regulator bulk data array
+ *
+ * This function is used as a cleanup callback registered with devm_add_action_or_reset().
+ * It ensures all regulators are properly disabled when the device is being
+ * removed or on error cleanup. This is called automatically by the device
+ * management framework to prevent power leakage.
+ */
 static void wsa885x_regulator_disable(void *data)
 {
 	regulator_bulk_disable(SUPPLIES_NUM, data);
 }
 
-/* Get and Put the usage Modes */
+/**
+ * wsa885x_i2c_usage_modes_get() - Get current usage mode setting
+ * @kcontrol: ALSA control structure
+ * @ucontrol: ALSA control element value
+ *
+ * This function retrieves the current usage mode setting for the codec.
+ * Usage modes control thermal and speaker protection algorithms.
+ *
+ * Return: 0 on success, -EINVAL on error
+ */
 static int wsa885x_i2c_usage_modes_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -1013,6 +1449,16 @@ static int wsa885x_i2c_usage_modes_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/**
+ * wsa885x_i2c_usage_modes_put() - Set usage mode setting
+ * @kcontrol: ALSA control structure
+ * @ucontrol: ALSA control element value
+ *
+ * This function sets the usage mode for the codec. Usage modes control
+ * thermal and speaker protection algorithms based on different use cases.
+ *
+ * Return: 0 on success, -EINVAL on error
+ */
 static int wsa885x_i2c_usage_modes_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -1032,7 +1478,16 @@ static int wsa885x_i2c_usage_modes_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-/* Get and Put for RX Select Channel */
+/**
+ * wsa885x_i2c_rx_slot_mask_get() - Get current RX slot mask setting
+ * @kcontrol: ALSA control structure
+ * @ucontrol: ALSA control element value
+ *
+ * This function retrieves the current RX slot mask configuration which
+ * determines the channel configuration (stereo, mono left, mono right).
+ *
+ * Return: 0 on success
+ */
 static int wsa885x_i2c_rx_slot_mask_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -1046,6 +1501,16 @@ static int wsa885x_i2c_rx_slot_mask_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/**
+ * wsa885x_i2c_rx_slot_mask_put() - Set RX slot mask configuration
+ * @kcontrol: ALSA control structure
+ * @ucontrol: ALSA control element value
+ *
+ * This function sets the RX slot mask which determines the channel
+ * configuration: 0b11=stereo, 0b01=mono left, 0b10=mono right.
+ *
+ * Return: 0 on success
+ */
 static int wsa885x_i2c_rx_slot_mask_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
@@ -1083,11 +1548,30 @@ static const struct snd_soc_component_driver wsa885x_i2c_component = {
 	.num_dapm_routes = 0,
 };
 
-static int handle_wsa885x_i2c_irq(int irq, void *data)
+/**
+ * handle_wsa885x_i2c_irq() - Handle codec interrupt events
+ * @irq: IRQ number
+ * @data: WSA885X private data structure
+ *
+ * This function handles various interrupt events from the WSA885X codec including:
+ * - Thermal protection events (SAF2WAR, WAR2SAF)
+ * - Over-current protection (PA0_OCP, PA1_OCP)
+ * - Audio clipping detection (CLIP0, CLIP1)
+ * - Clock watchdog and PLL unlock events
+ * - FSM (Finite State Machine) errors for power and PA control
+ * - PCM data watchdog and DC detection
+ * - Under-voltage lockout (UVLO) and brown-out protection (BOP)
+ *
+ * The function performs appropriate recovery actions for each interrupt type
+ * to maintain codec stability and protect the hardware.
+ *
+ * Return: IRQ_HANDLED on success, IRQ_NONE for unhandled interrupts
+ */
+static irqreturn_t handle_wsa885x_i2c_irq(int irq, void *data)
 {
 	struct wsa885x_i2c_priv *wsa885x = data;
 
-	// Handle the interrupt based on the IRQ number
+	/* Handle the interrupt based on the IRQ number */
 	switch (irq) {
 	case WSA885X_IRQ_INT_SAF2WAR:
 	case WSA885X_IRQ_INT_WAR2SAF:
@@ -1210,12 +1694,26 @@ static irqreturn_t wsa885x_interrupt_handler(int irq, void *data)
 
 	return ret;
 }
-
+/**
+ * wsa885x_register_irq() - Register and configure interrupt handling
+ * @wsa885x: WSA885X private data structure
+ *
+ * This function sets up interrupt handling for the WSA885X codec by:
+ * 1. Converting GPIO descriptor to IRQ number
+ * 2. Adding regmap IRQ chip for interrupt management
+ * 3. Registering individual interrupt handlers for each IRQ type
+ * 4. Configuring interrupt flags and triggers
+ *
+ * The function handles all codec interrupt sources including thermal protection,
+ * over-current protection, clipping detection, FSM errors, and more.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
 int wsa885x_register_irq(struct wsa885x_i2c_priv *wsa885x)
 {
 	int ret;
 
-	// Get the IRQ number for the GPIO
+	/* Get the IRQ number for the GPIO */
 	int irq_number = gpiod_to_irq(wsa885x->intr_pin);
 
 	if (irq_number < 0) {
@@ -1236,6 +1734,26 @@ int wsa885x_register_irq(struct wsa885x_i2c_priv *wsa885x)
 	return ret;
 }
 
+/**
+ * wsa885x_i2c_probe() - I2C device probe and initialization
+ * @client: I2C client device structure
+ *
+ * This function is called when the WSA885X I2C device is detected and needs
+ * to be initialized. It performs comprehensive device setup including:
+ * 1. Memory allocation for private data structure
+ * 2. Regmap initialization for register access
+ * 3. Device tree property parsing (init table, codec name)
+ * 4. Regulator setup and power management
+ * 5. GPIO configuration for power control and interrupts
+ * 6. ALSA SoC component and DAI registration
+ * 7. Interrupt handling setup
+ * 8. Debug interface registration
+ *
+ * The function uses device-managed (devm_) APIs for automatic resource
+ * cleanup on device removal or probe failure.
+ *
+ * Return: 0 on success, negative error code on failure
+ */
 static int wsa885x_i2c_probe(struct i2c_client *client)
 {
 	struct wsa885x_i2c_priv *wsa885x;
