@@ -1605,11 +1605,11 @@ static const struct snd_kcontrol_new name##_mux = \
 
 #ifdef CONFIG_BOLERO_VER_4P0
 static const char * const adc_mux_text[] = {
-	"VA_DMIC", "SWR_MIC", "RX_SWR_MIC"
+	"MSM_DMIC", "SWR_MIC", "RX_SWR_MIC"
 };
 #else
 static const char * const adc_mux_text[] = {
-	"VA_DMIC", "SWR_MIC"
+	"MSM_DMIC", "SWR_MIC"
 };
 #endif
 
