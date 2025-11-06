@@ -50,11 +50,13 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9378_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko
 endif
+ifeq ($(call is-board-platform-in-list,canoe alor whale art), true)
+AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wsa885x_i2c_dlkm.ko
+endif
 ifeq ($(call is-board-platform-in-list,sun canoe alor whale art), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/qmp_dlkm.ko
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/simple_amp_dlkm.ko
-AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wsa885x_i2c_dlkm.ko
 endif
 ifeq ($(call is-board-platform-in-list,bengal holi blair), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
