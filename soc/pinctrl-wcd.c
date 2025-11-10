@@ -245,7 +245,7 @@ static int wcd_gpio_get(struct gpio_chip *chip, unsigned int pin)
 	return value;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 7)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
 static int wcd_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
 #else
 static void wcd_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
@@ -258,7 +258,7 @@ static void wcd_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
 
 	wcd_config_set(priv_data->ctrl, pin, &config, 1);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 7)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 0)
 	return 0;
 #endif
 }
@@ -267,11 +267,7 @@ static const struct gpio_chip wcd_gpio_chip = {
 	.direction_input  = wcd_gpio_direction_input,
 	.direction_output = wcd_gpio_direction_output,
 	.get = wcd_gpio_get,
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 17, 7)
-	.set_rv = wcd_gpio_set,
-#else
 	.set = wcd_gpio_set,
-#endif
 };
 
 static int wcd_pinctrl_probe(struct platform_device *pdev)
