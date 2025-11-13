@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -1066,7 +1067,15 @@ static int msm_register_pm_qos_latency_controls(struct snd_soc_pcm_runtime *rtd)
 	if (!lpass_cdc_component) {
 		pr_err("%s: could not find component for lpass-cdc\n",
 				__func__);
-		return -EINVAL;
+		//if lpass-cdc driver name is not found, go ahead to loop up bolero_codec driver name.
+		lpass_cdc_component = snd_soc_rtdcom_lookup(rtd, "bolero_codec");
+		if (!lpass_cdc_component) {
+			pr_err("%s: could not find component for bolero_codec\n",
+					__func__);
+			return -EINVAL;
+		} else {
+			pr_debug("%s: find component for bolero_codec\n", __func__);
+		}
 	}
 
 	ret = snd_soc_add_component_controls(lpass_cdc_component,
