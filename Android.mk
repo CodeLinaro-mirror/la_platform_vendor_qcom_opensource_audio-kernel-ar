@@ -36,13 +36,17 @@ ifeq ($(call is-board-platform-in-list,chora),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_CHORA=m
 endif
 
+ifeq ($(call is-board-platform-in-list,malabar),true)
+AUDIO_SELECT  := CONFIG_SND_SOC_MALABAR=m
+endif
+
 ifeq ($(ENABLE_AUDIO_LEGACY_TECHPACK),true)
 include $(call all-subdir-makefiles)
 LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale chora),true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale chora malabar),true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -356,15 +360,6 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-###########################################################
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
-LOCAL_MODULE              := lpass_bt_swr_dlkm.ko
-LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/lpass_bt_swr_dlkm.ko
-LOCAL_MODULE_TAGS         := optional
-LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
 ########################### WSA884x CODEC  ###########################
 include $(CLEAR_VARS)
@@ -385,7 +380,7 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-
+ifneq ($(call is-board-platform-in-list, malabar),true)
 ########################### WCD938x CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -404,6 +399,16 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := lpass_bt_swr_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/lpass_bt_swr_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 ########################### WCD939x CODEC  ################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -441,7 +446,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
-ifeq ($(call is-board-platform-in-list, sun canoe alor whale chora),true)
+ifeq ($(call is-board-platform-in-list, sun canoe alor whale chora malabar),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -462,6 +467,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 ###########################################################
+ifeq ($(call is-board-platform-in-list, sun canoe alor whale chora),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := hdmi_dlkm.ko
@@ -500,6 +506,18 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
+ifeq ($(call is-board-platform-in-list, malabar),true)
+###########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := wsa881x_analog_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/wsa881x_analog_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+endif
 endif
 
 ifeq ($(call is-board-platform-in-list, bengal holi blair),true)

@@ -39,7 +39,7 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/hdmi_dlkm.ko
 endif
 
-ifeq ($(call is-board-platform-in-list,sun canoe alor whale chora),true)
+ifeq ($(call is-board-platform-in-list,sun canoe alor whale chora malabar),true)
 LOCAL_MODULE_DDK_BUILD := true
 
 LOCAL_MODULE_KO_DIRS := dsp/q6_notifier_dlkm.ko
@@ -71,19 +71,24 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_tx_macro_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_rx_macro_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa884x/wsa884x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa883x/wsa883x_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd939x/wcd939x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd939x/wcd939x_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_slave_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass_bt_swr_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/hdmi_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/qmp1000/qmp_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/sdca/simple_amp_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa885x_i2c_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_slave_dlkm.ko
+ifeq ($(call is-board-platform-in-list,sun canoe alor whale chora),true)
+LOCAL_MODULE_KO_DIRS += asoc/codecs/hdmi_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd938x/wcd938x_slave_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/sdca/simple_amp_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa885x_i2c_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass_bt_swr_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/qmp1000/qmp_dlkm.ko
+endif
+ifeq ($(call is-board-platform-in-list, malabar),true)
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa881x_analog_dlkm.ko
+endif
 endif
 
 ifeq ($(call is-board-platform-in-list,blair),true)
