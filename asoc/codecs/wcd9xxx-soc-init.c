@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2017, 2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -11,8 +12,9 @@ static int __init wcd9xxx_soc_init(void)
 	int ret = 0;
 
 	ret = audio_ref_clk_platform_init();
-	if (ret)
+	if (ret) {
 		pr_err("%s: init extclk fail: %d\n", __func__, ret);
+	}
 
 	return ret;
 }

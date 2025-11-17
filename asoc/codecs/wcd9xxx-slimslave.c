@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2012-2018, 2020-2021, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2012-2018, 2020-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/slab.h>
 #include <linux/mutex.h>
@@ -13,7 +15,6 @@ struct wcd9xxx_slim_sch {
 };
 
 static struct wcd9xxx_slim_sch sh_ch;
-
 static int wcd9xxx_configure_ports(struct wcd9xxx *wcd9xxx)
 {
 	if (wcd9xxx->codec_type->slim_slave_type ==
@@ -62,19 +63,12 @@ int wcd9xxx_init_slimslave(struct wcd9xxx *wcd9xxx, u8 wcd9xxx_pgd_la,
 		pr_err("%s: invalid rx num %d\n", __func__, rx_num);
 		return -EINVAL;
 	}
+
 	if (wcd9xxx->rx_chs) {
 		wcd9xxx->num_rx_port = rx_num;
 		for (i = 0; i < rx_num; i++) {
 			wcd9xxx->rx_chs[i].ch_num = rx_slot[i];
 			INIT_LIST_HEAD(&wcd9xxx->rx_chs[i].list);
-		}
-		wcd9xxx->sruntime_rx = slim_stream_allocate(wcd9xxx->slim, "WCD9xxx-SLIM-RX");
-		if (wcd9xxx->sruntime_rx == NULL) {			
-			pr_err("%s: Failed to alloc %d rx slimbus channels\n",
-				__func__, wcd9xxx->num_rx_port);
-			kfree(wcd9xxx->rx_chs);
-			wcd9xxx->rx_chs = NULL;
-			wcd9xxx->num_rx_port = 0;
 		}
 	} else {
 		pr_err("Not able to allocate memory for %d slimbus rx ports\n",
@@ -91,23 +85,16 @@ int wcd9xxx_init_slimslave(struct wcd9xxx *wcd9xxx, u8 wcd9xxx_pgd_la,
 			wcd9xxx->tx_chs[i].ch_num = tx_slot[i];
 			INIT_LIST_HEAD(&wcd9xxx->tx_chs[i].list);
 		}
-		wcd9xxx->sruntime_tx = slim_stream_allocate(wcd9xxx->slim, "WCD9xxx-SLIM-TX");
-		if (wcd9xxx->sruntime_tx == NULL) {
-			pr_err("%s: Failed to alloc %d tx slimbus channels\n",
-				__func__, wcd9xxx->num_tx_port);
-			kfree(wcd9xxx->tx_chs);
-			wcd9xxx->tx_chs = NULL;
-			wcd9xxx->num_tx_port = 0;
-		}
 	} else {
 		pr_err("Not able to allocate memory for %d slimbus tx ports\n",
 			wcd9xxx->num_tx_port);
 	}
+
 	return 0;
 err:
 	return ret;
 }
-EXPORT_SYMBOL_GPL(wcd9xxx_init_slimslave);
+EXPORT_SYMBOL(wcd9xxx_init_slimslave);
 
 /* Enable slimbus slave device for RX path */
 int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
@@ -118,7 +105,7 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 	u8 ch_cnt = 0;
 	u8  payload = 0;
 	u16 codec_port = 0;
-	int ret=0;
+	int ret = 0;
 	struct wcd9xxx_ch *rx;
 	int i = 0;
 	struct slim_stream_config sconfig_rx;
@@ -126,9 +113,7 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 	sconfig_rx.direction = direction;
 	sconfig_rx.bps = bit_width;
 	sconfig_rx.rate = rate;
-
 	/* Configure slave interface device */
-
 	list_for_each_entry(rx, wcd9xxx_ch_list, list) {
 		payload |= 1 << rx->shift;
 		ch_cnt++;
@@ -140,8 +125,10 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 	sconfig_rx.chs = kcalloc(sconfig_rx.ch_count, sizeof(unsigned int), GFP_KERNEL);
 
 	if (!sconfig_rx.chs) {
+		pr_debug("%s:channel allocation failed", __func__);
 		return -ENOMEM;
 	}
+
 	list_for_each_entry(rx, wcd9xxx_ch_list, list) {
 		sconfig_rx.chs[i++] = rx->ch_num;
 		codec_port = rx->port;
@@ -160,7 +147,6 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 				SB_PGD_RX_PORT_MULTI_CHANNEL_0(
 				sh_ch.rx_port_ch_reg_base, codec_port),
 				payload);
-
 		if (ret < 0) {
 			pr_err("%s:Intf-dev fail reg[%d] payload[%d] ret[%d]\n",
 				__func__,
@@ -180,24 +166,29 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 		}
 	}
 
+	wcd9xxx->sruntime_rx = slim_stream_allocate(wcd9xxx->slim, "WCD9xxx-SLIM-RX");
+	if (wcd9xxx->sruntime_rx == NULL) {
+		pr_err("%s: Failed to allocate slimbus stream\n",
+				__func__);
+		ret = -EINVAL;
+		goto err_close_slim_sch;
+	}
+
 	/* slim_control_ch */
 	ret = slim_stream_prepare(wcd9xxx->sruntime_rx, &sconfig_rx);
 	if (ret < 0) {
-		pr_err("%s: slim_stream_prepare failed ret[%d]\n",
-			__func__, ret);
-		goto err_close_slim_sch;
-	}
-	ret = slim_stream_enable(wcd9xxx->sruntime_rx);
-	if (ret < 0) {
-		pr_err("%s: slim_stream_enable failed ret[%d]\n",
+	    pr_err("%s: Failed to prepare slimbus stream, ret %d\n",
 			__func__, ret);
 		goto err_close_slim_sch;
 	}
 
-	/*  release all acquired handles */
-	sconfig_rx.port_mask = 0;
-	kfree(sconfig_rx.chs);
-	sconfig_rx.chs = NULL;
+	ret = slim_stream_enable(wcd9xxx->sruntime_rx);
+	if (ret < 0) {
+		pr_err("%s: Failed to enable slimbus stream, ret %d\n",
+			__func__, ret);
+		goto err_close_slim_sch;
+	}
+
 	return 0;
 
 err_close_slim_sch:
@@ -209,7 +200,7 @@ err_close_slim_sch:
 }
 EXPORT_SYMBOL(wcd9xxx_cfg_slim_sch_rx);
 
-/* Enable slimbus slave device for RX path */
+/* Enable slimbus slave device for TX path */
 int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 			    struct list_head *wcd9xxx_ch_list,
 			    unsigned int rate, unsigned int bit_width,
@@ -232,10 +223,12 @@ int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 		ch_cnt++;
 		sconfig_tx.port_mask |= BIT(tx->port);
 	}
+
 	sconfig_tx.ch_count = ch_cnt;
 	sconfig_tx.chs = kcalloc(sconfig_tx.ch_count, sizeof(unsigned int), GFP_KERNEL);
 
 	if (!sconfig_tx.chs) {
+		pr_debug("%s:channel allocation failed", __func__);
 		return -ENOMEM;
 	}
 
@@ -277,23 +270,28 @@ int wcd9xxx_cfg_slim_sch_tx(struct wcd9xxx *wcd9xxx,
 		}
 	}
 
+	wcd9xxx->sruntime_tx = slim_stream_allocate(wcd9xxx->slim, "WCD9xxx-SLIM-TX");
+	if (wcd9xxx->sruntime_tx == NULL) {
+		pr_err("%s: Failed to allocate slimbus stream\n",
+				__func__);
+		ret = -EINVAL;
+		goto err;
+	}
+
 	ret = slim_stream_prepare(wcd9xxx->sruntime_tx, &sconfig_tx);
 	if (ret < 0) {
-		pr_err("%s: slim_stream_prepare failed ret[%d]\n",
-			__func__, ret);
-		goto err;
-	}	
-	ret = slim_stream_enable(wcd9xxx->sruntime_tx);
-	if (ret < 0) {
-		pr_err("%s: slim_stream_enable failed ret[%d]\n",
+		pr_err("%s: Failed to prepare slimbus stream, ret %d\n",
 			__func__, ret);
 		goto err;
 	}
 
-	/* release all acquired handles */
-	sconfig_tx.port_mask = 0;
-	kfree(sconfig_tx.chs);
-	sconfig_tx.chs = NULL;
+	ret = slim_stream_enable(wcd9xxx->sruntime_tx);
+	if (ret < 0) {
+		pr_err("%s: Failed to enable slimbus stream, ret %d\n",
+			__func__, ret);
+		goto err;
+	}
+
 	return 0;
 err:
 	/* release all acquired handles */
@@ -302,14 +300,14 @@ err:
 	sconfig_tx.chs = NULL;
 	return ret;
 }
-EXPORT_SYMBOL_GPL(wcd9xxx_cfg_slim_sch_tx);
+EXPORT_SYMBOL(wcd9xxx_cfg_slim_sch_tx);
 
 int wcd9xxx_get_slave_port(unsigned int ch_num)
 {
 	int ret = 0;
 
 	ret = (ch_num - BASE_CH_NUM);
-	pr_debug("%s: ch_num[%d] slave port[%d]\n", __func__, ch_num, ret);
+	pr_err("%s: ch_num[%d] slave port[%d]\n", __func__, ch_num, ret);
 	if (ret < 0) {
 		pr_err("%s: Error:- Invalid slave port found = %d\n",
 			__func__, ret);
@@ -324,45 +322,48 @@ int wcd9xxx_disconnect_port_tx(struct wcd9xxx *wcd9xxx)
 	int ret = 0;
 
 	if (wcd9xxx->sruntime_tx == NULL) {
-		pr_err("Channel not enabled yet. returning\n");
+		pr_err("%s: sruntime_tx is NULL", __func__);
 		return -EINVAL;
 	}
 
 	/* free the ports allocated to the stream */
-	ret = slim_stream_unprepare_disconnect_port(wcd9xxx->sruntime_tx, true, true);
-
-	if (ret != 0)
-		pr_err("slim_stream_unprepare failed: returned val = %d\n", ret);
-
 	ret = slim_stream_disable(wcd9xxx->sruntime_tx);
-
 	if (ret != 0)
-		pr_err("slim_stream_disable failed :returned val = %d\n", ret);
+		pr_err("%s: Failed to disable slimbus stream, ret %d\n", __func__, ret);
 
+	ret = slim_stream_unprepare_disconnect_port(wcd9xxx->sruntime_tx, true, true);
+	if (ret != 0)
+		pr_err("%s: Failed to disconnect slimbus stream, ret %d\n", __func__, ret);
+
+	slim_stream_free(wcd9xxx->sruntime_tx);
+	wcd9xxx->sruntime_tx = NULL;
 	return ret;
 }
-EXPORT_SYMBOL_GPL(wcd9xxx_disconnect_port_tx);
+EXPORT_SYMBOL(wcd9xxx_disconnect_port_tx);
 
 int wcd9xxx_disconnect_port_rx(struct wcd9xxx *wcd9xxx)
 {
 	int ret = 0;
-
 	if (wcd9xxx->sruntime_rx == NULL) {
-		pr_err("Channel not enabled yet. returning\n");
+		pr_err("%s: sruntime_rx is NULL", __func__);
 		return -EINVAL;
 	}
 
 	/* free the ports allocated to the stream */
-	ret = slim_stream_unprepare_disconnect_port(wcd9xxx->sruntime_rx, true, true);
-	if (ret != 0)
-		pr_err("slim_stream_unprepare failed: returned val = %d\n", ret);
-
 	ret = slim_stream_disable(wcd9xxx->sruntime_rx);
-	if (ret != 0)
-		pr_err("slim_stream_disable failed :returned val = %d\n", ret);
+	if (ret < 0)
+		pr_err("%s: Failed to disable slimbus stream, ret %d\n", __func__, ret);
+
+	ret = slim_stream_unprepare_disconnect_port(wcd9xxx->sruntime_rx, true, true);
+	if (ret < 0)
+		pr_err("%s: Failed to disconnect slimbus stream, ret %d\n", __func__, ret);
+
+	slim_stream_free(wcd9xxx->sruntime_rx);
+	wcd9xxx->sruntime_rx = NULL;
+
 	return ret;
 }
-EXPORT_SYMBOL_GPL(wcd9xxx_disconnect_port_rx);
+EXPORT_SYMBOL(wcd9xxx_disconnect_port_rx);
 
 /* This function is called with mutex acquired */
 int wcd9xxx_rx_vport_validation(u32 port_id,
@@ -372,10 +373,9 @@ int wcd9xxx_rx_vport_validation(u32 port_id,
 	int ret = 0;
 
 	pr_debug("%s: port_id %u\n", __func__, port_id);
-
 	list_for_each_entry(ch,
 		codec_dai_list, list) {
-		pr_debug("%s: ch->port %u\n", __func__, ch->port);
+		pr_err("%s: ch->port %u\n", __func__, ch->port);
 		if (ch->port == port_id) {
 			ret = -EINVAL;
 			break;
@@ -397,7 +397,7 @@ int wcd9xxx_tx_vport_validation(u32 table, u32 port_id,
 	unsigned long vtable = table;
 	u32 size = sizeof(table) * BITS_PER_BYTE;
 
-	pr_debug("%s: vtable 0x%lx port_id %u size %d\n", __func__,
+	pr_err("%s: vtable 0x%lx port_id %u size %d\n", __func__,
 		 vtable, port_id, size);
 	for_each_set_bit(index, &vtable, size) {
 		if (index < num_codec_dais) {

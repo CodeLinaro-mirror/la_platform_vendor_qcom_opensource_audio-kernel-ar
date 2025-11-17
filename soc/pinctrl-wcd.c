@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2017, 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio/driver.h>
@@ -269,24 +270,10 @@ static int wcd_pinctrl_probe(struct platform_device *pdev)
 	struct pinctrl_desc *pctrldesc;
 	struct wcd_gpio_pad *pad, *pads;
 	struct wcd_gpio_priv *priv_data;
-	int ret=0, i, j;
+	int ret, i, j;
 	u32 npins;
 	char **name;
-	struct device_node *np = dev->of_node;
-	
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
-	//pr_err("%s  line=%d Platform device name: %s\n",  __func__,__LINE__,pdev->name);	
-	//pr_info("%s line=%d Device name using dev_name(): %s\n",  __func__,__LINE__,dev_name(&pdev->dev));
 
-	if (!np) {
-    		dev_err(dev, "%s Device node is NULL — check DTS and driver matching line=%d\n", __func__,__LINE__);
-    		return -ENODEV;
-	}else {
-		dev_err(dev, "%s: node=%s line=%d\n",  __func__,np->full_name,__LINE__);
-	
-	}
-
-	//dev_err(&pdev->dev, "Node: %s, Compatible: %s\n",dev->of_node->full_name,(char *)of_get_property(dev->of_node, "compatible", NULL));
 	ret = of_property_read_u32(dev->of_node, "qcom,gpios-count", &npins);
 	if (ret) {
 		dev_err(dev, "%s: Looking up %s property in node %s failed\n",
@@ -294,20 +281,18 @@ static int wcd_pinctrl_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_priv_alloc;
 	}
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
 	if (!npins) {
 		dev_err(dev, "%s: no.of pins are 0\n", __func__);
 		ret = -EINVAL;
 		goto err_priv_alloc;
 	}
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
 
 	priv_data = devm_kzalloc(dev, sizeof(*priv_data), GFP_KERNEL);
 	if (!priv_data) {
 		ret = -ENOMEM;
 		goto err_priv_alloc;
 	}
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
+
 	priv_data->dev = dev;
 	priv_data->map = dev_get_regmap(dev->parent, NULL);
 	if (!priv_data->map) {
@@ -315,13 +300,13 @@ static int wcd_pinctrl_probe(struct platform_device *pdev)
 		ret = -EINVAL;
 		goto err_regmap;
 	}
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
+
 	pindesc = devm_kcalloc(dev, npins, sizeof(*pindesc), GFP_KERNEL);
 	if (!pindesc) {
 		ret = -ENOMEM;
 		goto err_pinsec_alloc;
 	}
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
+
 	pads = devm_kcalloc(dev, npins, sizeof(*pads), GFP_KERNEL);
 	if (!pads) {
 		ret = -ENOMEM;
@@ -340,7 +325,7 @@ static int wcd_pinctrl_probe(struct platform_device *pdev)
 	pctrldesc->name = dev_name(dev);
 	pctrldesc->pins = pindesc;
 	pctrldesc->npins = npins;
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
+
 	name = devm_kcalloc(dev, npins, sizeof(char *), GFP_KERNEL);
 	if (!name) {
 		ret = -ENOMEM;
@@ -350,7 +335,6 @@ static int wcd_pinctrl_probe(struct platform_device *pdev)
 		name[i] = devm_kzalloc(dev, sizeof(char) * WCD_GPIO_STRING_LEN,
 				       GFP_KERNEL);
 		if (!name[i]) {
-			dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
 			ret = -ENOMEM;
 			goto err_pin;
 		}
@@ -370,20 +354,20 @@ static int wcd_pinctrl_probe(struct platform_device *pdev)
 	priv_data->chip.label = dev_name(dev);
 	priv_data->chip.of_gpio_n_cells = 2;
 	priv_data->chip.can_sleep = false;
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
+
 	priv_data->ctrl = devm_pinctrl_register(dev, pctrldesc, priv_data);
 	if (IS_ERR(priv_data->ctrl)) {
 		dev_err(dev, "%s: failed to register to pinctrl\n", __func__);
 		ret = PTR_ERR(priv_data->ctrl);
 		goto err_pin;
 	}
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
+
 	ret = gpiochip_add_data(&priv_data->chip, priv_data);
 	if (ret) {
 		dev_err(dev, "%s: can't add gpio chip\n", __func__);
 		goto err_pin;
 	}
-	dev_err(dev, "%s: enter line=%d\n", __func__,__LINE__);
+
 	ret = gpiochip_add_pin_range(&priv_data->chip, dev_name(dev), 0, 0,
 				     npins);
 	if (ret) {
@@ -391,7 +375,7 @@ static int wcd_pinctrl_probe(struct platform_device *pdev)
 		goto err_range;
 	}
 	platform_set_drvdata(pdev, priv_data);
-	dev_err(dev, "%s: exit line=%d\n", __func__,__LINE__);
+
 	return 0;
 
 err_range:

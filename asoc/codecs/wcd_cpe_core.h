@@ -1,12 +1,14 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2013-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef WCD_CPE_CORE_H
 #define WCD_CPE_CORE_H
 
 #include <soc/qcom/ramdump.h>
-#include <linux/dma-map-ops.h>
+#include <linux/dma-mapping.h>
 #include "wcd_cpe_services.h"
 
 #define WCD_CPE_LAB_MAX_LATENCY 250

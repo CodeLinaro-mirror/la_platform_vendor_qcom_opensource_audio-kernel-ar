@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -11,8 +13,8 @@
 #include <linux/regmap.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
-#include <linux/mfd/core.h>
 #include <linux/pm_qos.h>
+#include <linux/mfd/core.h>
 #include <asoc/core.h>
 #include <asoc/msm-cdc-supply.h>
 #include <asoc/msm-cdc-pinctrl.h>
@@ -62,7 +64,6 @@ static int wcd9xxx_read_of_property_u32(struct device *dev, const char *name,
 	if (rc)
 		dev_err(dev, "%s: Looking up %s property in node %s failed",
 			__func__, name, dev->of_node->full_name);
-pr_err("%s: enter\n", __func__);
 	return rc;
 }
 
@@ -71,7 +72,6 @@ static void wcd9xxx_dt_parse_micbias_info(struct device *dev,
 {
 	u32 prop_val;
 	int rc;
-pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-ldoh-v", NULL)) {
 		rc = wcd9xxx_read_of_property_u32(dev,
 						  "qcom,cdc-micbias-ldoh-v",
@@ -79,7 +79,6 @@ pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		if (!rc)
 			mb->ldoh_v  =  (u8)prop_val;
 	}
-pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB1 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-cfilt1-mv",
 			     NULL)) {
@@ -109,7 +108,6 @@ pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		dev_info(dev, "%s: Micbias1 DT property not found\n",
 			__func__);
 	}
-pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB2 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-cfilt2-mv",
 			     NULL)) {
@@ -140,7 +138,6 @@ pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		dev_info(dev, "%s: Micbias2 DT property not found\n",
 			__func__);
 	}
-pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB3 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias-cfilt3-mv",
 			     NULL)) {
@@ -172,7 +169,6 @@ pr_err("%s: enter line=%d\n", __func__,__LINE__);
 		dev_info(dev, "%s: Micbias3 DT property not found\n",
 			__func__);
 	}
-pr_err("%s: enter line=%d\n", __func__,__LINE__);
 	/* MB4 */
 	if (of_find_property(dev->of_node, "qcom,cdc-micbias4-cfilt-sel",
 			     NULL)) {
@@ -350,14 +346,6 @@ struct wcd9xxx_pdata *wcd9xxx_populate_dt_data(struct device *dev)
 			dev->of_node->full_name);
 		goto err_parse_dt_prop;
 	}
-	/*(pdata->reset_gpio = of_get_named_gpio(dev->of_node,
-                                                     "qcom,wcd-rst-gpio-node", 0);
-	if (!pdata->reset_gpio) {
-                dev_err(dev, "%s: Looking up %s gpio property in node %s failed\n",
-                        __func__, "qcom,wcd-rst-gpio-node",
-                        dev->of_node->full_name);
-               goto err_parse_dt_prop;
-        }*/
 
 	pdata->has_buck_vsel_gpio = of_property_read_bool(dev->of_node,
 						"qcom,has-buck-vsel-gpio");
@@ -512,10 +500,8 @@ int wcd9xxx_page_write(struct wcd9xxx *wcd9xxx, unsigned short *reg)
 	pg_num = c_reg >> 8;
 	reg_addr = c_reg & 0xff;
 	if (wcd9xxx->prev_pg_valid) {
-		//pr_err("%s line=%d\n",__func__,__LINE__);
 		prev_pg_num = wcd9xxx->prev_pg;
 		if (prev_pg_num != pg_num) {
-			//pr_err("%s line=%d\n",__func__,__LINE__);
 			ret = wcd9xxx->write_dev(
 					wcd9xxx, PAGE_REG_ADDR, 1,
 					(void *) &pg_num, false);
@@ -755,6 +741,7 @@ int wcd9xxx_reset(struct device *dev)
 	return rc;
 }
 EXPORT_SYMBOL(wcd9xxx_reset);
+
 /*
  * wcd9xxx_reset_low:
  *	Pull the wcd9xxx codec reset_n to low
@@ -910,9 +897,6 @@ int wcd9xxx_get_codec_info(struct device *dev)
 
 	switch (wcd9xxx->type) {
 	case WCD934X:
-		dev_err(dev, "%s: kiran codec wcd934x\n",
-                        __func__);
-
 		cinfo->dev = tavil_devs;
 		cinfo->size = ARRAY_SIZE(tavil_devs);
 		break;
@@ -1007,7 +991,6 @@ int wcd9xxx_core_res_init(
 	wcd9xxx_core_res->wlock_holders = 0;
 	wcd9xxx_core_res->pm_state = WCD9XXX_PM_SLEEPABLE;
 	init_waitqueue_head(&wcd9xxx_core_res->pm_wq);
-
 	cpu_latency_qos_add_request(&wcd9xxx_core_res->pm_qos_req,
 				PM_QOS_DEFAULT_VALUE);
 
@@ -1031,12 +1014,10 @@ EXPORT_SYMBOL(wcd9xxx_core_res_init);
  */
 void wcd9xxx_core_res_deinit(struct wcd9xxx_core_resource *wcd9xxx_core_res)
 {
-
 	if (!wcd9xxx_core_res)
 		return;
 
 	cpu_latency_qos_remove_request(&wcd9xxx_core_res->pm_qos_req);
-
 	mutex_destroy(&wcd9xxx_core_res->pm_lock);
 }
 EXPORT_SYMBOL(wcd9xxx_core_res_deinit);
@@ -1087,7 +1068,6 @@ int wcd9xxx_core_res_suspend(
 {
 	int ret = 0;
 
-	pr_err("%s: enter\n", __func__);
 	/*
 	 * pm_qos_update_request() can be called after this suspend chain call
 	 * started. thus suspend can be called while lock is being held
@@ -1147,7 +1127,6 @@ int wcd9xxx_core_res_resume(
 {
 	int ret = 0;
 
-	pr_err("%s: enter\n", __func__);
 	mutex_lock(&wcd9xxx_core_res->pm_lock);
 	if (wcd9xxx_core_res->pm_state == WCD9XXX_PM_ASLEEP) {
 		pr_debug("%s: resuming system, state %d, wlock %d\n", __func__,
@@ -1174,7 +1153,6 @@ EXPORT_SYMBOL(wcd9xxx_core_res_resume);
  */
 enum wcd9xxx_intf_status wcd9xxx_get_intf_type(void)
 {
-	pr_err("%s: enter\n", __func__);
 	return wcd9xxx_intf;
 }
 EXPORT_SYMBOL(wcd9xxx_get_intf_type);

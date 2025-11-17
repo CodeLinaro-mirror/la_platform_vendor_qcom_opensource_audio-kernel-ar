@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2014-2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -11,7 +13,7 @@
 #include <linux/debugfs.h>
 #include <linux/delay.h>
 #include <linux/pm_qos.h>
-#include <linux/dma-map-ops.h>
+#include <linux/dma-mapping.h>
 #include <sound/soc.h>
 #include <sound/info.h>
 #include <audio/sound/lsm_params.h>

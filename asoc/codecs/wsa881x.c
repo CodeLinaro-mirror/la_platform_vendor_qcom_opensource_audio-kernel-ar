@@ -38,10 +38,9 @@
 			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
 			SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000 |\
 			SNDRV_PCM_RATE_384000)
-
 #define WSA881X_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
-			SNDRV_PCM_FMTBIT_S24_LE |\
-			SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE)
+		SNDRV_PCM_FMTBIT_S24_LE |\
+		SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE)
 
 enum {
 	G_18DB = 0,
@@ -1570,7 +1569,7 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 				wsa881x->pd_gpio);
 			goto err;
 		}
-		dev_err(&pdev->dev, "%s: reset gpio %d\n", __func__,
+		dev_dbg(&pdev->dev, "%s: reset gpio %d\n", __func__,
 			wsa881x->pd_gpio);
 	}
 	swr_set_dev_data(pdev, wsa881x);
@@ -1671,8 +1670,7 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 		sizeof(struct snd_soc_dai_driver));
 
 	/* Get last digit from HEX format */
-	//dev_index = pdev->dev_num;
-        dev_index = (int)((char) (pdev->addr & 0xF));
+	dev_index = (int)((char)(pdev->addr & 0xF));
 
 	snprintf(buffer, sizeof(buffer), "wsa-codec.%d", dev_index);
 	wsa881x->driver->name = kstrndup(buffer,
@@ -1689,6 +1687,7 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 	/* Number of DAI's used is 1 */
 	ret = snd_soc_register_component(&pdev->dev,
 				wsa881x->driver, wsa881x->dai_driver, 1);
+
 	if (ret) {
 		dev_err(&pdev->dev, "%s: Codec registration failed\n",
 			__func__);
@@ -1704,6 +1703,7 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 		ret = -EINVAL;
 		goto err_mem;
 	}
+
 	component->name_prefix = wsa881x->wsa881x_name_prefix;
 
 	wsa881x->bolero_np = of_parse_phandle(pdev->dev.of_node,
@@ -1740,7 +1740,6 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 	mutex_init(&wsa881x->temp_lock);
 
 	return 0;
-
 err_mem:
 	kfree(wsa881x->wsa881x_name_prefix);
 	if (wsa881x->dai_driver) {
@@ -1752,6 +1751,7 @@ err_mem:
 		devm_kfree(&pdev->dev, wsa881x->driver->name);
 		devm_kfree(&pdev->dev, wsa881x->driver);
 	}
+
 dev_err:
 	if (pin_state_current == false)
 		wsa881x_gpio_ctrl(wsa881x, false);

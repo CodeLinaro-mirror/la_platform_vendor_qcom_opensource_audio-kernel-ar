@@ -1,7 +1,7 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _LINUX_SOUNDWIRE_H
@@ -30,7 +30,12 @@ enum {
 #define SWR_CLK_RATE_4P8MHZ      4800000
 #define SWR_CLK_RATE_9P6MHZ      9600000
 #define SWR_CLK_RATE_11P2896MHZ  11289600
-#define SWR_CLK_RATE_12P288MHZ   12288000
+#define SWR_CLK_RATE_0P384MHZ     384000
+#define SWR_CLK_RATE_0P768MHZ     768000
+#define SWR_CLK_RATE_1P536MHZ    1536000
+#define SWR_CLK_RATE_3P072MHZ    3072000
+#define SWR_CLK_RATE_6P144MHZ    6144000
+#define SWR_CLK_RATE_12P288MHZ  12288000
 
 extern struct bus_type soundwire_type;
 struct swr_device;
