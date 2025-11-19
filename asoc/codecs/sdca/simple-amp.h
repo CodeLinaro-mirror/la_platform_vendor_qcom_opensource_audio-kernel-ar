@@ -1,6 +1,5 @@
-
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef SIMPLE_AMP_H
@@ -12,10 +11,14 @@
 #include <linux/debugfs.h>
 #include <linux/soundwire/sdw_registers.h>
 
+#define SIMPLE_CHIP_VERSION_V1 0
+#define SIMPLE_CHIP_VERSION_V2 1
+
 #define MCLK_9P6MHZ 9600000
 #define MAX_INIT_REGS 64
 #define MAX_CNTL_NUMBERS 4
 #define NUM_IMP_DEF_REG_VAL_PAIRS  16
+#define SIMPLE_AMP_NUM_RETRY 5
 
 #define MAX_SWR_SLV_PORTS 4
 #define PORT_1 1
@@ -29,7 +32,6 @@
 #define SWRS_BASE                      0x00
 #define SWRS_DP_PREPARE_CONTROL(n)     (SWRS_BASE+0x5+0x100*n)
 #define SWRS_SCP_COMMIT  0x4c
-
 
 enum sdca_function_type {
 	FUNCTION_ZERO = 0,
@@ -76,13 +78,12 @@ enum sdca_function_type {
 #define SIMPLE_AMP_CTL_PDE_ACT_PS          0x10
 
 
-#define SDCA_INT1_MASK (SDW_SCP_SDCA_INTMASK_SDCA_3 | SDW_SCP_SDCA_INTMASK_SDCA_4 \
-				| SDW_SCP_SDCA_INTMASK_SDCA_5)
-#define SDCA_INT2_MASK (SDW_SCP_SDCA_INTMASK_SDCA_8 | SDW_SCP_SDCA_INTMASK_SDCA_11 \
-		| SDW_SCP_SDCA_INTMASK_SDCA_13 | SDW_SCP_SDCA_INTMASK_SDCA_14 \
-		| SDW_SCP_SDCA_INTMASK_SDCA_15)
-#define SDCA_INT3_MASK (SDW_SCP_SDCA_INTMASK_SDCA_21 | SDW_SCP_SDCA_INTMASK_SDCA_22 \
-		| SDW_SCP_SDCA_INTMASK_SDCA_23)
+#define SDCA_INT1_MASK (SDW_SCP_SDCA_INTMASK_SDCA_2 | SDW_SCP_SDCA_INTMASK_SDCA_3\
+				| SDW_SCP_SDCA_INTMASK_SDCA_4 | SDW_SCP_SDCA_INTMASK_SDCA_7)
+#define SDCA_INT2_MASK (SDW_SCP_SDCA_INTMASK_SDCA_10 | SDW_SCP_SDCA_INTMASK_SDCA_12 \
+		| SDW_SCP_SDCA_INTMASK_SDCA_13 | SDW_SCP_SDCA_INTMASK_SDCA_14)
+#define SDCA_INT3_MASK (SDW_SCP_SDCA_INTMASK_SDCA_20 | SDW_SCP_SDCA_INTMASK_SDCA_21 \
+		| SDW_SCP_SDCA_INTMASK_SDCA_22)
 
 /* FU Volume control registers */
 #define ENTITY_FU21  0x4
@@ -115,12 +116,46 @@ enum sdca_function_type {
 #define SIMPLE_AMP_IMPL_DEF_PA0_FSM  0x4058042A
 #define SIMPLE_AMP_IMPL_DEF_PA1_FSM  0x40580434
 
+/* Get temperature for Speaker */
+#define T1_TEMP -10
+#define T2_TEMP 150
+#define LOW_TEMP_THRESHOLD 5
+#define HIGH_TEMP_THRESHOLD 45
+#define TEMP_INVALID	0xFFFF
+#define SIMPLE_AMP_TEMP_RETRY 3
+#define READ_REG_MAX 6
+
+#define WSA8855_DIG_CTRL0_TEMP_DIN_MSB   0x40580452
+#define WSA8855_DIG_CTRL0_TEMP_DIN_LSB   0x40580453
+#define WSA8855_DIG_TRIM_OTP_REG_1       0x40580881
+#define WSA8855_DIG_TRIM_OTP_REG_2       0x40580882
+#define WSA8855_DIG_TRIM_OTP_REG_3       0x40580883
+#define WSA8855_DIG_TRIM_OTP_REG_4       0x40580884
+
+/* FSM related IMPL def registers */
+#define SIMPLE_AMP_IMPL_DEF_POWER_FSM_STATUS0 0x40580427
+#define SIMPLE_AMP_IMPL_DEF_FSM_ERR_COND      0x40580429
+#define SIMPLE_AMP_IMPL_DEF_PA0_STATUS0       0x40580430
+#define SIMPLE_AMP_IMPL_DEF_ERR_COND          0x40580432
+#define SIMPLE_AMP_IMPL_DEF_PA1_STATUS0       0x4058043A
+#define SIMPLE_AMP_IMPL_DEF_PA1_ERR_COND      0x4058043C
+
+struct simple_amp_temp_register {
+	int d1_msb;
+	int d1_lsb;
+	int d2_msb;
+	int d2_lsb;
+	int dmeas_msb;
+	int dmeas_lsb;
+};
+
 struct port_config {
 	int num_ports;
 	u8 port_id[MAX_SWR_SLV_PORTS];
 	u8 ch_mask[MAX_SWR_SLV_PORTS];
 	u8 port_type[MAX_SWR_SLV_PORTS];
 	u8 num_ch[MAX_SWR_SLV_PORTS];
+	unsigned int bitwidth[MAX_SWR_SLV_PORTS];
 	unsigned int ch_rate[MAX_SWR_SLV_PORTS];
 	struct swr_device *swr_slave;
 };
@@ -168,6 +203,7 @@ struct simple_amp_priv {
 	int ch1_voldB;
 	int rx_ch_sel;
 	bool debug_mode_enable;
+	bool trigger_die_temp_enable;
 
 	struct device_node *parent_np;
 	struct platform_device *parent_dev;
@@ -185,6 +221,14 @@ struct simple_amp_priv {
 	struct dentry *debugfs_reg_dump;
 	unsigned int read_data;
 #endif
+	struct work_struct temperature_work;
+	struct completion tmp_th_complete;
+	int curr_temp;
+	int chip_version;
 };
+
+void get_reg_defaults(const struct reg_default **reg_def, size_t *num_defaults,
+			struct simple_amp_priv *simple_amp);
+
 
 #endif /* SIMPLE_AMP_H */

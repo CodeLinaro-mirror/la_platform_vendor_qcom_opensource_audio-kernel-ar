@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -397,11 +397,105 @@ int swr_connect_port(struct swr_device *dev, u8 *port_id, u8 num_port,
 		txn->ch_rate[i] = ch_rate[i];
 		txn->ch_en[i]   = ch_mask[i];
 		txn->port_type[i] = port_type[i];
+		txn->bit_width[i] = 0;
 	}
 	ret = master->connect_port(master, txn);
 	return ret;
 }
 EXPORT_SYMBOL(swr_connect_port);
+
+/**
+ * swr_connect_port_v2 - enable soundwire slave port(s)
+ * @dev: pointer to soundwire slave device
+ * @port_id: logical port id(s) of soundwire slave device
+ * @num_port: number of slave device ports need to be enabled
+ * @ch_mask: channels for each port that needs to be enabled
+ * @ch_rate: rate at which each port/channels operate
+ * @num_ch: number of channels for each port
+ * @port_type: array of master port types
+ * @bit_width: array of bit widths of different channels
+ *
+ * soundwire slave device call swr_connect_port API to enable all/some of
+ * its ports and corresponding channels and channel rate. This API will
+ * call master connect_port callback function to calculate frame structure
+ * and enable master and slave ports
+ */
+int swr_connect_port_v2(struct swr_device *dev, u8 *port_id, u8 num_port,
+			u8 *ch_mask, u32 *ch_rate, u8 *num_ch, u8 *port_type,
+			unsigned int *bit_width)
+{
+	u8 i = 0;
+	int ret = 0;
+	struct swr_params *txn = NULL;
+	struct swr_params **temp_txn = NULL;
+	struct swr_master *master = dev->master;
+
+	if (!master) {
+		pr_err_ratelimited("%s: Master is NULL\n", __func__);
+		return -EINVAL;
+	}
+	if (num_port > SWR_MAX_DEV_PORT_NUM) {
+		dev_err_ratelimited(&master->dev, "%s: num_port %d exceeds max port %d\n",
+			__func__, num_port, SWR_MAX_DEV_PORT_NUM);
+		return -EINVAL;
+	}
+
+	/*
+	 * create "txn" to accommodate ports enablement of
+	 * different slave devices calling swr_connect_port at the
+	 * same time. Once master process the txn data, it calls
+	 * swr_port_response() to free the transaction. Maximum
+	 * of 256 transactions can be allocated.
+	 */
+	txn = kzalloc(sizeof(struct swr_params), GFP_KERNEL);
+	if (!txn)
+		return -ENOMEM;
+
+	mutex_lock(&master->mlock);
+	for (i = 0; i < master->last_tid; i++) {
+		if (master->port_txn[i] == NULL)
+			break;
+	}
+	if (i >= master->last_tid) {
+		if (master->last_tid == 255) {
+			mutex_unlock(&master->mlock);
+			kfree(txn);
+			dev_err_ratelimited(&master->dev, "%s Max tid reached\n",
+				__func__);
+			return -ENOMEM;
+		}
+		temp_txn = krealloc(master->port_txn,
+				(i + 1) * sizeof(struct swr_params *),
+				GFP_KERNEL);
+		if (!temp_txn) {
+			mutex_unlock(&master->mlock);
+			kfree(txn);
+			dev_err_ratelimited(&master->dev, "%s Not able to allocate\n"
+				"master port transaction memory\n",
+				__func__);
+			return -ENOMEM;
+		}
+		master->port_txn = temp_txn;
+		master->last_tid++;
+	}
+	master->port_txn[i] = txn;
+	mutex_unlock(&master->mlock);
+	txn->tid = i;
+
+	txn->dev_num = dev->dev_num;
+	txn->num_port = num_port;
+	for (i = 0; i < num_port; i++) {
+		txn->port_id[i] = port_id[i];
+		txn->num_ch[i]  = num_ch[i];
+		txn->ch_rate[i] = ch_rate[i];
+		txn->ch_en[i]   = ch_mask[i];
+		txn->port_type[i] = port_type[i];
+		txn->bit_width[i] = bit_width[i];
+	}
+	ret = master->connect_port(master, txn);
+	return ret;
+}
+EXPORT_SYMBOL(swr_connect_port_v2);
 
 /**
  * swr_disconnect_port - disable soundwire slave port(s)
