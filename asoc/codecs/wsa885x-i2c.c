@@ -928,11 +928,14 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 {
 	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
-	int ret = 0, ps0 = 0, ps3 = 3;
+	int ret = 0, ps0 = 0, ps3 = 3, open_count = 0;
 
 	dev_dbg(wsa885x->dev, "%s: Stream is %s\n", __func__, mute ? "muted" : "unmuted");
 
 	if (mute) {
+		open_count = atomic_dec_return(&wsa885x->open_count);
+		if (open_count > 0)
+			return 0;
 		/* Handle SSR (SubSystem Restart) scenario */
 		if (gpr_get_q6_state() == GPR_SUBSYS_DOWN)
 			return wsa885x_handle_ssr_reset(wsa885x);
@@ -946,6 +949,9 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 				"Successfully transitioned to power state %d\n", ps3);
 		}
 	} else {
+		open_count = atomic_read(&wsa885x->open_count);
+		if (open_count > 1)
+			return 0;
 		/* Disable power amplifier FSM before configuration */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
 
