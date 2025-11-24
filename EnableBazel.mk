@@ -77,8 +77,6 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd939x/wcd939x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd939x/wcd939x_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_slave_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_dlkm.ko
-LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass_bt_swr_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/hdmi_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/qmp1000/qmp_dlkm.ko
@@ -86,6 +84,11 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/sdca/simple_amp_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa885x_i2c_dlkm.ko
 endif
 
+ifeq ($(call is-board-platform-in-list, chora),true)
+LOCAL_MODULE_DDK_BUILD := true
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_slave_dlkm.ko
+endif
 ifeq ($(call is-board-platform-in-list,blair),true)
 LOCAL_MODULE_DDK_BUILD := true
 
