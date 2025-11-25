@@ -23,6 +23,16 @@
 #include <linux/qti-regmap-debugfs.h>
 #include <linux/proc_fs.h>
 
+/* Register addresses */
+#define LPASS_RATE_GEN_CTRL		0x7EED000
+#define LPASS_RATE_GEN_COUNTER_0	0x7EED004
+#define LPASS_RATE_GEN_DELAY		0x7EED010
+
+/* Register base and size for ioremap */
+#define LPASS_RATE_GEN_BASE		0x7EED000
+#define LPASS_RATE_GEN_SIZE		0x1000
+
+
 #define DRV_NAME "lpass-cdc"
 
 #define LPASS_CDC_VERSION_ENTRY_SIZE 32
@@ -1391,6 +1401,42 @@ static const struct proc_ops lpass_cdc_proc_ops = {
 	.proc_read = lpass_cdc_proc_read,
 };
 
+
+/**
+ * lpass_rate_gen_write_regs - ioremap and write to rate generator registers
+ *
+ * This function maps the rate generator registers and writes sample values
+ */
+static void lpass_rate_gen_write_regs(void)
+{
+	void __iomem *io_base;
+
+	/* ioremap the register region */
+	io_base = ioremap(LPASS_RATE_GEN_BASE, LPASS_RATE_GEN_SIZE);
+	if (!io_base) {
+		pr_err("%s: Failed to ioremap rate gen registers\n", __func__);
+		return;
+	}
+
+	/* Write to LPASS_RATE_GEN_COUNTER_0 */
+	iowrite32(0x960, io_base + (LPASS_RATE_GEN_COUNTER_0 - LPASS_RATE_GEN_BASE));
+
+	/* Write to LPASS_RATE_GEN_DELAY */
+	iowrite32(0x16, io_base + (LPASS_RATE_GEN_DELAY - LPASS_RATE_GEN_BASE));
+
+		/* Write to LPASS_RATE_GEN_CTRL */
+	iowrite32(0x1, io_base + (LPASS_RATE_GEN_CTRL - LPASS_RATE_GEN_BASE));
+
+	pr_debug("%s: COUNTER: 0x%X delay: 0x%X cntrl: 0x%X \n", __func__,
+			ioread32(io_base + (LPASS_RATE_GEN_COUNTER_0 - LPASS_RATE_GEN_BASE)),
+			ioread32(io_base + (LPASS_RATE_GEN_DELAY - LPASS_RATE_GEN_BASE)),
+			ioread32(io_base + (LPASS_RATE_GEN_CTRL - LPASS_RATE_GEN_BASE)));
+
+	/* Unmap when done */
+	iounmap(io_base);
+}
+
+
 static int lpass_cdc_probe(struct platform_device *pdev)
 {
 	struct lpass_cdc_priv *priv;
@@ -1581,6 +1627,7 @@ core_clk_vote:
 		}
 	}
 	priv->core_clk_vote_count++;
+	lpass_rate_gen_write_regs();
 
 done:
 	mutex_unlock(&priv->vote_lock);
