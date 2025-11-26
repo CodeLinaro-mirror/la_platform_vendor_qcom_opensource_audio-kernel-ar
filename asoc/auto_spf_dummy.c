@@ -26,6 +26,7 @@
 #include <soc/snd_event.h>
 #include "msm_dailink.h"
 #include "msm_common.h"
+#include <linux/bootmarker_kernel.h>
 
 
 #define DRV_NAME "spf-asoc-snd"
@@ -1546,6 +1547,12 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	dev_err(&pdev->dev, "%s: audio_reach\n",
 		__func__);
 
+#if (IS_ENABLED(CONFIG_BOOTMARKER_PROXY))
+	bootmarker_place_marker("M - DRIVER Audio Init");
+#else
+	dev_err(&pdev->dev, "M - DRIVER Audio Init\n");
+#endif
+
 	match = of_match_node(asoc_machine_of_match, pdev->dev.of_node);
 	if (!match) {
 		dev_err(&pdev->dev, "%s: No DT match found for sound card\n",
@@ -1648,6 +1655,13 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		card->name);
 	pr_err("Sound card %s registered\n",
 		card->name);
+
+#if (IS_ENABLED(CONFIG_BOOTMARKER_PROXY))
+	bootmarker_place_marker("M - DRIVER Audio Ready");
+#else
+	dev_err(&pdev->dev, "M - DRIVER Audio Ready\n");
+#endif
+
 	spdev = pdev;
 
 #ifdef CONFIG_MSM_COUPLED_SSR
