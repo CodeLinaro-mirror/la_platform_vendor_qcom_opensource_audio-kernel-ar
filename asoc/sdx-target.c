@@ -1087,6 +1087,8 @@ static int sdx_ssr_enable(struct device *dev, void *data)
 
 #if IS_ENABLED(CONFIG_AUDIO_QGKI)
 	snd_soc_card_change_online_state(card, 1);
+#else
+	snd_card_notify_user(SND_CARD_STATUS_ONLINE);
 #endif /* CONFIG_AUDIO_QGKI */
 	dev_dbg(dev, "%s: setting snd_card to ONLINE\n", __func__);
 
@@ -1107,6 +1109,8 @@ static void sdx_ssr_disable(struct device *dev, void *data)
 	dev_dbg(dev, "%s: setting snd_card to OFFLINE\n", __func__);
 #if IS_ENABLED(CONFIG_AUDIO_QGKI)
 	snd_soc_card_change_online_state(card, 0);
+#else
+	snd_card_notify_user(SND_CARD_STATUS_OFFLINE);
 #endif /* CONFIG_AUDIO_QGKI */
 
 	if (!strcmp(card->name, "sdx-stub-snd-card")) {
@@ -1343,12 +1347,15 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	pdata->lpass_audio_hw_vote = lpass_audio_hw_vote;
 	pdata->core_audio_vote_count = 0;
 #endif
-
+	snd_card_sysfs_init();
 	ret = msm_audio_ssr_register(&pdev->dev);
 	if (ret)
 		pr_err("%s: Registration with SND event FWK failed ret = %d\n",
 			__func__, ret);
 	is_initial_boot = true;
+
+	dev_info(&pdev->dev, "%s: Setting snd_card status to online.", __func__);
+	snd_card_set_card_status(SND_CARD_STATUS_ONLINE);
 
 	/* Add QoS request for audio tasks */
 	msm_audio_add_qos_request();
