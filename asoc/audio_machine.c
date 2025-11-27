@@ -1635,6 +1635,8 @@ static const struct of_device_id canoe_asoc_machine_of_match[]  = {
 	{ .compatible = "qcom,canoe-asoc-snd-stub", .data = "stub_codec"},
 	{ .compatible = "qcom,art-asoc-snd", .data = "codec"},
 	{ .compatible = "qcom,art-asoc-snd-stub", .data = "stub_codec"},
+	{ .compatible = "qcom,shikra-asoc-snd", .data = "codec"},
+	{ .compatible = "qcom,shikra-asoc-snd-stub", .data = "stub_codec"},
 	{},
 };
 
