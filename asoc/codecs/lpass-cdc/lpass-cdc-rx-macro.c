@@ -2810,8 +2810,13 @@ static int lpass_cdc_rx_macro_enable_interp_clk(struct snd_soc_component *compon
 			if (rx_priv->is_pcm_enabled && !rx_priv->is_native_on &&
 					interp_idx != INTERP_AUX) {
 				if (rx_priv->pcm_select_users == 0)
+#ifdef CONFIG_BOLERO_VER_4P0
+					snd_soc_component_update_bits(component,
+						LPASS_CDC_RX_TOP_SWR_CTRL, 0x10, 0x10);
+#else
 					snd_soc_component_update_bits(component,
 						LPASS_CDC_RX_TOP_SWR_CTRL, 0x02, 0x02);
+#endif
 				++rx_priv->pcm_select_users;
 			}
 			lpass_cdc_notify_wcd_rx_clk(rx_dev, rx_priv->is_native_on);
@@ -2830,8 +2835,13 @@ static int lpass_cdc_rx_macro_enable_interp_clk(struct snd_soc_component *compon
 			if (rx_priv->is_pcm_enabled && !rx_priv->is_native_on &&
 					interp_idx != INTERP_AUX) {
 				if (rx_priv->pcm_select_users == 1)
+#ifdef CONFIG_BOLERO_VER_4P0
+					snd_soc_component_update_bits(component,
+						LPASS_CDC_RX_TOP_SWR_CTRL, 0x10, 0x00);
+#else
 					snd_soc_component_update_bits(component,
 						LPASS_CDC_RX_TOP_SWR_CTRL, 0x02, 0x00);
+#endif
 				--rx_priv->pcm_select_users;
 				if (rx_priv->pcm_select_users < 0)
 					rx_priv->pcm_select_users = 0;
