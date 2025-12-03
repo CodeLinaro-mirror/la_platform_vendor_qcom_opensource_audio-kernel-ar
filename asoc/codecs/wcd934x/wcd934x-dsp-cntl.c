@@ -8,7 +8,7 @@
 #include <linux/component.h>
 #include <linux/debugfs.h>
 #include <sound/soc.h>
-#include <sound/wcd-dsp-mgr.h>
+#include <asoc/wcd-dsp-mgr.h>
 #include <asoc/wcd934x_registers.h>
 #include "wcd934x.h"
 #include "wcd934x-dsp-cntl.h"

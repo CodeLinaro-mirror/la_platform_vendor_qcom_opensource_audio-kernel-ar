@@ -11,7 +11,7 @@
 #include <linux/component.h>
 #include <linux/dma-map-ops.h>
 #include <soc/qcom/qcom_ramdump.h>
-#include <sound/wcd-dsp-mgr.h>
+#include <asoc/wcd-dsp-mgr.h>
 #include "wcd-dsp-utils.h"
 
 /* Forward declarations */

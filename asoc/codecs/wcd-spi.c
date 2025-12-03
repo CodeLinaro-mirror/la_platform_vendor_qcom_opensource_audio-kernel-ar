@@ -15,8 +15,8 @@
 #include <linux/component.h>
 #include <linux/ratelimit.h>
 #include <linux/platform_device.h>
-#include <sound/wcd-dsp-mgr.h>
-#include <sound/wcd-spi.h>
+#include <asoc/wcd-dsp-mgr.h>
+#include <asoc/wcd-spi.h>
 #include <soc/wcd-spi-ac.h>
 #include "wcd-spi-registers.h"
 
