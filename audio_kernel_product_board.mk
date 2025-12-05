@@ -16,6 +16,8 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/mbhc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/sdca_registers_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/machine_dlkm.ko
 ifneq ($(call is-board-platform-in-list,bengal holi blair), true)
@@ -45,6 +47,7 @@ ifeq ($(call is-board-platform-in-list,sun canoe alor whale chora),true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/qmp_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/simple_amp_dlkm.ko
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wsa885x_i2c_dlkm.ko
 endif
 ifeq ($(call is-board-platform-in-list,bengal holi blair), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
