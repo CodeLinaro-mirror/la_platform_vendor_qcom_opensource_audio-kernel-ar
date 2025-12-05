@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -2142,15 +2142,18 @@ static int wsa884x_swr_probe(struct swr_device *pdev)
 	devm_regmap_qti_debugfs_register(&pdev->dev, wsa884x->regmap);
 
 	proc_entry_name = devm_kasprintf(&pdev->dev, GFP_KERNEL, "wsa884x_reginfo_%d", devnum);
-	wsa884x->wsa884x_proc_entry = proc_mkdir(proc_entry_name, NULL);
-	if (wsa884x->wsa884x_proc_entry) {
-		wsa884x_proc_regdump_file = proc_create_data("wsa884x_regdump", 0444,
-				wsa884x->wsa884x_proc_entry, &wsa884x_proc_ops, wsa884x);
-		if (!wsa884x_proc_regdump_file) {
-			dev_err(&pdev->dev, "%s: error creating proc read interface\n",
-					__func__);
-			proc_remove(wsa884x->wsa884x_proc_entry);
-			wsa884x->wsa884x_proc_entry = NULL;
+	if (proc_entry_name) {
+		wsa884x->wsa884x_proc_entry = proc_mkdir(proc_entry_name, NULL);
+		if (wsa884x->wsa884x_proc_entry) {
+			wsa884x_proc_regdump_file =
+			proc_create_data("wsa884x_regdump", 0444,
+			wsa884x->wsa884x_proc_entry, &wsa884x_proc_ops, wsa884x);
+			if (!wsa884x_proc_regdump_file) {
+				dev_err(&pdev->dev, "%s: error creating proc read interface\n",
+						__func__);
+				proc_remove(wsa884x->wsa884x_proc_entry);
+				wsa884x->wsa884x_proc_entry = NULL;
+			}
 		}
 	}
 

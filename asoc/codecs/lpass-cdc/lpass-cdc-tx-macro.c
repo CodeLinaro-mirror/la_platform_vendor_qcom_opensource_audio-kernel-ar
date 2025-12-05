@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -23,6 +23,7 @@
 #define LPASS_CDC_TX_MACRO_MAX_OFFSET 0x1000
 
 #define NUM_DECIMATORS 8
+#define MAX_TUNING_REG_VALUE_PAIRS 30
 
 #define LPASS_CDC_TX_MACRO_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
 			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
@@ -37,7 +38,6 @@
 #define  CF_MIN_3DB_150HZ		0x2
 
 #define LPASS_CDC_TX_MACRO_DMIC_SAMPLE_RATE_UNDEFINED 0
-#define LPASS_CDC_TX_MACRO_MCLK_FREQ 9600000
 #define LPASS_CDC_TX_MACRO_TX_PATH_OFFSET \
 	(LPASS_CDC_TX1_TX_PATH_CTL - LPASS_CDC_TX0_TX_PATH_CTL)
 #define LPASS_CDC_TX_MACRO_SWR_MIC_MUX_SEL_MASK 0xF
@@ -46,9 +46,10 @@
 
 #define LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS	40
 #define LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS	100
+#define LPASS_CDC_TX_MACRO_HS_AMIC_UNMUTE_DELAY_MS	300
 #define LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS	300
 #define LPASS_CDC_TX_MACRO_AMIC_HPF_DELAY_MS	300
-#define LPASS_CDC_TX_MACRO_DEC_UNMUTE_DELAY_MS  10
+#define LPASS_CDC_TX_MACRO_DEC_UNMUTE_DELAY_MS  35
 
 static int tx_unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
 module_param(tx_unmute_delay, int, 0664);
@@ -145,10 +146,10 @@ struct lpass_cdc_tx_macro_priv {
 	struct mutex mclk_lock;
 	struct mutex wlock;
 	struct snd_soc_component *component;
-	struct tx_dec_unmute_work tx_dec_unmute_work;
+	struct tx_dec_unmute_work tx_dec_unmute_work[LPASS_CDC_TX_MACRO_MAX_DAIS];
 	struct hpf_work tx_hpf_work[NUM_DECIMATORS];
 	struct tx_mute_work tx_mute_dwork[NUM_DECIMATORS];
-	u16 dmic_clk_div;
+	u16 dmic_clk_div[MIC_PAIR_MAX];
 	u32 version;
 	unsigned long active_ch_mask[LPASS_CDC_TX_MACRO_MAX_DAIS];
 	unsigned long active_ch_cnt[LPASS_CDC_TX_MACRO_MAX_DAIS];
@@ -158,6 +159,7 @@ struct lpass_cdc_tx_macro_priv {
 	int child_count;
 	bool bcs_enable;
 	int dec_mode[NUM_DECIMATORS];
+	int dec_ref_cnt[NUM_DECIMATORS];
 	int bcs_ch;
 	bool bcs_clk_en;
 	bool hs_slow_insert_complete;
@@ -165,6 +167,8 @@ struct lpass_cdc_tx_macro_priv {
 	bool swr_dmic_enable;
 	bool swr_dmic_gain_disable;
 	int wlock_holders;
+	int adapt_tuning_registers;
+	u32 tuning_reg_values[MAX_TUNING_REG_VALUE_PAIRS];
 };
 
 static int lpass_cdc_tx_macro_wake_enable(struct lpass_cdc_tx_macro_priv *tx_priv,
@@ -547,7 +551,7 @@ static void mute_stream_dec_unmute(struct work_struct *work)
 		tx_mute_ctl_reg = LPASS_CDC_TX0_TX_PATH_CTL +
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 		snd_soc_component_update_bits(component, tx_mute_ctl_reg, 0x10, 0x00);
-
+		tx_priv->dec_ref_cnt[decimator]++;
 		if (tx_priv->swr_dmic_gain_disable) {
 			dec_gain_reg = LPASS_CDC_TX0_TX_PATH_CFG1 +
 				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
@@ -1008,10 +1012,18 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 adc_mux_reg = 0;
 	u16 adc_mux0_reg = 0;
 	u16 dmic_clk_reg = 0;
+#ifdef CONFIG_BOLERO_VER_2P85
+	u16 adapt_ctrl = 0;
+	u16 adapt_pdm_ctl0 = 0;
+	u16 adapt_pdm_ctl1 = 0;
+	u16 adc_bypass_reg = 0;
+	u8 i = 0;
+#endif
 	int hpf_delay = LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS;
 	int unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
 	struct device *tx_dev = NULL;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+	u32 mic_pair = 0;
 
 	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
 		return -EINVAL;
@@ -1036,7 +1048,17 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	adc_mux0_reg = LPASS_CDC_TX_INP_MUX_ADC_MUX0_CFG0 +
 			LPASS_CDC_TX_MACRO_ADC_MUX_CFG_OFFSET * decimator;
 	tx_fs_reg = LPASS_CDC_TX0_TX_PATH_CTL +
-				LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+#ifdef CONFIG_BOLERO_VER_2P85
+	adapt_ctrl = LPASS_TX_CDC_ADPT0_ADPT_CTRL +
+			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+	adapt_pdm_ctl0 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_0 +
+			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+	adapt_pdm_ctl1 = LPASS_TX_CDC_ADPT0_DBG_PDM_RATE_CTRL_1 +
+			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+	adc_bypass_reg = LPASS_CDC_TX0_TX_PATH_CFG2 +
+			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+#endif
 
 	tx_priv->pcm_rate[decimator] = (snd_soc_component_read(component,
 				     tx_fs_reg) & 0x0F);
@@ -1049,27 +1071,60 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		snd_soc_component_update_bits(component,
 			dec_cfg_reg, 0x06, tx_priv->dec_mode[decimator] <<
 			LPASS_CDC_TX_MACRO_ADC_MODE_CFG0_SHIFT);
-		/* Enable TX PGA Mute */
-		snd_soc_component_update_bits(component,
-			tx_vol_ctl_reg, 0x10, 0x10);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		/* if SWR DMIC is used, set SWR_MICn clk div */
 		if (tx_priv->swr_dmic_enable) {
 			swr_micn = snd_soc_component_read(component, adc_mux0_reg) & 0xf;
-			if (swr_micn > 0 && swr_micn <= 4)
+			if (swr_micn > 0 && swr_micn <= 4) {
 				dmic_clk_reg = LPASS_CDC_TX_TOP_CSR_SWR_MIC0_CTL;
-			else if (swr_micn > 4 && swr_micn <= 7)
+				mic_pair = MIC_PAIR01;
+			} else if (swr_micn > 4 && swr_micn <= 7) {
 				dmic_clk_reg = LPASS_CDC_TX_TOP_CSR_SWR_MIC1_CTL;
-			else if (swr_micn > 7 && swr_micn <= 11)
+				mic_pair = MIC_PAIR23;
+			} else if (swr_micn > 7 && swr_micn <= 11) {
 				dmic_clk_reg = LPASS_CDC_TX_TOP_CSR_SWR_MIC2_CTL;
+				mic_pair = MIC_PAIR45;
+			}
 
 			if (dmic_clk_reg)
 				snd_soc_component_update_bits(component,
 						dmic_clk_reg,
-						0x0E, tx_priv->dmic_clk_div << 0x1);
+						0x0E, tx_priv->dmic_clk_div[mic_pair] << 0x1);
 					/* TODO: Add all DIV support */
 		}
+		usleep_range(5000, 5050);
+#ifdef CONFIG_BOLERO_VER_2P85
+		if (tx_priv->adapt_tuning_registers > 0) {
+			snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
+			snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
+			snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
+			/* enable active detection for amic case */
+			if (is_amic_enabled(component, decimator))
+				snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x1);
+			if (tx_priv->adapt_tuning_registers <= MAX_TUNING_REG_VALUE_PAIRS) {
+				if (!tx_priv->bcs_enable) {
+					for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
+						snd_soc_component_update_bits(component,
+						(tx_priv->tuning_reg_values[i] +
+						 LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
+						 0xFF, tx_priv->tuning_reg_values[i + 1]);
+					}
+				} else {
+					for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
+						snd_soc_component_update_bits(component,
+						(tx_priv->tuning_reg_values[i] +
+						LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator),
+						0xFF, tx_priv->tuning_reg_values[i + 2]);
+					}
+				}
+			}
+		} else {
+			//Disable adapt block
+			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
+		}
+#endif
 		snd_soc_component_update_bits(component,
 			tx_vol_ctl_reg, 0x20, 0x20);
 		if (!is_amic_enabled(component, decimator)) {
@@ -1094,7 +1149,10 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 
 		if (is_amic_enabled(component, decimator)) {
 			hpf_delay = LPASS_CDC_TX_MACRO_AMIC_HPF_DELAY_MS;
-			unmute_delay = LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS;
+			if (tx_priv->bcs_enable)
+				unmute_delay = LPASS_CDC_TX_MACRO_HS_AMIC_UNMUTE_DELAY_MS;
+			else
+				unmute_delay = LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS;
 		}
 		if (tx_priv->tx_hpf_work[decimator].hpf_cut_off_freq !=
 							CF_MIN_3DB_150HZ) {
@@ -1199,6 +1257,10 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 					LPASS_CDC_VA_TOP_CSR_SWR_CTRL, 0x0F,
 					0x00);
 		}
+#ifdef CONFIG_BOLERO_VER_2P85
+		/* bypass active detection during usecase teardown */
+		snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x3);
+#endif
 		break;
 	}
 	return 0;
@@ -1239,6 +1301,7 @@ static int lpass_cdc_tx_macro_hw_params(struct snd_pcm_substream *substream,
 	int tx_fs_rate = -EINVAL;
 	struct snd_soc_component *component = dai->component;
 	u32 decimator = 0;
+	u16 tx_vol_ctl_reg = 0;
 	u32 sample_rate = 0;
 	u16 tx_fs_reg = 0;
 	struct device *tx_dev = NULL;
@@ -1284,10 +1347,15 @@ static int lpass_cdc_tx_macro_hw_params(struct snd_pcm_substream *substream,
 		if (decimator >= 0) {
 			tx_fs_reg = LPASS_CDC_TX0_TX_PATH_CTL +
 				    LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+			tx_vol_ctl_reg = LPASS_CDC_TX0_TX_PATH_CTL +
+						LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 			dev_dbg(component->dev, "%s: set DEC%u rate to %u\n",
 				__func__, decimator, sample_rate);
 			snd_soc_component_update_bits(component, tx_fs_reg,
 						0x0F, tx_fs_rate);
+			/* Enable TX PGA Mute */
+			snd_soc_component_update_bits(component,
+				tx_vol_ctl_reg, 0x10, 0x10);
 		} else {
 			dev_err_ratelimited(component->dev,
 				"%s: ERROR: Invalid decimator: %d\n",
@@ -1345,22 +1413,16 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 			LPASS_CDC_TX_MACRO_DEC_MAX) {
 		adc_mux_reg = LPASS_CDC_TX_INP_MUX_ADC_MUX0_CFG1 +
 			LPASS_CDC_TX_MACRO_ADC_MUX_CFG_OFFSET * decimator;
-		if (snd_soc_component_read(component, adc_mux_reg) & 0x3) {
-			if (!tx_priv->swr_dmic_enable)
-				continue;
-		}
 		tx_mute_ctl_reg = LPASS_CDC_TX0_TX_PATH_CTL +
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
+
 		if (mute) {
-			snd_soc_component_update_bits(component, tx_mute_ctl_reg, 0x10, 0x10);
-		} else {
-			if (!is_msm_dmic_enabled(component, decimator)) {
-				snd_soc_component_update_bits(component, tx_mute_ctl_reg,
-							0x40, 0x40);
-				usleep_range(2000, 2100);
-				snd_soc_component_update_bits(component, tx_mute_ctl_reg,
-							0x40, 0x00);
-			}
+			if (tx_priv->dec_ref_cnt[decimator] > 0)
+				tx_priv->dec_ref_cnt[decimator]--;
+
+			if (!tx_priv->dec_ref_cnt[decimator])
+				snd_soc_component_update_bits(component,
+						tx_mute_ctl_reg, 0x10, 0x10);
 		}
 		dev_dbg(component->dev, "capture: TX decimator %d %s\n", decimator,
 				(mute ? "muted" : "unmuted"));
@@ -1369,9 +1431,9 @@ static int lpass_cdc_tx_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 		/*
 		 * Schedule dwork after 10MS to unmute the dec to unblock the main thread
 		 */
-		tx_priv->tx_dec_unmute_work.dai_id = dai->id;
+		tx_priv->tx_dec_unmute_work[dai->id].dai_id = dai->id;
 		queue_delayed_work(system_freezable_wq,
-			&tx_priv->tx_dec_unmute_work.dwork,
+			&tx_priv->tx_dec_unmute_work[dai->id].dwork,
 			msecs_to_jiffies(LPASS_CDC_TX_MACRO_DEC_UNMUTE_DELAY_MS));
 	}
 	return 0;
@@ -2046,7 +2108,7 @@ static const struct snd_kcontrol_new lpass_cdc_tx_macro_snd_controls[] = {
 		     lpass_cdc_tx_macro_get_dec_gain_bypass, lpass_cdc_tx_macro_put_dec_gain_bypass),
 };
 
-static int lpass_cdc_tx_macro_clk_div_get(struct snd_soc_component *component)
+static int lpass_cdc_tx_macro_clk_div_get(struct snd_soc_component *component, u32 mic_pair)
 {
 	struct device *tx_dev = NULL;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
@@ -2054,57 +2116,47 @@ static int lpass_cdc_tx_macro_clk_div_get(struct snd_soc_component *component)
 	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
 		return -EINVAL;
 
-	return (int)tx_priv->dmic_clk_div;
+	if (mic_pair >= MIC_PAIR_MAX)
+		return -EINVAL;
+
+	return (int)tx_priv->dmic_clk_div[mic_pair];
 }
 
-static int lpass_cdc_tx_macro_validate_dmic_sample_rate(u32 dmic_sample_rate,
-				      struct lpass_cdc_tx_macro_priv *tx_priv)
+static void lpass_cdc_tx_macro_update_clk_div_factor(u32 div_factor,
+				      struct lpass_cdc_tx_macro_priv *tx_priv,
+				      u32 mic_pair)
 {
-	u32 div_factor = LPASS_CDC_TX_MACRO_CLK_DIV_2;
-	u32 mclk_rate = LPASS_CDC_TX_MACRO_MCLK_FREQ;
 
-	if (dmic_sample_rate == LPASS_CDC_TX_MACRO_DMIC_SAMPLE_RATE_UNDEFINED ||
-	    mclk_rate % dmic_sample_rate != 0)
-		goto undefined_rate;
+	dev_dbg(tx_priv->dev, "%s: div_factor = %u, mic_pair %d\n",
+		__func__, div_factor, mic_pair);
 
-	div_factor = mclk_rate / dmic_sample_rate;
+	if (mic_pair >= MIC_PAIR_MAX)
+		return;
 
 	switch (div_factor) {
 	case 2:
-		tx_priv->dmic_clk_div = LPASS_CDC_TX_MACRO_CLK_DIV_2;
+		tx_priv->dmic_clk_div[mic_pair] = LPASS_CDC_TX_MACRO_CLK_DIV_2;
 		break;
 	case 3:
-		tx_priv->dmic_clk_div = LPASS_CDC_TX_MACRO_CLK_DIV_3;
+		tx_priv->dmic_clk_div[mic_pair] = LPASS_CDC_TX_MACRO_CLK_DIV_3;
 		break;
 	case 4:
-		tx_priv->dmic_clk_div = LPASS_CDC_TX_MACRO_CLK_DIV_4;
+		tx_priv->dmic_clk_div[mic_pair] = LPASS_CDC_TX_MACRO_CLK_DIV_4;
 		break;
 	case 6:
-		tx_priv->dmic_clk_div = LPASS_CDC_TX_MACRO_CLK_DIV_6;
+		tx_priv->dmic_clk_div[mic_pair] = LPASS_CDC_TX_MACRO_CLK_DIV_6;
 		break;
 	case 8:
-		tx_priv->dmic_clk_div = LPASS_CDC_TX_MACRO_CLK_DIV_8;
+		tx_priv->dmic_clk_div[mic_pair] = LPASS_CDC_TX_MACRO_CLK_DIV_8;
 		break;
 	case 16:
-		tx_priv->dmic_clk_div = LPASS_CDC_TX_MACRO_CLK_DIV_16;
+		tx_priv->dmic_clk_div[mic_pair] = LPASS_CDC_TX_MACRO_CLK_DIV_16;
 		break;
 	default:
 		/* Any other DIV factor is invalid */
-		goto undefined_rate;
+		dev_err(tx_priv->dev, "%s: Invalid div factor %d, for mic_pair %d\n",
+			 __func__, div_factor, mic_pair);
 	}
-
-	/* Valid dmic DIV factors */
-	dev_dbg(tx_priv->dev, "%s: DMIC_DIV = %u, mclk_rate = %u\n",
-		__func__, div_factor, mclk_rate);
-
-	return dmic_sample_rate;
-
-undefined_rate:
-	dev_dbg(tx_priv->dev, "%s: Invalid rate %d, for mclk %d\n",
-		 __func__, dmic_sample_rate, mclk_rate);
-	dmic_sample_rate = LPASS_CDC_TX_MACRO_DMIC_SAMPLE_RATE_UNDEFINED;
-
-	return dmic_sample_rate;
 }
 
 static const struct lpass_cdc_tx_macro_reg_mask_val
@@ -2116,7 +2168,7 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 {
 	struct snd_soc_dapm_context *dapm =
 			snd_soc_component_get_dapm(component);
-	int ret = 0, i = 0;
+	int ret = 0, i = 0, dai_idx;
 	struct device *tx_dev = NULL;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 
@@ -2184,9 +2236,11 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 			  lpass_cdc_tx_macro_mute_update_callback);
 	}
 
-	tx_priv->tx_dec_unmute_work.tx_priv = tx_priv;
-	INIT_DELAYED_WORK(&tx_priv->tx_dec_unmute_work.dwork,
-		mute_stream_dec_unmute);
+	for (dai_idx = 0; dai_idx < LPASS_CDC_TX_MACRO_MAX_DAIS; ++dai_idx) {
+		tx_priv->tx_dec_unmute_work[dai_idx].tx_priv = tx_priv;
+		INIT_DELAYED_WORK(&tx_priv->tx_dec_unmute_work[dai_idx].dwork,
+				mute_stream_dec_unmute);
+	}
 	tx_priv->component = component;
 
 	for (i = 0; i < ARRAY_SIZE(lpass_cdc_tx_macro_reg_init); i++)
@@ -2228,10 +2282,11 @@ static int lpass_cdc_tx_macro_probe(struct platform_device *pdev)
 {
 	struct macro_ops ops = {0};
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
-	u32 tx_base_addr = 0, sample_rate = 0;
+	u32 tx_base_addr = 0, prop_size, *temp;
 	char __iomem *tx_io_base = NULL;
-	int ret = 0;
-	const char *dmic_sample_rate = "qcom,tx-dmic-sample-rate";
+	int ret = 0, i;
+
+	const char *dmic_clk_div_factor = "qcom,tx-dmic-clk-div-factor";
 
 	if (!lpass_cdc_is_va_macro_registered(&pdev->dev)) {
 		dev_err(&pdev->dev,
@@ -2265,17 +2320,35 @@ static int lpass_cdc_tx_macro_probe(struct platform_device *pdev)
 	tx_priv->swr_dmic_enable = false;
 	tx_priv->swr_dmic_gain_disable = false;
 	tx_priv->wlock_holders = 0;
-	ret = of_property_read_u32(pdev->dev.of_node, dmic_sample_rate,
-				   &sample_rate);
-	if (ret) {
+
+	for (i = 0; i < MIC_PAIR_MAX; i++)
+		tx_priv->dmic_clk_div[i] = LPASS_CDC_TX_MACRO_CLK_DIV_2;
+
+	if (!of_find_property(pdev->dev.of_node, dmic_clk_div_factor, &prop_size)) {
 		dev_err(&pdev->dev,
-			"%s: could not find sample_rate entry in dt\n",
+			"%s: could not find div_clk_factor entry in dt\n",
 			__func__);
-		tx_priv->dmic_clk_div = LPASS_CDC_TX_MACRO_CLK_DIV_2;
 	} else {
-		if (lpass_cdc_tx_macro_validate_dmic_sample_rate(
-		sample_rate, tx_priv) == LPASS_CDC_TX_MACRO_DMIC_SAMPLE_RATE_UNDEFINED)
-			return -EINVAL;
+		temp = devm_kzalloc(&pdev->dev, prop_size, GFP_KERNEL);
+		if (!temp)
+			return -ENOMEM;
+		if (!of_property_read_u32_array(pdev->dev.of_node,
+					dmic_clk_div_factor, temp, prop_size/sizeof(u32)))
+			/* Limit the loop iteration to match the array size MIC_PAIR_MAX. */
+			for (i = 0; i < MIC_PAIR_MAX; i++)
+				lpass_cdc_tx_macro_update_clk_div_factor(
+						temp[i], tx_priv, i);
+
+	}
+
+	tx_priv->adapt_tuning_registers = of_property_read_variable_u32_array(pdev->dev.of_node,
+				"adapt-tuning-reg-values", tx_priv->tuning_reg_values, 0,
+						ARRAY_SIZE(tx_priv->tuning_reg_values));
+
+	if (tx_priv->adapt_tuning_registers == -EOVERFLOW ||
+		(tx_priv->adapt_tuning_registers < 0)) {
+		dev_err(&pdev->dev, "failure in reading tuning registers\n");
+		tx_priv->adapt_tuning_registers = 0;
 	}
 
 	mutex_init(&tx_priv->mclk_lock);
@@ -2310,6 +2383,7 @@ static int lpass_cdc_tx_macro_remove(struct platform_device *pdev)
 {
 	int rc = 0;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+	int dai_idx;
 
 	tx_priv = platform_get_drvdata(pdev);
 
@@ -2318,8 +2392,9 @@ static int lpass_cdc_tx_macro_remove(struct platform_device *pdev)
 		goto exit;
 	}
 
-	cancel_delayed_work_sync(
-		&tx_priv->tx_dec_unmute_work.dwork);
+	for (dai_idx = 0; dai_idx < LPASS_CDC_TX_MACRO_MAX_DAIS; ++dai_idx)
+		cancel_delayed_work_sync(
+				&tx_priv->tx_dec_unmute_work[dai_idx].dwork);
 	pm_runtime_disable(&pdev->dev);
 	pm_runtime_set_suspended(&pdev->dev);
 	mutex_destroy(&tx_priv->mclk_lock);

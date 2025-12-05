@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -42,7 +42,6 @@
 #define  CF_MIN_3DB_150HZ		0x2
 
 #define LPASS_CDC_VA_MACRO_DMIC_SAMPLE_RATE_UNDEFINED 0
-#define LPASS_CDC_VA_MACRO_MCLK_FREQ 9600000
 #define LPASS_CDC_VA_MACRO_TX_PATH_OFFSET \
 	(LPASS_CDC_VA_TX1_TX_PATH_CTL - LPASS_CDC_VA_TX0_TX_PATH_CTL)
 #define LPASS_CDC_VA_MACRO_TX_DMIC_CLK_DIV_MASK 0x0E
@@ -153,7 +152,8 @@ struct lpass_cdc_va_macro_priv {
 	struct va_mute_work va_mute_dwork[LPASS_CDC_VA_MACRO_NUM_DECIMATORS];
 	unsigned long active_ch_mask[LPASS_CDC_VA_MACRO_MAX_DAIS];
 	unsigned long active_ch_cnt[LPASS_CDC_VA_MACRO_MAX_DAIS];
-	u16 dmic_clk_div;
+	u16 dmic_clk_div[MIC_PAIR_MAX];
+	u16 dmic_override_clk_div[MIC_PAIR_MAX];
 	u16 va_mclk_users;
 	int swr_clk_users;
 	bool reset_swr;
@@ -232,7 +232,7 @@ static bool lpass_cdc_va_macro_get_data(struct snd_soc_component *component,
 	return true;
 }
 
-static int lpass_cdc_va_macro_clk_div_get(struct snd_soc_component *component)
+static int lpass_cdc_va_macro_clk_div_get(struct snd_soc_component *component, u32 mic_pair)
 {
 	struct device *va_dev = NULL;
 	struct lpass_cdc_va_macro_priv *va_priv = NULL;
@@ -240,13 +240,14 @@ static int lpass_cdc_va_macro_clk_div_get(struct snd_soc_component *component)
 	if (!lpass_cdc_va_macro_get_data(component, &va_dev,
 					 &va_priv, __func__))
 		return -EINVAL;
+	if (mic_pair >= MIC_PAIR_MAX)
+		return -EINVAL;
 
 	if (va_priv->clk_div_switch &&
-	    (va_priv->dmic_clk_div == LPASS_CDC_VA_MACRO_CLK_DIV_16))
-		return LPASS_CDC_VA_MACRO_CLK_DIV_4;
+	    (va_priv->dmic_clk_div[mic_pair] == LPASS_CDC_VA_MACRO_CLK_DIV_16))
+		return va_priv->dmic_override_clk_div[mic_pair];
 
-
-	return (int)va_priv->dmic_clk_div;
+	return (int)va_priv->dmic_clk_div[mic_pair];
 }
 
 static int lpass_cdc_va_macro_mclk_enable(
@@ -1080,9 +1081,6 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		snd_soc_component_update_bits(component,
 			dec_cfg_reg, 0x06, va_priv->dec_mode[decimator] <<
 			LPASS_CDC_VA_MACRO_ADC_MODE_CFG0_SHIFT);
-		/* Enable TX PGA Mute */
-		snd_soc_component_update_bits(component,
-				tx_vol_ctl_reg, 0x10, 0x10);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 		/* Enable TX CLK */
@@ -1453,6 +1451,9 @@ static int lpass_cdc_va_macro_hw_params(struct snd_pcm_substream *substream,
 				__func__, decimator, sample_rate);
 			snd_soc_component_update_bits(component, tx_fs_reg,
 						0x0F, tx_fs_rate);
+			/* Enable TX PGA Mute */
+			snd_soc_component_update_bits(component, tx_fs_reg,
+						0x10, 0x10);
 		} else {
 			dev_err_ratelimited(va_dev,
 				"%s: ERROR: Invalid decimator: %d\n",
@@ -1521,9 +1522,6 @@ static int lpass_cdc_va_mute_stream(struct snd_soc_dai *dai, int mute, int strea
 		if (mute) {
 			snd_soc_component_update_bits(component, va_mute_ctl_reg, 0x10, 0x10);
 		} else {
-			snd_soc_component_update_bits(component, va_mute_ctl_reg, 0x40, 0x40);
-			usleep_range(2000, 2100);
-			snd_soc_component_update_bits(component, va_mute_ctl_reg, 0x40, 0x00);
 			va_priv->va_dec_unmute_work.dai_id = dai->id;
 			/*
 			 * Schedule dwork after 10MS to unmute the dec to unblock the main thread
@@ -1952,54 +1950,44 @@ static const struct snd_kcontrol_new lpass_cdc_va_macro_snd_controls[] = {
 			lpass_cdc_va_macro_dec_mode_get, lpass_cdc_va_macro_dec_mode_put),
 };
 
-static int lpass_cdc_va_macro_validate_dmic_sample_rate(u32 dmic_sample_rate,
-				      struct lpass_cdc_va_macro_priv *va_priv)
+static void lpass_cdc_va_macro_update_clk_div_factor(u32 div_factor,
+				      struct lpass_cdc_va_macro_priv *va_priv,
+				      u32 mic_pair, bool is_override)
 {
-	u32 div_factor;
-	u32 mclk_rate = LPASS_CDC_VA_MACRO_MCLK_FREQ;
+	u16 *clk_div =
+		is_override ? va_priv->dmic_override_clk_div : va_priv->dmic_clk_div;
 
-	if (dmic_sample_rate == LPASS_CDC_VA_MACRO_DMIC_SAMPLE_RATE_UNDEFINED ||
-	    mclk_rate % dmic_sample_rate != 0)
-		goto undefined_rate;
+	dev_dbg(va_priv->dev, "%s: div_factor = %u, mic_pair %d, is_override %d\n",
+		__func__, div_factor, mic_pair, is_override);
 
-	div_factor = mclk_rate / dmic_sample_rate;
+	if (mic_pair >= MIC_PAIR_MAX)
+		return;
 
 	switch (div_factor) {
 	case 2:
-		va_priv->dmic_clk_div = LPASS_CDC_VA_MACRO_CLK_DIV_2;
+		clk_div[mic_pair] = LPASS_CDC_VA_MACRO_CLK_DIV_2;
 		break;
 	case 3:
-		va_priv->dmic_clk_div = LPASS_CDC_VA_MACRO_CLK_DIV_3;
+		clk_div[mic_pair] = LPASS_CDC_VA_MACRO_CLK_DIV_3;
 		break;
 	case 4:
-		va_priv->dmic_clk_div = LPASS_CDC_VA_MACRO_CLK_DIV_4;
+		clk_div[mic_pair] = LPASS_CDC_VA_MACRO_CLK_DIV_4;
 		break;
 	case 6:
-		va_priv->dmic_clk_div = LPASS_CDC_VA_MACRO_CLK_DIV_6;
+		clk_div[mic_pair] = LPASS_CDC_VA_MACRO_CLK_DIV_6;
 		break;
 	case 8:
-		va_priv->dmic_clk_div = LPASS_CDC_VA_MACRO_CLK_DIV_8;
+		clk_div[mic_pair] = LPASS_CDC_VA_MACRO_CLK_DIV_8;
 		break;
 	case 16:
-		va_priv->dmic_clk_div = LPASS_CDC_VA_MACRO_CLK_DIV_16;
+		clk_div[mic_pair] = LPASS_CDC_VA_MACRO_CLK_DIV_16;
 		break;
 	default:
 		/* Any other DIV factor is invalid */
-		goto undefined_rate;
+		dev_err(va_priv->dev, "%s: Invalid div_factor %d mic_pair %d, is_override %d\n",
+		 __func__, div_factor, mic_pair, is_override);
 	}
 
-	/* Valid dmic DIV factors */
-	dev_dbg(va_priv->dev, "%s: DMIC_DIV = %u, mclk_rate = %u\n",
-		__func__, div_factor, mclk_rate);
-
-	return dmic_sample_rate;
-
-undefined_rate:
-	dev_dbg(va_priv->dev, "%s: Invalid rate %d, for mclk %d\n",
-		 __func__, dmic_sample_rate, mclk_rate);
-	dmic_sample_rate = LPASS_CDC_VA_MACRO_DMIC_SAMPLE_RATE_UNDEFINED;
-
-	return dmic_sample_rate;
 }
 
 static int lpass_cdc_va_macro_init(struct snd_soc_component *component)
@@ -2280,14 +2268,15 @@ static int lpass_cdc_va_macro_probe(struct platform_device *pdev)
 {
 	struct macro_ops ops;
 	struct lpass_cdc_va_macro_priv *va_priv;
-	u32 va_base_addr, sample_rate = 0;
+	u32 va_base_addr, prop_size, *temp;
 	char __iomem *va_io_base;
 	const char *micb_supply_str = "va-vdd-micb-supply";
 	const char *micb_supply_str1 = "va-vdd-micb";
 	const char *micb_voltage_str = "qcom,va-vdd-micb-voltage";
 	const char *micb_current_str = "qcom,va-vdd-micb-current";
-	int ret = 0;
-	const char *dmic_sample_rate = "qcom,va-dmic-sample-rate";
+	int ret = 0, i;
+	const char *dmic_clk_div_factor = "qcom,va-dmic-clk-div-factor";
+	const char *dmic_override_clk_div_factor = "qcom,va-dmic-override-clk-div-factor";
 	u32 default_clk_id = 0, use_clk_id = 0;
 	struct clk *lpass_audio_hw_vote = NULL;
 	u32 is_used_va_swr_gpio = 0;
@@ -2307,18 +2296,43 @@ static int lpass_cdc_va_macro_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	ret = of_property_read_u32(pdev->dev.of_node, dmic_sample_rate,
-				   &sample_rate);
-	if (ret) {
-		dev_err(&pdev->dev, "%s: could not find %d entry in dt\n",
-			__func__, sample_rate);
-		va_priv->dmic_clk_div = LPASS_CDC_VA_MACRO_CLK_DIV_2;
-	} else {
-		if (lpass_cdc_va_macro_validate_dmic_sample_rate(
-		sample_rate, va_priv) ==
-			LPASS_CDC_VA_MACRO_DMIC_SAMPLE_RATE_UNDEFINED)
-			return -EINVAL;
+	for (i = 0; i < MIC_PAIR_MAX; i++) {
+		va_priv->dmic_clk_div[i] = LPASS_CDC_VA_MACRO_CLK_DIV_2;
+		va_priv->dmic_override_clk_div[i] = LPASS_CDC_VA_MACRO_CLK_DIV_4;
 	}
+
+	if (!of_find_property(pdev->dev.of_node, dmic_clk_div_factor, &prop_size)) {
+		dev_err(&pdev->dev,
+			"%s: could not find clk_div_factor entry in dt\n",
+			__func__);
+	} else {
+		temp = devm_kzalloc(&pdev->dev, prop_size, GFP_KERNEL);
+		if (!temp)
+			return -ENOMEM;
+		if (!of_property_read_u32_array(pdev->dev.of_node,
+				dmic_clk_div_factor, temp, prop_size/sizeof(u32)))
+			/* Limit the loop iteration to array size MIC_PAIR_MAX. */
+			for (i = 0; i < MIC_PAIR_MAX; i++)
+				lpass_cdc_va_macro_update_clk_div_factor(
+							temp[i], va_priv, i, false);
+	}
+
+	if (!of_find_property(pdev->dev.of_node, dmic_override_clk_div_factor, &prop_size)) {
+		dev_err(&pdev->dev,
+			"%s: could not find override_clk_div_factor entry in dt\n",
+			__func__);
+	} else {
+		temp = devm_kzalloc(&pdev->dev, prop_size, GFP_KERNEL);
+		if (!temp)
+			return -ENOMEM;
+		if (!of_property_read_u32_array(pdev->dev.of_node,
+				dmic_override_clk_div_factor, temp, prop_size/sizeof(u32)))
+			/* Limit the loop iteration to array size MIC_PAIR_MAX. */
+			for (i = 0; i < MIC_PAIR_MAX; i++)
+				lpass_cdc_va_macro_update_clk_div_factor(
+							temp[i], va_priv, i, true);
+	}
+
 
 	if (of_find_property(pdev->dev.of_node, is_used_va_swr_gpio_dt,
 			     NULL)) {
