@@ -11,7 +11,7 @@ endif
 
 ifeq ($(BUILD_AUDIO_MODULES),true)
 ifneq ($(TARGET_BOARD_AUTO),true)
-ifeq ($(call is-board-platform-in-list,$(TARGET_BOARD_PLATFORM)),true)
+ifneq ($(TARGET_BOARD_PLATFORM),)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/spf_core_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/audpkt_ion_dlkm.ko \
@@ -30,7 +30,8 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/machine_dlkm.ko
-ifneq ($(call is-board-platform-in-list,bengal holi blair), true)
+EXCLUDED_PLATFORMS := bengal holi blair
+ifeq (,$(filter $(TARGET_BOARD_PLATFORM),$(EXCLUDED_PLATFORMS)))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/swr_haptics_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko \
@@ -47,12 +48,14 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd939x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd939x_slave_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list,sun canoe), true)
+SUPPORTED_PLATFORMS := sun canoe
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM),$(SUPPORTED_PLATFORMS)))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/qmp_dlkm.ko
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/simple_amp_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list,bengal holi blair), true)
+SUPPORTED_PLATFORMS := bengal holi blair
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM),$(SUPPORTED_PLATFORMS)))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/va_macro_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/tx_macro_dlkm.ko \
@@ -61,13 +64,15 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list, holi blair), true)
+SUPPORTED_PLATFORMS := holi blair
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM),$(SUPPORTED_PLATFORMS)))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif
 endif
 else
-ifeq ($(call is-board-platform-in-list, gen4 msmnile), true)
+SUPPORTED_PLATFORMS := gen4 msmnile
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM),$(SUPPORTED_PLATFORMS)))
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/machine_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko
