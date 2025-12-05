@@ -1365,6 +1365,30 @@ static const struct reg_default lpass_cdc_defaults[] = {
 	{ LPASS_CDC_WSA2_PBR_CFG23, 0x00},
 };
 
+static bool is_applicable_2p8(int reg)
+{
+	switch (reg) {
+	case LPASS_TX_TX_INP_MUX_ADC_MUX0_CFG2:
+	case LPASS_TX_TX_INP_MUX_ADC_MUX1_CFG2:
+	case LPASS_TX_TX_INP_MUX_ADC_MUX2_CFG2:
+	case LPASS_TX_TX_INP_MUX_ADC_MUX3_CFG2:
+	case LPASS_TX_TX_INP_MUX_ADC_MUX4_CFG2:
+	case LPASS_TX_TX_INP_MUX_ADC_MUX5_CFG2:
+	case LPASS_TX_TX_INP_MUX_ADC_MUX6_CFG2:
+	case LPASS_TX_TX_INP_MUX_ADC_MUX7_CFG2:
+	case LPASS_CDC_TX0_TX_PATH_CFG2:
+	case LPASS_CDC_TX1_TX_PATH_CFG2:
+	case LPASS_CDC_TX2_TX_PATH_CFG2:
+	case LPASS_CDC_TX3_TX_PATH_CFG2:
+	case LPASS_CDC_TX4_TX_PATH_CFG2:
+	case LPASS_CDC_TX5_TX_PATH_CFG2:
+	case LPASS_CDC_TX6_TX_PATH_CFG2:
+	case LPASS_CDC_TX7_TX_PATH_CFG2:
+		return true;
+	}
+	return false;
+}
+
 static bool lpass_cdc_is_readable_register(struct device *dev,
 					unsigned int reg)
 {
@@ -1381,6 +1405,10 @@ static bool lpass_cdc_is_readable_register(struct device *dev,
 	if (macro_id < 0 || !priv->macros_supported[macro_id])
 		return false;
 
+	if (macro_id == 0 && priv->version < LPASS_CDC_VERSION_2_8) {
+	       if (is_applicable_2p8(reg) || reg > 0x07A8)
+		       return false;
+	}
 	reg_tbl = lpass_cdc_reg_access[macro_id];
 	reg_offset = (reg - macro_id_base_offset[macro_id])/4;
 
@@ -1406,6 +1434,10 @@ static bool lpass_cdc_is_writeable_register(struct device *dev,
 	if (macro_id < 0 || !priv->macros_supported[macro_id])
 		return false;
 
+	if (macro_id == 0 && priv->version < LPASS_CDC_VERSION_2_8) {
+	       if (is_applicable_2p8(reg) || reg > 0x07A8)
+		       return false;
+	}
 	reg_tbl = lpass_cdc_reg_access[macro_id];
 	reg_offset = (reg - macro_id_base_offset[macro_id])/4;
 
