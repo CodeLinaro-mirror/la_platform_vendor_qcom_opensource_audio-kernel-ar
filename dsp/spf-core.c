@@ -33,7 +33,7 @@
 #define APM_CMD_RSP_GET_SPF_STATE 0x02001007
 #define APM_MODULE_INSTANCE_ID   0x00000001
 #define GPR_SVC_ADSP_CORE 0x3
-#define ADD_CHILD_DEVICES_APM_TIMEOUT_MS 10000
+#define ADD_CHILD_DEVICES_APM_TIMEOUT_MS 300000
 
 struct spf_core {
 	struct gpr_device *adev;
@@ -176,10 +176,6 @@ bool spf_core_is_apm_ready(int timeout_ms)
 
 	timeout = jiffies + msecs_to_jiffies(timeout_ms);
 	mutex_lock(&core->lock);
-
-	/* sleep for 100ms before querying AVS up */
-	msleep(100);
-
 	for (;;) {
 		if (__spf_core_is_apm_ready(core)) {
 			ret = true;
