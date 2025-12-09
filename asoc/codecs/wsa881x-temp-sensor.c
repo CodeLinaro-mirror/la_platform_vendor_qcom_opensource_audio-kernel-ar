@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015, 2017-2019 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/bitops.h>
@@ -9,6 +10,7 @@
 #include <linux/delay.h>
 #include <linux/thermal.h>
 #include <sound/soc.h>
+#include <linux/version.h>
 #include "wsa881x-temp-sensor.h"
 
 #define T1_TEMP -10
@@ -41,9 +43,12 @@ int wsa881x_get_temp(struct thermal_zone_device *thermal,
 
 	if (!thermal)
 		return -EINVAL;
-
-	if (thermal->devdata) {
-		pdata = thermal->devdata;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+    pdata = thermal_zone_device_priv(thermal);
+#else
+    pdata = thermal->devdata;
+#endif
+	if(pdata) {
 		if (pdata->component) {
 			component = pdata->component;
 		} else {
@@ -156,7 +161,7 @@ int wsa881x_init_thermal(struct wsa881x_tz_priv *tz_pdata)
 		return -EINVAL;
 	}
 	/* Register with the thermal zone */
-	tz_dev = thermal_zone_device_register(tz_pdata->name,
+	tz_dev = thermal_zone_device_register_with_trips(tz_pdata->name,
 				0, 0, tz_pdata,
 				&wsa881x_thermal_ops, NULL, 0, 0);
 	if (IS_ERR(tz_dev)) {
@@ -176,8 +181,12 @@ void wsa881x_deinit_thermal(struct thermal_zone_device *tz_dev)
 {
 	struct wsa881x_tz_priv *pdata;
 
-	if (tz_dev && tz_dev->devdata) {
-		pdata = tz_dev->devdata;
+	if (tz_dev) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+    pdata = thermal_zone_device_priv(tz_dev);
+#else
+    pdata = tz_dev->devdata;
+#endif
 		if (pdata)
 			unregister_pm_notifier(&pdata->pm_nb);
 	}

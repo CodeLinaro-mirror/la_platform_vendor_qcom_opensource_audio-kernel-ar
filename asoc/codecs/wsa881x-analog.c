@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2016, 2018-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -29,6 +29,7 @@
 #include <soc/internal.h>
 #include <linux/regmap.h>
 #include <asoc/msm-cdc-pinctrl.h>
+#include <asoc/msm-cdc-supply.h>
 #include "wsa881x-analog.h"
 #include "wsa881x-temp-sensor.h"
 
@@ -294,6 +295,7 @@ static int wsa881x_i2c_read_device(struct wsa881x_pdata *wsa881x,
 			ret = i2c_transfer(
 				wsa881x->client[wsa881x_index]->adapter,
 						wsa881x->xfer_msg, 2);
+		/* Try again if read fails first time */
 			if (ret != 2) {
 				pr_err_ratelimited("failed to read wsa register:%d\n",
 								reg);
@@ -922,7 +924,7 @@ static void wsa881x_ocp_ctl_work(struct work_struct *work)
 	struct wsa881x_pdata *wsa881x;
 	struct delayed_work *dwork;
 	struct snd_soc_component *component;
-	int temp_val;
+	int temp_val = 0;
 
 	dwork = to_delayed_work(work);
 	wsa881x = container_of(dwork, struct wsa881x_pdata, ocp_ctl_work);
@@ -1367,8 +1369,7 @@ static int wsa881x_populate_dt_pdata(struct device *dev, int wsa881x_index)
 	return ret;
 }
 
-static int wsa881x_i2c_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int wsa881x_i2c_probe(struct i2c_client *client)
 {
 	int ret = 0;
 	int wsa881x_index = 0;
@@ -1585,7 +1586,11 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void wsa881x_i2c_remove(struct i2c_client *client)
+#else
 static int wsa881x_i2c_remove(struct i2c_client *client)
+#endif
 {
 	struct wsa881x_pdata *wsa881x = client->dev.platform_data;
 
@@ -1602,7 +1607,10 @@ static int wsa881x_i2c_remove(struct i2c_client *client)
 	}
 	i2c_set_clientdata(client, NULL);
 	kfree(wsa881x);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 #ifdef CONFIG_PM_SLEEP
