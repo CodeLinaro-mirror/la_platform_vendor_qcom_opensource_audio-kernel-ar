@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2017, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -18,11 +18,6 @@ static struct audio_pdr_service audio_pdr_services[AUDIO_PDR_DOMAIN_MAX] = {
 	{	/* AUDIO_PDR_DOMAIN_ADSP */
 		.service_name = "avs/audio",
 		.service_path = "msm/adsp/audio_pd",
-	},
-	{
-		/* AUDIO_PDR_DOMAIN_MODEM_ROOT */
-		.service_name = "avs/audio",
-		.service_path = "msm/modem/root_pd",
 	}
 };
 
@@ -36,12 +31,7 @@ void *audio_pdr_service_register(int domain_id, void (*cb)(int, char *, void *))
 
 	audio_pdr_services[domain_id].pdr_handle = pdr_handle_alloc(cb, NULL);
 
-	if (domain_id == AUDIO_PDR_DOMAIN_ADSP)
-		return pdr_add_service_lookup(audio_pdr_services[domain_id].pdr_handle,
-			      audio_pdr_services[domain_id].service_name,
-			      audio_pdr_services[domain_id].service_path);
-	else
-		return pdr_add_lookup(audio_pdr_services[domain_id].pdr_handle,
+	return pdr_add_lookup(audio_pdr_services[domain_id].pdr_handle,
 			      audio_pdr_services[domain_id].service_name,
 			      audio_pdr_services[domain_id].service_path);
 }
