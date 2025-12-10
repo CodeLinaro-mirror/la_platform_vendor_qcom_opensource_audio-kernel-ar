@@ -1,5 +1,6 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -228,7 +229,7 @@ struct gpr_hdr {
 
 struct gpr_pkt {
        struct gpr_hdr hdr;
-       uint8_t payload[0];
+       DECLARE_FLEX_ARRAY(uint8_t, payload);
 };
 
 #define GPR_IBASIC_RSP_RESULT 0x02001005

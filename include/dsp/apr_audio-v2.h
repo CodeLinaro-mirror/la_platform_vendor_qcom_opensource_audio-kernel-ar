@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 
@@ -657,10 +658,10 @@ struct adm_cmd_set_pp_params {
 #define DSP_STREAM_CALLBACK "ADSP Stream Callback Event"
 #define DSP_STREAM_CALLBACK_QUEUE_SIZE 1024
 
-struct dsp_stream_callback_list {
+/*struct dsp_stream_callback_list {
 	struct list_head list;
 	struct msm_adsp_event_data event;
-};
+};*/
 
 struct dsp_stream_callback_prtd {
 	uint16_t event_count;

@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Changes from Qualcomm Technologies, Inc. are provided under the following license:
  * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
@@ -31,6 +30,7 @@ enum {
 #define SWR_CLK_RATE_4P8MHZ      4800000
 #define SWR_CLK_RATE_9P6MHZ      9600000
 #define SWR_CLK_RATE_11P2896MHZ  11289600
+#define SWR_CLK_RATE_12P288MHZ   12288000
 
 extern struct bus_type soundwire_type;
 struct swr_device;
@@ -134,6 +134,7 @@ struct swr_port_info {
 	u8 req_ch;
 	u8 num_ch;
 	u32 ch_rate;
+	u32 req_ch_rate;
 };
 
 struct swr_port_params {
@@ -158,6 +159,8 @@ struct swr_dev_frame_config {
  * be configured
  * @ch_en: array of channels mask for all the ports
  * @port_type: the required master port type
+ * @bit_width: array of bit-width of different channels that need to
+ * be configured
  */
 struct swr_params {
 	u8 tid;
@@ -168,6 +171,7 @@ struct swr_params {
 	u32 ch_rate[SWR_MAX_DEV_PORT_NUM];
 	u8 ch_en[SWR_MAX_DEV_PORT_NUM];
 	u8 port_type[SWR_MAX_DEV_PORT_NUM];
+	unsigned int bit_width[SWR_MAX_DEV_PORT_NUM];
 };
 
 /*
@@ -272,8 +276,13 @@ struct swr_device {
 	struct device    dev;
 	u64 addr;
 	u8 group_id;
+	bool paging_support;
+	bool ignore_nested_irq;
 	struct irq_domain *slave_irq;
 	bool slave_irq_pending;
+	bool clk_scale_initialized;
+	u8 g_scp1_val; /* used for v1.2 or class devices */
+	u8 g_scp2_val; /* used for v1.2 or class devices */
 };
 
 static inline struct swr_device *to_swr_device(struct device *dev)
@@ -301,6 +310,7 @@ struct swr_driver {
 	int	(*device_up)(struct swr_device *swr);
 	int	(*device_down)(struct swr_device *swr);
 	int	(*reset_device)(struct swr_device *swr);
+	int	(*interrupt_callback)(struct swr_device *swr, u8 devnum);
 	struct device_driver		driver;
 	const struct swr_device_id	*id_table;
 };
@@ -375,6 +385,9 @@ extern int swr_write(struct swr_device *dev, u8 dev_num, u16 reg_addr,
 extern int swr_bulk_write(struct swr_device *dev, u8 dev_num, void *reg_addr,
 			  const void *buf, size_t len);
 
+int swr_connect_port_v2(struct swr_device *dev, u8 *port_id, u8 num_port,
+		u8 *ch_mask, u32 *ch_rate, u8 *num_ch, u8 *port_type, unsigned int *bit_width);
+
 extern int swr_connect_port(struct swr_device *dev, u8 *port_id, u8 num_port,
 				u8 *ch_mask, u32 *ch_rate, u8 *num_ch,
 				u8 *port_type);
@@ -400,6 +413,8 @@ extern void swr_unregister_master(struct swr_master *master);
 extern int swr_register_master(struct swr_master *master);
 
 extern int swr_device_up(struct swr_device *swr_dev);
+
+extern int swr_device_handle_interrupt(struct swr_device *swr_dev, u8 devnum);
 
 extern int swr_device_down(struct swr_device *swr_dev);
 
