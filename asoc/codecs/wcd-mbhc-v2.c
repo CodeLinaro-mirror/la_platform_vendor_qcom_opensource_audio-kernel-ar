@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -1685,6 +1685,7 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 					   unsigned long mode, void *ptr)
 {
+	pr_info("%s: mode = %lu, handler not implemented\n", __func__, mode);
 	return 0;
 }
 #endif
@@ -1912,7 +1913,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 	if (mbhc->headset_jack.jack == NULL) {
 		ret = snd_soc_card_jack_new(component->card,
 					    "Headset Jack", WCD_MBHC_JACK_MASK,
-					    &mbhc->headset_jack, NULL, 0);
+					    &mbhc->headset_jack);
 		if (ret) {
 			pr_err("%s: Failed to create new jack\n", __func__);
 			return ret;
@@ -1921,7 +1922,7 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 		ret = snd_soc_card_jack_new(component->card,
 					    "Button Jack",
 					    WCD_MBHC_JACK_BUTTON_MASK,
-					    &mbhc->button_jack, NULL, 0);
+					    &mbhc->button_jack);
 		if (ret) {
 			pr_err("Failed to create new jack\n");
 			return ret;

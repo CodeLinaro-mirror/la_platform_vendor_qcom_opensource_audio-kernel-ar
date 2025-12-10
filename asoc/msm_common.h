@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef _MSM_COMMON_H_
 #define _MSM_COMMON_H_
 
 #include <sound/soc.h>
 #include <sound/pcm.h>
-
-#define DEVICE_ENABLE 1
-#define DEVICE_DISABLE 0
+#include <linux/cpu.h>
 
 enum {
 	MI2S = 0,
@@ -31,7 +29,7 @@ enum {
 
 typedef enum snd_card_status_t {
 	SND_CARD_STATUS_INVALID = -1,
-	SND_CARD_STATUS_OFFLINE = 0,
+	SND_CARD_STATUS_OFFLINE,
 	SND_CARD_STATUS_ONLINE,
 	SND_CARD_STATUS_STANDBY,
 } snd_card_status_t;
@@ -39,7 +37,7 @@ typedef enum snd_card_status_t {
 struct msm_common_pdata {
 	uint8_t *aud_dev_state;
 	struct kobject aud_dev_kobj;
-	uint8_t dsp_sessions_closed;
+	struct mutex aud_dev_lock;
 	uint32_t num_aud_devs;
 	struct device_node *mi2s_gpio_p[MI2S_TDM_AUXPCM_MAX];
 	struct mutex lock[MI2S_TDM_AUXPCM_MAX];

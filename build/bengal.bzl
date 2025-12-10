@@ -4,9 +4,10 @@ load(":module_mgr.bzl", "define_target_modules")
 def define_bengal():
     define_target_modules(
         target = "bengal",
-        variants = ["consolidate", "gki"],
+        variants = ["consolidate", "gki", "perf"],
         registry = audio_modules,
         modules = [
+            "q6_notifier_dlkm",
             "spf_core_dlkm",
             "audpkt_ion_dlkm",
             "gpr_dlkm",
@@ -38,6 +39,7 @@ def define_bengal():
             "CONFIG_SND_SOC_WCD_IRQ",
             "CONFIG_MSM_QDSP6_SSR",
             "CONFIG_MSM_CDC_PINCTRL",
+            "CONFIG_SWRM_VER_1P7",
             "CONFIG_SOUNDWIRE_MSTR_CTRL",
             "CONFIG_WCD9XXX_CODEC_CORE_V2",
             "CONFIG_SND_SOC_WCD9XXX_V2",
