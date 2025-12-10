@@ -10,6 +10,8 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __QCOM_GPR_H_
@@ -228,7 +230,7 @@ struct gpr_hdr {
 
 struct gpr_pkt {
        struct gpr_hdr hdr;
-       uint8_t payload[0];
+       DECLARE_FLEX_ARRAY(uint8_t, payload);
 };
 
 #define GPR_IBASIC_RSP_RESULT 0x02001005
