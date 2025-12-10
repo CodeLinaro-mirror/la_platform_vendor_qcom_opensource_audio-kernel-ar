@@ -69,6 +69,15 @@
 #define LPI_GPIO_FUNC_FUNC4              "func4"
 #define LPI_GPIO_FUNC_FUNC5              "func5"
 
+#define LPI_GPIO_DRV_2_MA      2
+#define LPI_GPIO_DRV_4_MA      4
+#define LPI_GPIO_DRV_6_MA      6
+#define LPI_GPIO_DRV_8_MA      8
+#define LPI_GPIO_DRV_10_MA      10
+#define LPI_GPIO_DRV_12_MA      12
+#define LPI_GPIO_DRV_14_MA      14
+#define LPI_GPIO_DRV_16_MA      16
+
 static bool lpi_dev_up;
 static struct device *lpi_dev;
 static bool initial_boot = false;
@@ -340,6 +349,11 @@ static int lpi_config_get(struct pinctrl_dev *pctldev,
 
 static unsigned int lpi_drive_to_regval(u32 arg)
 {
+	if (arg < LPI_GPIO_DRV_2_MA)
+		arg = LPI_GPIO_DRV_2_MA;
+	if (arg > LPI_GPIO_DRV_16_MA)
+		arg = LPI_GPIO_DRV_16_MA;
+
 	return (arg/2 - 1);
 }
 
@@ -401,9 +415,24 @@ static int lpi_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 			mutex_lock(&state->slew_access_lock);
 			if (pad->lpi_slew_reg != NULL) {
 				pad->base = pad->lpi_slew_reg;
+				if (pad->slew_offset != LPI_SLEW_OFFSET_INVALID) {
+					val = lpi_gpio_read(pad, LPI_SLEW_REG_VAL_CTL);  //16-bit
+					pad->offset = pad->slew_offset;
+					for (i = 0; i < LPI_SLEW_BITS_SIZE; i++) {
+						if (arg & 0x01)
+							set_bit(pad->offset, &val);
+						else
+							clear_bit(pad->offset, &val);
+					pad->offset++;
+					arg = arg >> 1;
+				}
+				pad->offset = 0;
+				lpi_gpio_write(pad, LPI_SLEW_REG_VAL_CTL, val);
+			} else {
 				lpi_gpio_write(pad, LPI_SLEW_REG_VAL_CTL, arg);
-				pad->base = pad->slew_base;
-				goto slew_exit;
+			}
+			pad->base = pad->slew_base;
+			goto slew_exit;
 			}
 			val = lpi_gpio_read(pad, LPI_SLEW_REG_VAL_CTL);
 			pad->offset = pad->slew_offset;
@@ -435,12 +464,12 @@ set_gpio:
 	val |= pad->pullup << LPI_GPIO_REG_PULL_SHIFT;
 	val |= lpi_drive_to_regval(pad->strength) <<
 		LPI_GPIO_REG_OUT_STRENGTH_SHIFT;
-	val |= pad->output_enabled << LPI_GPIO_REG_OE_SHIFT;
+	if (pad->output_enabled)
+		val |= pad->value << LPI_GPIO_REG_OE_SHIFT;
 
 	lpi_gpio_write(pad, LPI_GPIO_REG_VAL_CTL, val);
-	if (pad->output_enabled)
-		lpi_gpio_write(pad, LPI_GPIO_REG_DIR_CTL,
-			pad->value << LPI_GPIO_REG_DIR_SHIFT);
+	lpi_gpio_write(pad, LPI_GPIO_REG_DIR_CTL,
+		       pad->output_enabled << LPI_GPIO_REG_DIR_SHIFT);
 done:
 	return ret;
 }
@@ -524,7 +553,6 @@ int lpi_pinctrl_suspend(struct device *dev)
 {
 	int ret = 0;
 
-	trace_printk("%s: system suspend\n",  __func__);
 	dev_dbg(dev, "%s: system suspend\n", __func__);
 
 	if ((!pm_runtime_enabled(dev) || !pm_runtime_suspended(dev))) {
@@ -561,7 +589,6 @@ static struct notifier_block service_nb = {
 
 static void lpi_pinctrl_ssr_disable(struct device *dev, void *data)
 {
-	trace_printk("%s: enter\n", __func__);
 	lpi_dev_up = false;
 	lpi_pinctrl_suspend(dev);
 }
@@ -579,7 +606,6 @@ static int lpi_pinctrl_ssr_enable(struct device *dev, void *data)
 	state = dev_get_drvdata(lpi_dev);
 
 	if (!initial_boot) {
-		trace_printk("%s: enter\n", __func__);
 		if (!lpi_dev_up) {
 			msleep(100);
 			if (state->lpass_core_hw_vote)
@@ -757,7 +783,7 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 	} else {
 		slew_base = NULL;
 		dev_dbg(dev, "error in reading lpi slew register: %d\n",
-			__func__, ret);
+			ret);
 	}
 
 	pindesc = devm_kcalloc(dev, npins, sizeof(*pindesc), GFP_KERNEL);
@@ -932,7 +958,6 @@ int lpi_pinctrl_runtime_resume(struct device *dev)
 	int ret = 0;
 	struct clk *hw_vote = state->lpass_core_hw_vote;
 
-	trace_printk("%s: enter\n", __func__);
 	if (state->lpass_core_hw_vote == NULL) {
 		dev_dbg(dev, "%s: Invalid core hw node\n", __func__);
 		if (state->lpass_audio_hw_vote == NULL) {
@@ -958,7 +983,6 @@ int lpi_pinctrl_runtime_resume(struct device *dev)
 
 exit:
 	mutex_unlock(&state->core_hw_vote_lock);
-	trace_printk("%s: exit\n", __func__);
 	return 0;
 }
 
@@ -967,7 +991,6 @@ int lpi_pinctrl_runtime_suspend(struct device *dev)
 	struct lpi_gpio_state *state = dev_get_drvdata(dev);
 	struct clk *hw_vote = state->lpass_core_hw_vote;
 
-	trace_printk("%s: enter\n", __func__);
 	if (state->lpass_core_hw_vote == NULL) {
 		dev_dbg(dev, "%s: Invalid core hw node\n", __func__);
 		if (state->lpass_audio_hw_vote == NULL) {
@@ -983,7 +1006,6 @@ int lpi_pinctrl_runtime_suspend(struct device *dev)
 		state->core_hw_vote_status = false;
 	}
 	mutex_unlock(&state->core_hw_vote_lock);
-	trace_printk("%s: exit\n", __func__);
 	return 0;
 }
 

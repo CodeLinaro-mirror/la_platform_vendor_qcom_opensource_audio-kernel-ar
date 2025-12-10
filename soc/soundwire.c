@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2020, The Linux Foundation. All rights reserved.
- * Changes from Qualcomm Technologies, Inc. are provided under the following license:
  * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
@@ -61,6 +60,32 @@ static void swr_dev_release(struct device *dev)
 	swr_master_put(swr_dev->master);
 	kfree(swr_dev);
 }
+/**
+ * swr_device_callback_interupt - interrupt callback to soundwire slave device
+ * @swr_dev: pointer to soundwire slave device
+ *
+ * Interrupt callback notification to soundwire slave device.
+ *
+ */
+int swr_device_handle_interrupt(struct swr_device *swr_dev, u8 devnum)
+{
+	struct device *dev;
+	const struct swr_driver *sdrv;
+
+	if (!swr_dev)
+		return -EINVAL;
+
+	dev = &swr_dev->dev;
+	sdrv = to_swr_driver(dev->driver);
+	if (!sdrv)
+		return 0;
+
+	if (sdrv->interrupt_callback)
+		return sdrv->interrupt_callback(to_swr_device(dev), devnum);
+
+	return -ENODEV;
+}
+EXPORT_SYMBOL(swr_device_handle_interrupt);
 
 /**
  * swr_remove_device - remove a soundwire device
@@ -128,7 +153,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	list_add_tail(&swr->dev_list, &master->devices);
 	mutex_unlock(&master->mlock);
 
-	dev_set_name(&swr->dev, "%s.%lx", swr->name, swr->addr);
+	dev_set_name(&swr->dev, "%s.%llx", swr->name, swr->addr);
 	result = device_register(&swr->dev);
 	if (result) {
 		dev_err_ratelimited(&master->dev, "device [%s] register failed err %d\n",
@@ -140,7 +165,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	return swr;
 
 err_out:
-	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%lx %d\n",
+	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%llx %d\n",
 		swr->name, swr->addr, result);
 	swr_master_put(master);
 	list_del_init(&swr->dev_list);
@@ -171,7 +196,8 @@ int of_register_swr_devices(struct swr_master *master)
 
 		dev_dbg(&master->dev, "of_swr:register %s\n", node->full_name);
 
-		if (of_modalias_node(node, info.name, sizeof(info.name)) < 0) {
+		if (of_alias_from_compatible(node, info.name,
+				sizeof(info.name)) < 0) {
 			dev_err_ratelimited(&master->dev, "of_swr:modalias failure %s\n",
 				node->full_name);
 			continue;
@@ -183,13 +209,13 @@ int of_register_swr_devices(struct swr_master *master)
 		}
 		info.addr = addr;
 		info.of_node = of_node_get(node);
-		master->num_dev++;
+		//master->num_dev++;
 		swr = swr_new_device(master, &info);
 		if (!swr) {
 			dev_err_ratelimited(&master->dev, "of_swr: Register failed %s\n",
 				node->full_name);
 			of_node_put(node);
-			master->num_dev--;
+			//master->num_dev--;
 			continue;
 		}
 	}
@@ -373,11 +399,105 @@ int swr_connect_port(struct swr_device *dev, u8 *port_id, u8 num_port,
 		txn->ch_rate[i] = ch_rate[i];
 		txn->ch_en[i]   = ch_mask[i];
 		txn->port_type[i] = port_type[i];
+		txn->bit_width[i] = 0;
 	}
 	ret = master->connect_port(master, txn);
 	return ret;
 }
 EXPORT_SYMBOL(swr_connect_port);
+
+/**
+ * swr_connect_port_v2 - enable soundwire slave port(s)
+ * @dev: pointer to soundwire slave device
+ * @port_id: logical port id(s) of soundwire slave device
+ * @num_port: number of slave device ports need to be enabled
+ * @ch_mask: channels for each port that needs to be enabled
+ * @ch_rate: rate at which each port/channels operate
+ * @num_ch: number of channels for each port
+ * @port_type: array of master port types
+ * @bit_width: array of bit widths of different channels
+ *
+ * soundwire slave device call swr_connect_port API to enable all/some of
+ * its ports and corresponding channels and channel rate. This API will
+ * call master connect_port callback function to calculate frame structure
+ * and enable master and slave ports
+ */
+int swr_connect_port_v2(struct swr_device *dev, u8 *port_id, u8 num_port,
+			u8 *ch_mask, u32 *ch_rate, u8 *num_ch, u8 *port_type,
+			unsigned int *bit_width)
+{
+	u8 i = 0;
+	int ret = 0;
+	struct swr_params *txn = NULL;
+	struct swr_params **temp_txn = NULL;
+	struct swr_master *master = dev->master;
+
+	if (!master) {
+		pr_err_ratelimited("%s: Master is NULL\n", __func__);
+		return -EINVAL;
+	}
+	if (num_port > SWR_MAX_DEV_PORT_NUM) {
+		dev_err_ratelimited(&master->dev, "%s: num_port %d exceeds max port %d\n",
+			__func__, num_port, SWR_MAX_DEV_PORT_NUM);
+		return -EINVAL;
+	}
+
+	/*
+	 * create "txn" to accommodate ports enablement of
+	 * different slave devices calling swr_connect_port at the
+	 * same time. Once master process the txn data, it calls
+	 * swr_port_response() to free the transaction. Maximum
+	 * of 256 transactions can be allocated.
+	 */
+	txn = kzalloc(sizeof(struct swr_params), GFP_KERNEL);
+	if (!txn)
+		return -ENOMEM;
+
+	mutex_lock(&master->mlock);
+	for (i = 0; i < master->last_tid; i++) {
+		if (master->port_txn[i] == NULL)
+			break;
+	}
+	if (i >= master->last_tid) {
+		if (master->last_tid == 255) {
+			mutex_unlock(&master->mlock);
+			kfree(txn);
+			dev_err_ratelimited(&master->dev, "%s Max tid reached\n",
+				__func__);
+			return -ENOMEM;
+		}
+		temp_txn = krealloc(master->port_txn,
+				(i + 1) * sizeof(struct swr_params *),
+				GFP_KERNEL);
+		if (!temp_txn) {
+			mutex_unlock(&master->mlock);
+			kfree(txn);
+			dev_err_ratelimited(&master->dev, "%s Not able to allocate\n"
+				"master port transaction memory\n",
+				__func__);
+			return -ENOMEM;
+		}
+		master->port_txn = temp_txn;
+		master->last_tid++;
+	}
+	master->port_txn[i] = txn;
+	mutex_unlock(&master->mlock);
+	txn->tid = i;
+
+	txn->dev_num = dev->dev_num;
+	txn->num_port = num_port;
+	for (i = 0; i < num_port; i++) {
+		txn->port_id[i] = port_id[i];
+		txn->num_ch[i]  = num_ch[i];
+		txn->ch_rate[i] = ch_rate[i];
+		txn->ch_en[i]   = ch_mask[i];
+		txn->port_type[i] = port_type[i];
+		txn->bit_width[i] = bit_width[i];
+	}
+	ret = master->connect_port(master, txn);
+	return ret;
+}
+EXPORT_SYMBOL(swr_connect_port_v2);
 
 /**
  * swr_disconnect_port - disable soundwire slave port(s)
@@ -933,7 +1053,8 @@ void swr_unregister_master(struct swr_master *master)
 		return;
 
 	mutex_lock(&board_lock);
-	list_del(&master->list);
+	if (!list_empty(&master->list)) // Check if the list is non-empty
+		list_del(&master->list);
 	mutex_unlock(&board_lock);
 
 	/* free bus id */
@@ -971,11 +1092,6 @@ int swr_register_master(struct swr_master *master)
 		return id;
 
 	master->bus_num = id;
-	/* Can't register until driver model init */
-	if (WARN_ON(!soundwire_type.p)) {
-		status = -EAGAIN;
-		goto done;
-	}
 
 	dev_set_name(&master->dev, "swr%u", master->bus_num);
 	master->dev.bus = &soundwire_type;
