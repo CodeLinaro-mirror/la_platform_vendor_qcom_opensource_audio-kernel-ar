@@ -65,7 +65,6 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
             "//soc-repo:{}_{}/drivers/base/regmap/qti-regmap-debugfs".format(target, variant),
             "//soc-repo:{}_{}/drivers/power/supply/qti_battery_charger".format(target, variant),
             "//soc-repo:{}_{}/drivers/soc/qcom/wcd_usbss_i2c".format(target, variant),
-            "//soc-repo:{}_{}/drivers/soc/qcom/fsa4480_i2c".format(target, variant),
             "//soc-repo:{}_{}/kernel/trace/qcom_ipc_logging".format(target, variant),
             "//soc-repo:{}_{}/drivers/soc/qcom/socinfo".format(target, variant),
         ] + registry.hdrs,

@@ -7,6 +7,15 @@ package(
 load("//build/kernel/kleaf:kernel.bzl", "ddk_headers")
 
 ddk_headers(
+    name = "kernel_core_headers",
+    hdrs = glob([
+        "include/linux/*.h",
+        "include/thermal/*.h",  # If present
+    ]),
+    includes = ["include", "include/linux", "include/thermal"]
+)
+
+ddk_headers(
     name = "audio_common_headers",
     hdrs = glob([
         "include/asoc/*.h",
@@ -42,7 +51,7 @@ ddk_headers(
 )
 ddk_headers(
     name = "audio_headers",
-    hdrs = [":audio_common_headers",  ":audio_uapi_headers", ":audio_src_headers", ":audio_configs"]
+    hdrs = [":audio_common_headers",  ":audio_uapi_headers", ":audio_src_headers", ":audio_configs", ":kernel_core_headers"]
 )
 
 load(":build/bengal.bzl", "define_bengal")

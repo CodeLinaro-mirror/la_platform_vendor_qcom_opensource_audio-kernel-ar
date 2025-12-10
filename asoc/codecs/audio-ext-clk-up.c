@@ -9,6 +9,7 @@
 #include <linux/io.h>
 #include <linux/err.h>
 #include <linux/module.h>
+#include <linux/version.h>
 #include <linux/of.h>
 #include <linux/clk.h>
 #include <linux/clk-provider.h>
@@ -721,11 +722,17 @@ static int audio_ref_clk_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void audio_ref_clk_remove(struct platform_device *pdev)
+#else
 static int audio_ref_clk_remove(struct platform_device *pdev)
+#endif
 {
 	audio_put_pinctrl(pdev);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id audio_ref_clk_match[] = {

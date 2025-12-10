@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -9,6 +9,8 @@
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/of_device.h>
+#include <linux/arch_topology.h>
+#include <linux/version.h>
 #include <sound/control.h>
 #include <sound/core.h>
 #include <sound/soc.h>
@@ -19,8 +21,14 @@
 #include <sound/info.h>
 #include <dsp/audio_prm.h>
 #include <dsp/digital-cdc-rsc-mgr.h>
-
+#ifdef CONFIG_SCHED_WALT
+#include <linux/sched/walt.h>
+#endif
 #include "msm_common.h"
+
+#ifndef topology_cluster_id
+#define topology_cluster_id(cpu) topology_physical_package_id(cpu)
+#endif
 
 struct snd_card_pdata {
 	struct kobject snd_card_kobj;
@@ -30,12 +38,19 @@ struct snd_card_pdata {
 #define to_asoc_mach_common_pdata(kobj) \
 	container_of((kobj), struct msm_common_pdata, aud_dev_kobj)
 
+#define DEVICE_ENABLE 1
+#define DEVICE_DISABLE 0
+
 #define ARRAY_SZ 21
 #define BUF_SZ 32
 #define DIR_SZ 10
 
 #define MAX_CODEC_DAI 8
+#ifdef CONFIG_SND_SOC_SUN
+#define TDM_SLOT_WIDTH_BITS 16
+#else
 #define TDM_SLOT_WIDTH_BITS 32
+#endif
 #define TDM_MAX_SLOTS 8
 #define MI2S_NUM_CHANNELS 2
 
@@ -44,6 +59,8 @@ struct snd_card_pdata {
 #define SAMPLING_RATE_176P4KHZ  176400
 #define SAMPLING_RATE_352P8KHZ  352800
 
+struct mutex vote_against_sleep_lock;
+
 static struct attribute device_state_attr = {
 	.name = "state",
 	.mode = 0660,
@@ -51,7 +68,7 @@ static struct attribute device_state_attr = {
 
 static struct attribute card_state_attr = {
 	.name = "card_state",
-	.mode = 0666,
+	.mode = 0660,
 };
 
 #define MAX_PORT 20
@@ -68,17 +85,28 @@ struct chmap_pdata {
 	struct snd_soc_dai *dai[MAX_CODEC_DAI];
 };
 
+static const struct snd_pcm_hardware dummy_dma_hardware = {
+	/* Random values to keep userspace happy when checking constraints */
+	.info               = SNDRV_PCM_INFO_INTERLEAVED |
+					SNDRV_PCM_INFO_BLOCK_TRANSFER,
+	.buffer_bytes_max   = 128*1024,
+	.period_bytes_min   = PAGE_SIZE,
+	.period_bytes_max   = PAGE_SIZE*2,
+	.periods_min        = 2,
+	.periods_max        = 128,
+};
+
 #define MAX_USR_INPUT 10
+#define MAX_CPU_CLUSTER 4 /* Silver, Gold, T, Prime */
 
 static int qos_vote_status;
 static bool lpi_pcm_logging_enable;
 static bool vote_against_sleep_enable;
+static unsigned int vote_against_sleep_cnt;
 
 static struct dev_pm_qos_request latency_pm_qos_req; /* pm_qos request */
 static unsigned int qos_client_active_cnt;
-/* set audio task affinity to core 1 & 2 */
-static const unsigned int audio_core_list[] = {1, 2};
-static cpumask_t audio_cpu_map = CPU_MASK_NONE;
+static int cluster_first_cpu[MAX_CPU_CLUSTER] = {-1, };
 static struct dev_pm_qos_request *msm_audio_req = NULL;
 static bool kregister_pm_qos_latency_controls = false;
 #define MSM_LL_QOS_VALUE	300 /* time in us to ensure LPM doesn't go in C3/C4 */
@@ -98,7 +126,7 @@ static ssize_t aud_dev_sysfs_store(struct kobject *kobj,
 
 	sscanf(buf, "%d %d", &pcm_id, &state);
 
-	if ((pcm_id > pdata->num_aud_devs) || (pcm_id < 0)) {
+	if ((pcm_id >= pdata->num_aud_devs) || (pcm_id < 0)) {
 		pr_err("%s: invalid pcm id %d \n", __func__, pcm_id);
 		goto done;
 	}
@@ -110,8 +138,6 @@ static ssize_t aud_dev_sysfs_store(struct kobject *kobj,
 	pr_debug("%s: pcm_id %d state %d \n", __func__, pcm_id, state);
 
 	pdata->aud_dev_state[pcm_id] = state;
-	if ( state == DEVICE_ENABLE && (pdata->dsp_sessions_closed != 0))
-		pdata->dsp_sessions_closed = 0;
 
 	ret = count;
 done:
@@ -158,6 +184,13 @@ int snd_card_notify_user(snd_card_status_t card_status)
 {
 	snd_card_pdata->card_status = card_status;
 	sysfs_notify(&snd_card_pdata->snd_card_kobj, NULL, "card_state");
+	if (card_status == 0) {
+		mutex_lock(&vote_against_sleep_lock);
+		vote_against_sleep_cnt = 0;
+		pr_debug("%s: SSR/PDR triggered reset vote_against_sleep_cnt = %d\n",
+					__func__, vote_against_sleep_cnt);
+		mutex_unlock(&vote_against_sleep_lock);
+	}
 	return 0;
 }
 
@@ -219,31 +252,6 @@ done:
 	return ret;
 }
 
-static void check_userspace_service_state(struct snd_soc_pcm_runtime *rtd,
-						struct msm_common_pdata *pdata)
-{
-	dev_info(rtd->card->dev,"%s: pcm_id %d state %d\n", __func__,
-				rtd->num, pdata->aud_dev_state[rtd->num]);
-
-	if (pdata->aud_dev_state[rtd->num] == DEVICE_ENABLE) {
-		dev_info(rtd->card->dev, "%s userspace service crashed\n",
-					__func__);
-		if (pdata->dsp_sessions_closed == 0) {
-			/*Issue close all graph cmd to DSP*/
-			spf_core_apm_close_all();
-			/*unmap all dma mapped buffers*/
-			msm_audio_ion_crash_handler();
-#if IS_ENABLED(CONFIG_SND_SOC_PCIE)
-			/*clear pcie driver state*/
-			msm_pcm_pcie_crash_handler();
-#endif
-			pdata->dsp_sessions_closed = 1;
-		}
-		/*Reset the state as sysfs node wont be triggred*/
-		pdata->aud_dev_state[rtd->num] = 0;
-	}
-}
-
 static int get_mi2s_tdm_auxpcm_intf_index(const char *stream_name)
 {
 
@@ -254,25 +262,10 @@ static int get_mi2s_tdm_auxpcm_intf_index(const char *stream_name)
 
 	if (strnstr(stream_name, "LPAIF_RXTX", strlen(stream_name)))
 		return QUAT_MI2S_TDM_AUXPCM;
-	else if (strnstr(stream_name, "LPAIF_WSA", strlen(stream_name))) {
-#ifdef CONFIG_MI2S_BOLERO_V2_1
-		if (strnstr(stream_name, "PRIMARY", strlen(stream_name)))
-			return SEC_MI2S_TDM_AUXPCM;
-		if (strnstr(stream_name, "SECONDARY", strlen(stream_name)))
-			return TER_MI2S_TDM_AUXPCM;
-#else
+	else if (strnstr(stream_name, "LPAIF_WSA", strlen(stream_name)))
 		return SEN_MI2S_TDM_AUXPCM;
-#endif
-	}
-	else if (strnstr(stream_name, "LPAIF_VA", strlen(stream_name))) {
-#ifdef CONFIG_MI2S_BOLERO_V2_1
-		pr_debug("%s: stream_name %s",__func__,stream_name);
-                if (strnstr(stream_name, "PRIMARY", strlen(stream_name)))
-                        return PRI_MI2S_TDM_AUXPCM;
-#else
+	else if (strnstr(stream_name, "LPAIF_VA", strlen(stream_name)))
 		return QUIN_MI2S_TDM_AUXPCM;
-#endif
-        }
 	else if (strnstr(stream_name, "LPAIF_AUD", strlen(stream_name))){
 		if (strnstr(stream_name, "PRIMARY", strlen(stream_name)))
 			return SEP_MI2S_TDM_AUXPCM;
@@ -442,7 +435,8 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				intf_clk_cfg.clk_root = 0;
 
 				if (pdata->is_audio_hw_vote_required[index]  &&
-					is_fractional_sample_rate(rate)) {
+					(is_fractional_sample_rate(rate) ||
+					(index == QUIN_MI2S_TDM_AUXPCM))) {
 					ret = mi2s_tdm_hw_vote_req(pdata, 1);
 					if (ret < 0) {
 						pr_err("%s lpass audio hw vote enable failed %d\n",
@@ -485,7 +479,8 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				intf_clk_cfg.clk_root = CLOCK_ROOT_DEFAULT;
 
 				if (pdata->is_audio_hw_vote_required[index]  &&
-					is_fractional_sample_rate(rate)) {
+					(is_fractional_sample_rate(rate) ||
+					(index == QUIN_MI2S_TDM_AUXPCM))) {
 					ret = mi2s_tdm_hw_vote_req(pdata, 1);
 					if (ret < 0) {
 						pr_err("%s lpass audio hw vote enable failed %d\n",
@@ -532,6 +527,9 @@ int msm_common_snd_startup(struct snd_pcm_substream *substream)
 		return -EINVAL;
 	}
 
+	if (!rtd->dai_link->no_pcm)
+		snd_soc_set_runtime_hwparams(substream, &dummy_dma_hardware);
+
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
 		if (pdata->mi2s_gpio_p[index]) {
@@ -573,8 +571,6 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 		return;
 	}
 
-	check_userspace_service_state(rtd, pdata);
-
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
 		atomic_dec(&pdata->lpass_intf_clk_ref_cnt[index]);
@@ -603,7 +599,8 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 			}
 
 			if (pdata->is_audio_hw_vote_required[index]  &&
-				is_fractional_sample_rate(rate)) {
+				(is_fractional_sample_rate(rate) ||
+				(index == QUIN_MI2S_TDM_AUXPCM))) {
 				ret = mi2s_tdm_hw_vote_req(pdata, 0);
 			}
 		} else if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) < 0) {
@@ -629,24 +626,30 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 
 static void msm_audio_add_qos_request(void)
 {
-	int i;
+	int num_req = 0;
 	int cpu = 0;
 	int ret = 0;
+	int cid, prev_cid = -1;
+	int cluster_num = 0;
+	cpumask_t *cluster_cpu_mask = NULL;
 
 	msm_audio_req = kcalloc(num_possible_cpus(),
 			sizeof(struct dev_pm_qos_request), GFP_KERNEL);
 	if (!msm_audio_req)
 		return;
 
-	for (i = 0; i < ARRAY_SIZE(audio_core_list); i++) {
-		if (audio_core_list[i] >= num_possible_cpus())
-			pr_err("%s incorrect cpu id: %d specified.\n",
-                                    __func__, audio_core_list[i]);
-		else
-			cpumask_set_cpu(audio_core_list[i], &audio_cpu_map);
+	for_each_cpu(cpu, cpu_possible_mask) {
+		cid = topology_cluster_id(cpu);
+		if (cid != prev_cid) {
+			cluster_first_cpu[cluster_num++] = cpu;
+			prev_cid = cid;
+		}
 	}
 
-	for_each_cpu(cpu, &audio_cpu_map) {
+	/* Pick the first cluster as it represents the Silver cluster. */
+	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
+
+	for_each_cpu(cpu, cluster_cpu_mask) {
 		ret = dev_pm_qos_add_request(get_cpu_device(cpu),
 			    &msm_audio_req[cpu],
 			    DEV_PM_QOS_RESUME_LATENCY,
@@ -654,7 +657,11 @@ static void msm_audio_add_qos_request(void)
 		if (ret < 0)
 			pr_err("%s error (%d) adding resume latency to cpu %d.\n",
                                                 __func__, ret, cpu);
-		pr_debug("%s set cpu affinity to core %d.\n", __func__, cpu);
+		pr_debug("%s set cpu affinity to logical core %d.\n", __func__, cpu);
+
+		/* Limit the request to 2 silver cpu cores. */
+		if (++num_req == 2)
+			break;
 	}
 }
 
@@ -662,9 +669,12 @@ static void msm_audio_remove_qos_request(void)
 {
 	int cpu = 0;
 	int ret = 0;
+	cpumask_t *cluster_cpu_mask = NULL;
+
+	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
 
 	if (msm_audio_req) {
-		for_each_cpu(cpu, &audio_cpu_map) {
+		for_each_cpu(cpu, cluster_cpu_mask) {
 			ret = dev_pm_qos_remove_request(
 				    &msm_audio_req[cpu]);
 			if (ret < 0)
@@ -682,7 +692,6 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 	int count, ret = 0;
 	uint32_t val_array[MI2S_TDM_AUXPCM_MAX] = {0};
 	struct clk *lpass_audio_hw_vote = NULL;
-
 	common_pdata = kcalloc(1, sizeof(struct msm_common_pdata), GFP_KERNEL);
 	if (!common_pdata)
 		return -ENOMEM;
@@ -779,6 +788,7 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 						sizeof(uint8_t), GFP_KERNEL);
 	dev_info(&pdev->dev, "num_links %d \n", card->num_links);
 	common_pdata->num_aud_devs = card->num_links;
+	mutex_init(&common_pdata->aud_dev_lock);
 
 	aud_dev_sysfs_init(common_pdata);
 
@@ -786,6 +796,8 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 
 	/* Add QoS request for audio tasks */
 	msm_audio_add_qos_request();
+
+	mutex_init(&vote_against_sleep_lock);
 
 	return 0;
 };
@@ -797,8 +809,10 @@ void msm_common_snd_deinit(struct msm_common_pdata *common_pdata)
 	if (!common_pdata)
 		return;
 
+	mutex_destroy(&vote_against_sleep_lock);
 	msm_audio_remove_qos_request();
 
+	mutex_destroy(&common_pdata->aud_dev_lock);
 	for (count = 0; count < MI2S_TDM_AUXPCM_MAX; count++) {
 		mutex_destroy(&common_pdata->lock[count]);
 	}
@@ -903,10 +917,8 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		/* reset return value from the loop above */
 		ret = 0;
 		if (rx_ch_cnt == 0 && tx_ch_cnt == 0) {
-			pr_debug("%s: got incorrect channel map for backend_id:%d, ",
-				__func__, backend_id);
-			pr_debug("%s: RX Channel Count:%d, TX Channel Count:%d\n",
-				__func__, rx_ch_cnt, tx_ch_cnt);
+			pr_debug("%s: incorrect ch map for backend_id:%d, RX Channel Cnt:%d, TX Channel Cnt:%d\n",
+				__func__, backend_id, rx_ch_cnt, tx_ch_cnt);
 			return ret;
 		}
 
@@ -952,9 +964,13 @@ static void msm_audio_update_qos_request(u32 latency)
 {
 	int cpu = 0;
 	int ret = -1;
+	int num_req = 0;
+	cpumask_t *cluster_cpu_mask = NULL;
+
+	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
 
 	if (msm_audio_req) {
-		for_each_cpu(cpu, &audio_cpu_map) {
+		for_each_cpu(cpu, cluster_cpu_mask) {
 			ret = dev_pm_qos_update_request(
 					&msm_audio_req[cpu], latency);
 			if (1 == ret ) {
@@ -967,28 +983,96 @@ static void msm_audio_update_qos_request(u32 latency)
 				pr_err("%s: failed to update latency of core %d, error %d \n",
 								__func__, cpu, ret);
 			}
+			/* Limit the request to 2 Silver CPU cores. */
+			if (++num_req == 2)
+				break;
 		}
 	}
+}
+
+static int msm_get_and_print_cpu_map_taken(cpumask_t* expected_cpu_map) {
+	int ret = 0;
+	int cpu = 0;
+
+#ifdef CONFIG_SCHED_WALT
+	cpumask_t current_cpu_map = walt_get_cpus_taken();
+#else
+	cpumask_t current_cpu_map = CPU_MASK_NONE;
+#endif
+
+	if (memcmp(&current_cpu_map, &CPU_MASK_NONE, sizeof(cpumask_t)) == 0) {
+		pr_debug("%s: current cpu map is none.\n", __func__);
+	} else {
+		for_each_cpu(cpu, &current_cpu_map) {
+			pr_debug("%s: current cpu core taken %d.\n", __func__, cpu);
+		}
+	}
+	if (memcmp(&current_cpu_map, expected_cpu_map, sizeof(cpumask_t)) == 0)
+		ret = 1;
+
+	return ret;
 }
 
 static int msm_qos_ctl_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
+	cpumask_t expected_cpu_map = CPU_MASK_NONE;
+	cpumask_t *cluster_cpu_mask = NULL;
 	qos_vote_status = ucontrol->value.enumerated.item[0];
+
+	cluster_cpu_mask = topology_core_cpumask(cluster_first_cpu[0]);
+	pr_debug("%s: qos_vote_status = %d, qos_client_active_cnt = %d.\n",
+				__func__, qos_vote_status, qos_client_active_cnt);
 	if (qos_vote_status) {
 		if (dev_pm_qos_request_active(&latency_pm_qos_req))
 			dev_pm_qos_remove_request(&latency_pm_qos_req);
 
 		qos_client_active_cnt++;
-		if (qos_client_active_cnt == 1)
+		if (qos_client_active_cnt == 1) {
 			msm_audio_update_qos_request(MSM_LL_QOS_VALUE);
+
+			expected_cpu_map = *cluster_cpu_mask;
+			if (msm_get_and_print_cpu_map_taken(&expected_cpu_map)) {
+				pr_debug("%s: already expected, don't need to set it.\n",
+							__func__);
+				return 0;
+			}
+
+#ifdef CONFIG_SCHED_WALT
+			walt_set_cpus_taken(cluster_cpu_mask);
+#endif
+			pr_debug("%s: set cpus taken to walt for audio RT tasks.\n",
+						__func__);
+
+			if (msm_get_and_print_cpu_map_taken(&expected_cpu_map)) {
+				pr_debug("%s: set cpus taken as expected successfully.\n",
+					__func__);
+			}
+		}
 	} else {
 		if (qos_client_active_cnt > 0)
 			qos_client_active_cnt--;
-		if (qos_client_active_cnt == 0)
+		if (qos_client_active_cnt == 0) {
 			msm_audio_update_qos_request(PM_QOS_CPU_LATENCY_DEFAULT_VALUE);
-	}
 
+			if (msm_get_and_print_cpu_map_taken(&expected_cpu_map)) {
+				pr_debug("%s: already expected, don't need to unset it.\n",
+							__func__);
+				return 0;
+			}
+
+#ifdef CONFIG_SCHED_WALT
+			walt_unset_cpus_taken(cluster_cpu_mask);
+#endif
+			pr_debug("%s: unset cpus taken to walt for audio RT tasks.\n",
+						__func__);
+
+			if (msm_get_and_print_cpu_map_taken(&expected_cpu_map)) {
+				pr_debug("%s: unset cpus taken as expected successfully.\n",
+							__func__);
+			}
+		}
+	}
 	return 0;
 }
 
@@ -1023,13 +1107,30 @@ static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
 {
 	int ret = 0;
 
+	mutex_lock(&vote_against_sleep_lock);
 	vote_against_sleep_enable = ucontrol->value.integer.value[0];
-	pr_debug("%s: vote against sleep enable: %d", __func__,
-			vote_against_sleep_enable);
+	pr_debug("%s: vote against sleep enable: %d sleep cnt: %d", __func__,
+			vote_against_sleep_enable, vote_against_sleep_cnt);
 
-	ret = audio_prm_set_vote_against_sleep((uint8_t)vote_against_sleep_enable);
+	if (vote_against_sleep_enable) {
+		vote_against_sleep_cnt++;
+		if (vote_against_sleep_cnt ==  1) {
+			ret = audio_prm_set_vote_against_sleep(1);
+			if (ret < 0) {
+				if (vote_against_sleep_cnt > 0)
+					--vote_against_sleep_cnt;
+				pr_err("%s: failed to vote against sleep ret: %d\n", __func__, ret);
+			}
+		}
+	} else {
+		if (vote_against_sleep_cnt == 1)
+			ret = audio_prm_set_vote_against_sleep(0);
+		if (vote_against_sleep_cnt > 0)
+			vote_against_sleep_cnt--;
+	}
 
 	pr_debug("%s: vote against sleep vote ret: %d\n", __func__, ret);
+	mutex_unlock(&vote_against_sleep_lock);
 	return ret;
 }
 
@@ -1081,7 +1182,11 @@ static int msm_register_pm_qos_latency_controls(struct snd_soc_pcm_runtime *rtd)
 
 int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 {
+#if (KERNEL_VERSION(6, 7, 0) <= LINUX_VERSION_CODE)
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
+#else
 	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+#endif
 	struct snd_soc_component *component = NULL;
 	struct snd_soc_dai_link *dai_link = rtd->dai_link;
 	struct device *dev = rtd->card->dev;
@@ -1118,16 +1223,20 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 	pdata = devm_kzalloc(dev, sizeof(struct chmap_pdata), GFP_KERNEL);
-	if (!pdata)
-		return -ENOMEM;
+	if (!pdata) {
+		ret = -ENOMEM;
+		goto free_backend;
+	}
 
 	if ((!strncmp(backend_name, "SLIM", strlen("SLIM"))) ||
 		(!strncmp(backend_name, "CODEC_DMA", strlen("CODEC_DMA")))) {
 		ctl_len = strlen(dai_link->stream_name) + 1 +
 				strlen(mixer_ctl_name) + 1;
 		mixer_str = kzalloc(ctl_len, GFP_KERNEL);
-		if (!mixer_str)
-			return -ENOMEM;
+		if (!mixer_str) {
+			ret = -ENOMEM;
+			goto free_backend;
+		}
 
 		snprintf(mixer_str, ctl_len, "%s %s", dai_link->stream_name,
 				mixer_ctl_name);
@@ -1150,8 +1259,8 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 			pdata->id = SLIM;
 		} else {
 			pdata->id = CODEC_DMA;
-			if (rtd->num_codecs <= MAX_CODEC_DAI) {
-				pdata->num_codec_dai = rtd->num_codecs;
+			if (rtd->dai_link->num_codecs <= MAX_CODEC_DAI) {
+				pdata->num_codec_dai = rtd->dai_link->num_codecs;
 				for_each_rtd_codec_dais(rtd, index, codec_dai) {
 					pdata->dai[index] = codec_dai;
 				}
@@ -1165,13 +1274,15 @@ int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd)
 	}
 
 free_mixer_str:
-	if (backend_name) {
-		kfree(backend_name);
-		backend_name = NULL;
-	}
 	if (mixer_str) {
 		kfree(mixer_str);
 		mixer_str = NULL;
+	}
+
+free_backend:
+	if (backend_name) {
+		kfree(backend_name);
+		backend_name = NULL;
 	}
 
 	return ret;
