@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -22,6 +22,7 @@
 #include <asoc/msm-cdc-pinctrl.h>
 #include <bindings/audio-codec-port-types.h>
 #include <asoc/msm-cdc-supply.h>
+#include <linux/version.h>
 
 #include "wcd937x-registers.h"
 #include "wcd937x.h"
@@ -63,8 +64,8 @@ enum {
 	HPH_COMP_DELAY,
 	HPH_PA_DELAY,
 	AMIC2_BCS_ENABLE,
-        WCD_HPHL_EN,
-        WCD_EAR_EN,
+	WCD_HPHL_EN,
+	WCD_EAR_EN,
 };
 
 static const DECLARE_TLV_DB_SCALE(line_gain, 0, 7, 1);
@@ -109,8 +110,10 @@ static struct regmap_irq_chip wcd937x_regmap_irq_chip = {
 //#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 	.clear_ack = 1,
 //#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	.mask_writeonly = 1,
 	.type_base = WCD937X_DIGITAL_INTR_LEVEL_0,
+#endif
 	.runtime_pm = false,
 	.handle_post_irq = wcd937x_handle_post_irq,
 	.irq_drv_data = NULL,
@@ -157,9 +160,11 @@ static int wcd937x_handle_post_irq(void *data)
 
 static int wcd937x_init_reg(struct snd_soc_component *component)
 {
-	u32 val =0;
+	u32 val = 0;
+
 	val = snd_soc_component_read(component, WCD937X_DIGITAL_EFUSE_REG_29)
 	     & 0x0F;
+
 	if (snd_soc_component_read(component, WCD937X_DIGITAL_EFUSE_REG_16)
 	    == 0x02 || snd_soc_component_read(component,
 	    WCD937X_DIGITAL_EFUSE_REG_17) > 0x09) {
@@ -215,7 +220,7 @@ static int wcd937x_init_reg(struct snd_soc_component *component)
 		snd_soc_component_update_bits(component,
 				WCD937X_BIAS_VBG_FINE_ADJ, 0xF0, 0xB0);
 		snd_soc_component_update_bits(component,
-				WCD937X_HPH_NEW_INT_RDAC_GAIN_CTL , 0xF0, 0x50);
+				WCD937X_HPH_NEW_INT_RDAC_GAIN_CTL, 0xF0, 0x50);
 	}
 	return 0;
 }
@@ -391,12 +396,10 @@ static int wcd937x_parse_port_mapping(struct device *dev,
 
 	for (i = 0; i < map_length; i++) {
 		port_num = dt_array[NUM_SWRS_DT_PARAMS * i];
-
 		if (port_num >= MAX_PORT || ch_iter >= MAX_CH_PER_PORT) {
 			dev_err(dev, "%s: Invalid port or channel number\n", __func__);
 			goto err_pdata_fail;
 		}
-
 		slave_port_type = dt_array[NUM_SWRS_DT_PARAMS * i + 1];
 		ch_mask = dt_array[NUM_SWRS_DT_PARAMS * i + 2];
 		ch_rate = dt_array[NUM_SWRS_DT_PARAMS * i + 3];
@@ -1778,7 +1781,7 @@ static int wcd937x_get_logical_addr(struct swr_device *swr_dev)
 		ret = swr_get_logical_dev_num(swr_dev, swr_dev->addr, &devnum);
 		if (ret) {
 			dev_err(&swr_dev->dev,
-				"%s get devnum %d for dev addr %lx failed\n",
+				"%s get devnum %d for dev addr %llx failed\n",
 				__func__, devnum, swr_dev->addr);
 			/* retry after 1ms */
 			usleep_range(1000, 1010);
@@ -2082,9 +2085,9 @@ static int wcd937x_get_compander(struct snd_kcontrol *kcontrol,
 				snd_soc_kcontrol_component(kcontrol);
 	struct wcd937x_priv *wcd937x = snd_soc_component_get_drvdata(component);
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 
 	ucontrol->value.integer.value[0] = hphr ? wcd937x->comp2_enable :
@@ -2100,9 +2103,9 @@ static int wcd937x_set_compander(struct snd_kcontrol *kcontrol,
 	struct wcd937x_priv *wcd937x = snd_soc_component_get_drvdata(component);
 	int value = ucontrol->value.integer.value[0];
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 	if (hphr)
 		wcd937x->comp2_enable = value;
@@ -2111,6 +2114,54 @@ static int wcd937x_set_compander(struct snd_kcontrol *kcontrol,
 
 	return 0;
 }
+
+/* wcd937x_codec_get_dev_num - returns swr device number
+ * @component: Codec instance
+ *
+ * Return: swr device number on success or negative error
+ * code on failure.
+ */
+int wcd937x_codec_get_dev_num(struct snd_soc_component *component)
+{
+	struct wcd937x_priv *wcd937x;
+
+	if (!component)
+		return -EINVAL;
+
+	wcd937x = snd_soc_component_get_drvdata(component);
+	if (!wcd937x || !wcd937x->rx_swr_dev) {
+		pr_err_ratelimited("%s: wcd939x component is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	return wcd937x->rx_swr_dev->dev_num;
+}
+EXPORT_SYMBOL(wcd937x_codec_get_dev_num);
+
+
+/*
+ * wcd937x_get_codec_variant
+ * @component: component instance
+ *
+ * Return: codec variant or -EINVAL in error.
+ */
+int wcd937x_get_codec_variant(struct snd_soc_component *component)
+{
+	struct wcd937x_priv *priv = NULL;
+
+	if (!component)
+		return -EINVAL;
+
+	priv = snd_soc_component_get_drvdata(component);
+	if (!priv) {
+		dev_err(component->dev,
+			"%s:wcd937x not probed\n", __func__);
+		return 0;
+	}
+
+	return priv->variant;
+}
+EXPORT_SYMBOL(wcd937x_get_codec_variant);
 
 static int wcd937x_codec_enable_vdd_buck(struct snd_soc_dapm_widget *w,
 					 struct snd_kcontrol *kcontrol,
@@ -2264,7 +2315,7 @@ static int wcd937x_tx_master_ch_put(struct snd_kcontrol *kcontrol,
 		return -EINVAL;
 
 	dev_dbg(component->dev, "%s: slave_ch_idx: %d", __func__, slave_ch_idx);
-	dev_dbg(component->dev, "%s: ucontrol->value.enumerated.item[0] = %ld\n",
+	dev_dbg(component->dev, "%s: ucontrol->value.enumerated.item[0] = %d\n",
 			__func__, ucontrol->value.enumerated.item[0]);
 
 	idx = ucontrol->value.enumerated.item[0];
@@ -3152,7 +3203,7 @@ static int wcd937x_reset(struct device *dev)
 	if (rc) {
 		dev_err(dev, "%s: wcd sleep state request fail!\n",
 				__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 	/* 20ms sleep required after pulling the reset gpio to LOW */
 	usleep_range(20, 30);
@@ -3161,7 +3212,7 @@ static int wcd937x_reset(struct device *dev)
 	if (rc) {
 		dev_err(dev, "%s: wcd active state request fail!\n",
 				__func__);
-		return rc;
+		return -EPROBE_DEFER;
 	}
 	/* 20ms sleep required after pulling the reset gpio to HIGH */
 	usleep_range(20, 30);
@@ -3385,7 +3436,11 @@ static int wcd937x_bind(struct device *dev)
 		goto err_bind_all;
 	}
 
-	wcd937x_reset(dev);
+	ret = wcd937x_reset(dev);
+	if (ret == -EPROBE_DEFER) {
+		dev_err(dev, "%s: wcd reset failed!\n", __func__);
+		goto err_bind_all;
+	}
 	/*
 	 * Add 5msec delay to provide sufficient time for
 	 * soundwire auto enumeration of slave devices as
@@ -3582,12 +3637,18 @@ static int wcd937x_probe(struct platform_device *pdev)
 					&wcd937x_comp_ops, match);
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void wcd937x_remove(struct platform_device *pdev)
+#else
 static int wcd937x_remove(struct platform_device *pdev)
+#endif
 {
 	component_master_del(&pdev->dev, &wcd937x_comp_ops);
 	dev_set_drvdata(&pdev->dev, NULL);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 #ifdef CONFIG_PM_SLEEP
