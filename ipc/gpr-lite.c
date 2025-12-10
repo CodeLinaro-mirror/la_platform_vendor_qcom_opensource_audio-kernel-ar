@@ -47,9 +47,6 @@ struct gpr {
 
 static struct gpr_q6 q6;
 static struct gpr *gpr_priv;
-#ifdef CONFIG_AUTO_AMS
-static struct gpr *adsp_gpr_priv = NULL;
-#endif
 
 enum gpr_subsys_state gpr_get_q6_state(void)
 {
@@ -102,7 +99,7 @@ int gpr_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt)
 	int ret;
 
 	if (gpr_get_q6_state() == GPR_SUBSYS_DOWN) {
-		pr_err_ratelimited("%s: q6 state is down\n", __func__, adev);
+		pr_err_ratelimited("%s: q6 state is down\n", __func__);
 		return -EINVAL;
 	}
 
@@ -142,14 +139,13 @@ int gpr_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt)
 
 	hdr = &pkt->hdr;
 	hdr->dst_domain_id = adev->domain_id;
-	if (adev->domain_id == GPR_DOMAIN_MODEM)
-		hdr->dst_domain_id = GPR_IDS_DOMAIN_ID_MODEM_V;
 	pkt_size = GPR_PKT_GET_PACKET_BYTE_SIZE(hdr->header);
 
 	dev_dbg(gpr->dev, "SVC_ID %d %s packet size %d\n",
 		adev->svc_id, __func__, pkt_size);
 	ret = rpmsg_trysend(gpr->ch, pkt, pkt_size);
 	spin_unlock_irqrestore(&adev->lock, flags);
+
 	return ret ? ret : pkt_size;
 }
 EXPORT_SYMBOL_GPL(gpr_send_pkt);
@@ -173,23 +169,14 @@ static void gpr_modem_down(unsigned long opcode)
 
 	gpr_set_modem_state(GPR_SUBSYS_DOWN);
 	//dispatch_event(opcode, APR_DEST_MODEM);
-#ifdef CONFIG_MDM_AUDIO_SSR
-	snd_event_notify(gpr_priv->dev, SND_EVENT_DOWN);
-#endif
 }
 
 static void gpr_modem_up(void)
 {
-	pr_err("%s: called \n", __func__);
-
-	gpr_set_modem_state(GPR_SUBSYS_LOADED);
 	//if (apr_cmpxchg_modem_state(APR_SUBSYS_DOWN, APR_SUBSYS_UP) ==
 	//						APR_SUBSYS_DOWN)
 	//	wake_up(&modem_wait);
 	//is_modem_up = 1;
-#ifdef CONFIG_MDM_AUDIO_SSR
-	snd_event_notify(gpr_priv->dev, SND_EVENT_UP);
-#endif
 }
 
 
@@ -212,21 +199,6 @@ static const struct snd_event_ops gpr_ssr_ops = {
 	.disable = gpr_ssr_disable,
 };
 
-#ifdef CONFIG_AUTO_AMS
-static void gpr_adsp_down(unsigned long opcode)
-{
-	dev_info_ratelimited(adsp_gpr_priv->dev, "%s: Q6 is Down\n", __func__);
-	gpr_set_q6_state(GPR_SUBSYS_DOWN);
-	snd_event_notify(adsp_gpr_priv->dev, SND_EVENT_DOWN);
-}
-
-static void gpr_adsp_up(void)
-{
-	dev_info_ratelimited(adsp_gpr_priv->dev, "%s: Q6 is Up\n", __func__);
-	gpr_set_q6_state(GPR_SUBSYS_LOADED);
-	snd_event_notify(adsp_gpr_priv->dev, SND_EVENT_UP);
-}
-#else
 static void gpr_adsp_down(unsigned long opcode)
 {
 	dev_info_ratelimited(gpr_priv->dev, "%s: Q6 is Down\n", __func__);
@@ -240,7 +212,6 @@ static void gpr_adsp_up(void)
 	gpr_set_q6_state(GPR_SUBSYS_LOADED);
 	snd_event_notify(gpr_priv->dev, SND_EVENT_UP);
 }
-#endif
 
 static int gpr_notifier_service_cb(struct notifier_block *this,
 			   unsigned long opcode, void *data)
@@ -264,12 +235,10 @@ static int gpr_notifier_service_cb(struct notifier_block *this,
 		 * up since everything is expected to be down.
 		 */
 		spin_lock(&gpr_priv->gpr_lock);
-#ifndef CONFIG_MDM_AUDIO_SSR
 		if (gpr_priv->is_initial_boot) {
 			spin_unlock(&gpr_priv->gpr_lock);
 			break;
 		}
-#endif
 		spin_unlock(&gpr_priv->gpr_lock);
 		if (cb_data->domain == AUDIO_NOTIFIER_MODEM_DOMAIN)
 			gpr_modem_down(opcode);
@@ -297,12 +266,11 @@ static struct notifier_block adsp_service_nb = {
 	.priority = 0,
 };
 
-#ifndef CONFIG_AUTO_AMS
 static struct notifier_block modem_service_nb = {
 	.notifier_call  = gpr_notifier_service_cb,
 	.priority = 0,
 };
-#endif
+
 
 static void gpr_dev_release(struct device *dev)
 {
@@ -323,7 +291,7 @@ static int gpr_callback(struct rpmsg_device *rpdev, void *buf,
 	unsigned long flags;
 	//uint32_t opcode_type;
 
-	if (len <= GPR_HDR_SIZE) {
+	if (len < GPR_HDR_SIZE) {
 		dev_err_ratelimited(gpr->dev, "GPR: Improper gpr pkt received:%p %d\n",
 			buf, len);
 		return -EINVAL;
@@ -351,11 +319,7 @@ static int gpr_callback(struct rpmsg_device *rpdev, void *buf,
 	if (hdr->opcode == APM_EVENT_MODULE_TO_CLIENT) {
 		dev_dbg(gpr->dev, "%s: Acquire wakelock in case of module event with timeout %d",
 			__func__, WAKELOCK_TIMEOUT);
-#ifdef CONFIG_AUTO_AMS
-		pm_wakeup_ws_event(gpr->wsource, WAKELOCK_TIMEOUT, true);
-#else
 		pm_wakeup_ws_event(gpr_priv->wsource, WAKELOCK_TIMEOUT, true);
-#endif
 	}
 	svc_id = hdr->dst_port;
 	spin_lock_irqsave(&gpr->svcs_lock, flags);
@@ -373,11 +337,7 @@ static int gpr_callback(struct rpmsg_device *rpdev, void *buf,
 	if (!adrv) {
 		dev_err_ratelimited(gpr->dev, "GPR: service is not registered\n");
 		if (hdr->opcode == APM_EVENT_MODULE_TO_CLIENT)
-#ifdef CONFIG_AUTO_AMS
-			__pm_relax(gpr->wsource);
-#else
 			__pm_relax(gpr_priv->wsource);
-#endif
 		return -EINVAL;
 	}
 
@@ -444,7 +404,7 @@ static void gpr_device_remove(struct device *dev)
 	return;
 }
 
-static int gpr_uevent(struct device *dev, struct kobj_uevent_env *env)
+static int gpr_uevent(const struct device *dev, struct kobj_uevent_env *env)
 {
 	struct gpr_device *adev = to_gpr_device(dev);
 	int ret;
@@ -529,22 +489,6 @@ static void of_register_gpr_devices(struct device *dev)
 	}
 }
 
-#ifdef CONFIG_AUTO_AMS
-static void gpr_notifier_register(struct work_struct *work)
-{
-	struct gpr *tmp_priv = container_of(work, struct gpr, notifier_reg_work);
-	if (tmp_priv == adsp_gpr_priv) {
-		gpr_subsys_notif_register("gpr_adsp",
-						AUDIO_NOTIFIER_ADSP_DOMAIN,
-						&adsp_service_nb);
-
-		dev_info_ratelimited(adsp_gpr_priv->dev,
-			"%s: registered via subsys_notif_register for domain id(%d)",
-			__func__, adsp_gpr_priv->dest_domain_id);
-	}
-	return;
-}
-#else
 static void gpr_notifier_register(struct work_struct *work)
 {
 	if (GPR_DOMAIN_ADSP == gpr_priv->dest_domain_id) {
@@ -555,10 +499,6 @@ static void gpr_notifier_register(struct work_struct *work)
 		gpr_subsys_notif_register("gpr_modem",
 				       AUDIO_NOTIFIER_MODEM_DOMAIN,
 				       &modem_service_nb);
-
-#ifdef CONFIG_MDM_AUDIO_SSR
-		gpr_modem_up();
-#endif
 	}
 
 	dev_info_ratelimited(gpr_priv->dev,
@@ -566,15 +506,11 @@ static void gpr_notifier_register(struct work_struct *work)
 		__func__, gpr_priv->dest_domain_id  );
 	return;
 }
-#endif
 
 static int gpr_probe(struct rpmsg_device *rpdev)
 {
 	struct device *dev = &rpdev->dev;
 	int ret;
-#ifdef CONFIG_AUTO_AMS
-	struct gpr *tmp_priv = NULL;
-#endif
 
 	if (!audio_notifier_probe_status()) {
 		pr_err("%s: Audio notify probe not completed, defer audio gpr probe\n",
@@ -612,23 +548,8 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 		return ret;
 	}
 
-	if (GPR_DOMAIN_MODEM == gpr_priv->dest_domain_id)
-		gpr_set_modem_state(GPR_SUBSYS_UP);
-
 	of_register_gpr_devices(dev);
 
-#ifdef CONFIG_AUTO_AMS
-	tmp_priv = dev_get_drvdata(dev);
-	if (GPR_DOMAIN_ADSP == tmp_priv->dest_domain_id) {
-		adsp_gpr_priv = tmp_priv;
-		dev_info(dev, "%s: gpr register for adsp notifier only\n", __func__);
-		INIT_WORK(&adsp_gpr_priv->notifier_reg_work, gpr_notifier_register);
-		schedule_work(&adsp_gpr_priv->notifier_reg_work);
-		adsp_gpr_priv->wsource = wakeup_source_register(adsp_gpr_priv->dev, "audio-gpr");
-	} else if (GPR_DOMAIN_MODEM == tmp_priv->dest_domain_id) {
-		tmp_priv->wsource = wakeup_source_register(tmp_priv->dev, "modem-gpr");
-	}
-#else
 	INIT_WORK(&gpr_priv->notifier_reg_work, gpr_notifier_register);
 
 	if (GPR_DOMAIN_ADSP == gpr_priv->dest_domain_id ||
@@ -639,13 +560,10 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 		  gpr_priv->dest_domain_id);
 		return -EINVAL;
 	}
-	gpr_priv->wsource = wakeup_source_register(gpr_priv->dev, "audio-gpr");
-#endif
 
+	gpr_priv->wsource = wakeup_source_register(gpr_priv->dev, "audio-gpr");
 	dev_info(dev, "%s: gpr-lite probe success\n",
 		__func__);
-
-	gpr_set_q6_state(GPR_SUBSYS_LOADED);
 
 	return 0;
 }
@@ -660,24 +578,10 @@ static int gpr_remove_device(struct device *dev, void *null)
 static void gpr_remove(struct rpmsg_device *rpdev)
 {
 	struct device *dev = &rpdev->dev;
-#ifdef CONFIG_AUTO_AMS
-	struct gpr *tmp_priv = dev_get_drvdata(dev);
-#endif
 
-#ifdef CONFIG_AUTO_AMS
-	wakeup_source_unregister(tmp_priv->wsource);
-#else
 	wakeup_source_unregister(gpr_priv->wsource);
-#endif
-
+	cancel_work_sync(&gpr_priv->notifier_reg_work);
 	snd_event_client_deregister(&rpdev->dev);
-
-#ifdef CONFIG_AUTO_AMS
-	if (GPR_DOMAIN_ADSP == tmp_priv->dest_domain_id) {
-		dev_info(dev, "%s: deregistering via subsys_notif_register for adsp", __func__);
-		gpr_subsys_notif_deregister("gpr_adsp");
-	}
-#else
 	dev_info(dev, "%s: deregistering via subsys_notif_register for domain_id(%d)",
 		__func__, gpr_priv->dest_domain_id );
 	if (GPR_DOMAIN_ADSP == gpr_priv->dest_domain_id)
@@ -688,7 +592,6 @@ static void gpr_remove(struct rpmsg_device *rpdev)
 	{
 		gpr_subsys_notif_deregister("gpr_modem");
 	}
-#endif
 	device_for_each_child(&rpdev->dev, NULL, gpr_remove_device);
 }
 
