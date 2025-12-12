@@ -432,6 +432,7 @@ static const struct reg_default codec_reg_defaults[] = {
 	{DIG_CTRL1_I2S_TDM_CTL1, 0x05},
 	{DIG_CTRL1_I2S_TDM_CH_TX, 0x00},
 	{DIG_CTRL1_I2S_RESET_CTL, 0x00},
+	{DIG_CTRL1_I2S_TDM_CH_RX, 0x08},
 	{CDC_RX0_RX_PATH_CFG0, 0x80},
 	{CDC_RX0_RX_PATH_CFG1, 0x64},
 	{CDC_RX0_RX_PATH_CTL, 0x04},
@@ -1221,6 +1222,7 @@ static int codec_hw_free(struct snd_pcm_substream *substream,
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x00);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_TX, 0x00);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_CTL0, 0x06);
+	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_RX, 0x08);
 
 	/* Reset Clock */
 	regmap_write(wsa885x->regmap, DIG_CTRL0_CLK_SOURCE_ENABLE, 0x00);
