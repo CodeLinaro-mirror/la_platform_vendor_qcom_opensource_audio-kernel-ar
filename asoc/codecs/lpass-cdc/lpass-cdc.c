@@ -23,16 +23,6 @@
 #include <linux/qti-regmap-debugfs.h>
 #include <linux/proc_fs.h>
 
-/* Register addresses */
-#define LPASS_RATE_GEN_CTRL		0x7EED000
-#define LPASS_RATE_GEN_COUNTER_0	0x7EED004
-#define LPASS_RATE_GEN_DELAY		0x7EED010
-
-/* Register base and size for ioremap */
-#define LPASS_RATE_GEN_BASE		0x7EED000
-#define LPASS_RATE_GEN_SIZE		0x1000
-
-
 #define DRV_NAME "lpass-cdc"
 
 #define LPASS_CDC_VERSION_ENTRY_SIZE 32
@@ -1401,6 +1391,15 @@ static const struct proc_ops lpass_cdc_proc_ops = {
 	.proc_read = lpass_cdc_proc_read,
 };
 
+#ifdef CONFIG_BOLERO_VER_4P0
+/* Register addresses */
+#define LPASS_RATE_GEN_CTRL		0x7EED000
+#define LPASS_RATE_GEN_COUNTER_0	0x7EED004
+#define LPASS_RATE_GEN_DELAY		0x7EED010
+
+/* Register base and size for ioremap */
+#define LPASS_RATE_GEN_BASE		0x7EED000
+#define LPASS_RATE_GEN_SIZE		0x1000
 
 /**
  * lpass_rate_gen_write_regs - ioremap and write to rate generator registers
@@ -1435,7 +1434,7 @@ static void lpass_rate_gen_write_regs(void)
 	/* Unmap when done */
 	iounmap(io_base);
 }
-
+#endif
 
 static int lpass_cdc_probe(struct platform_device *pdev)
 {
@@ -1627,7 +1626,9 @@ core_clk_vote:
 		}
 	}
 	priv->core_clk_vote_count++;
+#ifdef CONFIG_BOLERO_VER_4P0
 	lpass_rate_gen_write_regs();
+#endif
 
 done:
 	mutex_unlock(&priv->vote_lock);
