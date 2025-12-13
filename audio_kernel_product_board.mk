@@ -16,8 +16,6 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/q6_notifier_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/mbhc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/sdca_registers_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9xxx_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/machine_dlkm.ko
 ifneq ($(call is-board-platform-in-list,bengal holi blair), true)
@@ -37,11 +35,9 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd939x_slave_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9378_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
-endif
-ifeq ($(call is-board-platform-in-list, chora),true)
-PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
-PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko
 endif
 ifeq ($(call is-board-platform-in-list,sun canoe alor whale chora),true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko

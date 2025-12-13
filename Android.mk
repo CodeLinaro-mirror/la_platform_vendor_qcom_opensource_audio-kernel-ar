@@ -423,7 +423,6 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ############################################################
-ifeq ($(call is-board-platform-in-list, chora),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := wcd937x_dlkm.ko
@@ -432,6 +431,7 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
+############################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := wcd937x_slave_dlkm.ko
@@ -440,7 +440,6 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
 ###########################################################
 ifeq ($(call is-board-platform-in-list, sun canoe alor whale chora),true)
 ###########################################################
