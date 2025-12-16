@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -149,6 +150,8 @@ static const struct snd_kcontrol_new name##_mux = \
 #define TAVIL_VERSION_ENTRY_SIZE 17
 
 #define WCD934X_DIG_CORE_COLLAPSE_TIMER_MS  (5 * 1000)
+
+#define ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT	0x1
 
 enum {
 	POWER_COLLAPSE,
@@ -1528,6 +1531,14 @@ static void tavil_codec_enable_slim_port_intr(
 					reg, val);
 				val = wcd9xxx_interface_reg_read(
 					tavil_p->wcd9xxx, reg);
+			}
+			/* Enable auto recovery from slim port overflow on port_num */
+			reg = WCD934X_SLIM_PGD_PORT_TX_OR_UR_CFG_0 + port_num;
+			val = wcd9xxx_interface_reg_read(tavil_p->wcd9xxx, reg);
+			if(!(val & (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT))) {
+				val = val | (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT);
+				wcd9xxx_interface_reg_write(tavil_p->wcd9xxx, reg, val);
+				val = wcd9xxx_interface_reg_read(tavil_p->wcd9xxx, reg);
 			}
 		}
 	}
@@ -8155,15 +8166,21 @@ static const struct snd_soc_dapm_widget tavil_dapm_widgets[] = {
 		tavil_codec_force_enable_micbias,
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
-	SND_SOC_DAPM_AIF_OUT_E("AIF1 CAP", "AIF1 Capture", 0, SND_SOC_NOPM,
-			       AIF1_CAP, 0, tavil_codec_enable_tx,
-			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_AIF_OUT_E("AIF2 CAP", "AIF2 Capture", 0, SND_SOC_NOPM,
-			       AIF2_CAP, 0, tavil_codec_enable_tx,
-			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_AIF_OUT_E("AIF3 CAP", "AIF3 Capture", 0, SND_SOC_NOPM,
-			       AIF3_CAP, 0, tavil_codec_enable_tx,
-			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_AIF_OUT("AIF1 CAP", "AIF1 Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("AIF2 CAP", "AIF2 Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("AIF3 CAP", "AIF3 Capture", 0, SND_SOC_NOPM, 0, 0),
+
+	SND_SOC_DAPM_MIXER_E("AIF1_CAP_MIX", SND_SOC_NOPM, AIF1_CAP, 0,
+		NULL, 0, tavil_codec_enable_tx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_MIXER_E("AIF2_CAP_MIX", SND_SOC_NOPM, AIF2_CAP, 0,
+		NULL, 0, tavil_codec_enable_tx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_MIXER_E("AIF3_CAP_MIX", SND_SOC_NOPM, AIF3_CAP, 0,
+		NULL, 0, tavil_codec_enable_tx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("SLIM TX0", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("SLIM TX1", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -9980,6 +9997,15 @@ static irqreturn_t tavil_slimbus_irq(int irq, void *data)
 			WARN(!cleared,
 			     "Couldn't find slimbus %s port %d for closing\n",
 			     (tx ? "TX" : "RX"), port_id);
+
+			/* Enable auto recovery from slim port overflow on port_num */
+			reg = WCD934X_SLIM_PGD_PORT_TX_OR_UR_CFG_0 + port_id;
+			val = wcd9xxx_interface_reg_read(tavil->wcd9xxx, reg);
+			if((val & (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT))) {
+				val = val ^ (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT);
+				wcd9xxx_interface_reg_write(tavil->wcd9xxx, reg, val);
+				val = wcd9xxx_interface_reg_read(tavil->wcd9xxx, reg);
+			}
 		}
 		wcd9xxx_interface_reg_write(tavil->wcd9xxx,
 					    WCD934X_SLIM_PGD_PORT_INT_CLR_RX_0 +
