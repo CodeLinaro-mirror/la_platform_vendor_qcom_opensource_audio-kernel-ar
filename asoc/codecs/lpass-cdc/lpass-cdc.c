@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/of_platform.h>
@@ -30,6 +30,109 @@
 
 #define REGDUMP_PRINT_LEN 8
 #define REGDUMP_PRINT_STRIDE 4
+
+#define CORE_ID_0_REV_MAJ			GENMASK(7, 0)
+#define CORE_ID_2_REV_MIN			GENMASK(7, 4)
+#define CORE_ID_2_REV_STEP			GENMASK(3, 0)
+
+char __iomem *lpass_core_0;
+char __iomem *lpass_core_1;
+char __iomem *lpass_core_2;
+
+int lpass_cdc_set_version(struct lpass_cdc_priv *priv)
+{
+	int ret;
+	int version = LPASS_CDC_VERSION_UNKNOWN;
+	u32 maj, min, step;
+	u32 val;
+
+	pr_debug("%s: Enter\n", __func__);
+
+	lpass_core_0 = devm_ioremap(priv->dev,
+					 priv->va_top_csr_core_reg[0], 0x20000);
+	if (!lpass_core_0) {
+		pr_err( "%s: Failed to map LPASS_core_0\n", __func__);
+		return -ENOMEM;
+	}
+
+	lpass_core_1 = devm_ioremap(priv->dev,
+					 priv->va_top_csr_core_reg[1], 0x10000);
+	if (!lpass_core_1) {
+		pr_err( "%s: Failed to map LPASS_core_1\n", __func__);
+		return -ENOMEM;
+	}
+	lpass_core_2 = devm_ioremap(priv->dev,
+					 priv->va_top_csr_core_reg[2], 0x10000);
+	if (!lpass_core_2) {
+		pr_err( "%s: Failed to map LPASS_core_2\n", __func__);
+		return -ENOMEM;
+	}
+
+	ret = digital_cdc_rsc_mgr_hw_vote_enable(priv->lpass_core_hw_vote, priv->dev);
+	if (ret < 0)
+		pr_err("%s:lpass core hw enable failed\n", __func__);
+
+	ret = digital_cdc_rsc_mgr_hw_vote_enable(priv->lpass_audio_hw_vote, priv->dev);
+	if (ret < 0)
+		pr_err("%s:lpass audio hw enable failed\n", __func__);
+
+	val = ioread32(lpass_core_0);
+	maj = FIELD_GET(CORE_ID_0_REV_MAJ, val);
+	pr_debug("%s: core_0 0x%X\n", __func__, val);
+
+	val = ioread32(lpass_core_1);
+	pr_debug("%s: core_1 0x%X\n",__func__, val);
+
+	val = ioread32(lpass_core_2);
+	pr_debug("%s: core_2 0x%X\n", __func__, val);
+	min = FIELD_GET(CORE_ID_2_REV_MIN, val);
+	step = FIELD_GET(CORE_ID_2_REV_STEP, val);
+
+	if (maj == 1) {
+		version = LPASS_CDC_VERSION_2_0;
+	} else if (maj == 2) {
+		switch (min) {
+		case 0:
+			version = LPASS_CDC_VERSION_2_0;
+			break;
+		case 5:
+			version = LPASS_CDC_VERSION_2_5;
+			break;
+		case 6:
+			version = LPASS_CDC_VERSION_2_6;
+			break;
+		case 7:
+			version = LPASS_CDC_VERSION_2_7;
+			break;
+		case 8:
+			version = LPASS_CDC_VERSION_2_8;
+			break;
+		default:
+			break;
+		}
+	} else if (maj == 4) {
+		switch (min) {
+		case 0:
+			version = LPASS_CDC_VERSION_4_0;
+			break;
+		default:
+			break;
+		}
+	}
+
+	if (version == LPASS_CDC_VERSION_UNKNOWN) {
+		dev_err(priv->dev, "LPASS Version v%u.%u.%u is not supported\n",
+			maj, min, step);
+	}
+
+	pr_debug("%s: Version : %d\n", __func__, version);
+	priv->version = version;
+
+	digital_cdc_rsc_mgr_hw_vote_disable(priv->lpass_core_hw_vote, priv->dev);
+	digital_cdc_rsc_mgr_hw_vote_disable(priv->lpass_audio_hw_vote, priv->dev);
+
+	return 0;
+}
 
 static const struct snd_soc_component_driver lpass_cdc;
 
@@ -1433,29 +1536,6 @@ static int lpass_cdc_probe(struct platform_device *pdev)
 	priv->dev_up = true;
 	priv->pre_dev_up = true;
 	priv->initial_boot = true;
-	priv->regmap = lpass_cdc_regmap_init(priv->dev,
-					  &lpass_cdc_regmap_config);
-	if (IS_ERR_OR_NULL((void *)(priv->regmap))) {
-		dev_err(&pdev->dev, "%s:regmap init failed\n", __func__);
-		return -EINVAL;
-	}
-
-	devm_regmap_qti_debugfs_register(priv->dev, priv->regmap);
-
-	priv->lpass_cdc_proc_entry = proc_mkdir("lpass_cdc_reginfo", NULL);
-	if (priv->lpass_cdc_proc_entry) {
-		cdc_proc_regdump_file = proc_create_data("lpass_cdc_regdump", 0444,
-				priv->lpass_cdc_proc_entry, &lpass_cdc_proc_ops, priv);
-		if (!cdc_proc_regdump_file) {
-			dev_err(&pdev->dev,
-					"%s: error creating proc read file interface\n",
-					__func__);
-			proc_remove(priv->lpass_cdc_proc_entry);
-			priv->lpass_cdc_proc_entry = NULL;
-		}
-	} else {
-		dev_err(&pdev->dev, "%s: error creating proc dir interface\n", __func__);
-	}
 
 	priv->read_dev = __lpass_cdc_reg_read;
 	priv->write_dev = __lpass_cdc_reg_write;
@@ -1496,6 +1576,43 @@ static int lpass_cdc_probe(struct platform_device *pdev)
 		ret = 0;
 	}
 	priv->lpass_audio_hw_vote = lpass_audio_hw_vote;
+
+	ret = of_property_read_variable_u32_array(pdev->dev.of_node, "va_top_csr_core_regs",
+			priv->va_top_csr_core_reg, 0, ARRAY_SIZE(priv->va_top_csr_core_reg));
+	if (ret <= 0) {
+		dev_err(&pdev->dev, "failure in reading va_top_csr registers defualting to 2P8\n");
+		priv->version = LPASS_CDC_VERSION_2_8;
+	} else {
+		if (lpass_cdc_set_version(priv) < 0) {
+			dev_err(&pdev->dev,
+				"failure in getting lpass cdc version defualting to 2P8\n");
+			priv->version = LPASS_CDC_VERSION_2_8;
+		}
+	}
+
+	priv->regmap = lpass_cdc_regmap_init(priv->dev,
+					  &lpass_cdc_regmap_config);
+	if (IS_ERR_OR_NULL((void *)(priv->regmap))) {
+		dev_err(&pdev->dev, "%s:regmap init failed\n", __func__);
+		return -EINVAL;
+	}
+
+	devm_regmap_qti_debugfs_register(priv->dev, priv->regmap);
+
+	priv->lpass_cdc_proc_entry = proc_mkdir("lpass_cdc_reginfo", NULL);
+	if (priv->lpass_cdc_proc_entry) {
+		cdc_proc_regdump_file = proc_create_data("lpass_cdc_regdump", 0444,
+				priv->lpass_cdc_proc_entry, &lpass_cdc_proc_ops, priv);
+		if (!cdc_proc_regdump_file) {
+			dev_err(&pdev->dev,
+					"%s: error creating proc read file interface\n",
+					__func__);
+			proc_remove(priv->lpass_cdc_proc_entry);
+			priv->lpass_cdc_proc_entry = NULL;
+		}
+	} else {
+		dev_err(&pdev->dev, "%s: error creating proc dir interface\n", __func__);
+	}
 	schedule_work(&priv->lpass_cdc_add_child_devices_work);
 
 	return 0;
