@@ -155,32 +155,6 @@ audio_modules.register(
         "msm_common.c",
     ],
     conditional_srcs = {
-	"CONFIG_SND_SOC_CHORA": [
-            "audio_machine.c"
-        ]
-    },
-    deps = [":%b_spf_core_dlkm",
-            ":%b_audio_prm_dlkm",
-            ":%b_wcd_core_dlkm",
-            ":%b_lpass_cdc_dlkm",
-            ":%b_wcd937x_dlkm",
-            ":%b_lpass_cdc_rx_macro_dlkm",
-            ":%b_wsa883x_dlkm",
-            ":%b_wsa884x_dlkm",
-            ":%b_snd_event_dlkm",
-            ":%b_wcd9378_dlkm",
-	],
-)
-
-
-# >>>> ASOC MODULES <<<<
-audio_modules.register(
-    name = "machine_dlkm",
-    path = ASOC_PATH,
-    srcs = [
-        "msm_common.c",
-    ],
-    conditional_srcs = {
         "CONFIG_SND_SOC_SM8150": [
             "sm8150.c",
             "machine_815x_init.c"
@@ -233,6 +207,9 @@ audio_modules.register(
         ],
 	"CONFIG_SND_SOC_ALOR": [
             "audio_machine.c"
+        ],
+        "CONFIG_SND_SOC_CHORA": [
+            "audio_machine.c"
         ]
     },
     deps = [":%b_spf_core_dlkm",
@@ -245,6 +222,7 @@ audio_modules.register(
             ":%b_wsa884x_dlkm",
             ":%b_snd_event_dlkm",
             ":%b_wcd9378_dlkm",
+            ":%b_wcd937x_dlkm",
 	],
 )
 # >>>> ASOC/CODEC MODULES <<<<
