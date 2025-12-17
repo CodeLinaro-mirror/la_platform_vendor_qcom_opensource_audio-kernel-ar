@@ -3293,6 +3293,7 @@ static int get_version_index(int version)
 		break;
 	case SWRM_VERSION_2_0:
 	case SWRM_VERSION_2_1:
+	case SWRM_VERSION_2_2:
 		version_index = SWRM_VER_IDX_2P0;
 		break;
 	default:
@@ -3402,7 +3403,7 @@ static int swrm_probe(struct platform_device *pdev)
 				"qcom,swr-master-version",
 				&swrm->version);
 	if (ret) {
-		dev_dbg(&pdev->dev, "%s: swrm version not defined, use default as 0\n",
+		dev_info(&pdev->dev, "%s: swrm version not defined, use default as 0\n",
 			 __func__);
 		swrm->version = 0;
 	}
@@ -3722,12 +3723,13 @@ static int swrm_probe(struct platform_device *pdev)
 
 	swrm_hw_ver = swr_master_read(swrm, SWRM_COMP_HW_VERSION);
 	if (swrm->version != swrm_hw_ver) {
-		dev_info(&pdev->dev,
-			 "%s: version specified in dtsi: 0x%x not match with HW read version 0x%x\n",
-			 __func__, swrm->version, swrm_hw_ver);
 		swrm->version = swrm_hw_ver;
 		swrm->version_index = get_version_index(swrm->version);
 	}
+
+	dev_info(&pdev->dev,
+		 "%s: swrm version defined in dt: 0x%x version read from HW: 0x%x\n",
+		 __func__, swrm->version, swrm_hw_ver);
 
 	swrm->num_auto_enum = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
                                 & SWRM_COMP_PARAMS_AUTO_ENUM_SLAVES) >> 20);

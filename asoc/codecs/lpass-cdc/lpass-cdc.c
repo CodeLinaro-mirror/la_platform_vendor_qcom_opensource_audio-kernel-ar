@@ -1258,41 +1258,8 @@ static int lpass_cdc_soc_codec_probe(struct snd_soc_component *component)
 {
 	struct lpass_cdc_priv *priv = dev_get_drvdata(component->dev);
 	int macro_idx, ret = 0;
-	u8 core_id_0 = 0, core_id_1 = 0, core_id_2 = 0;
 
 	snd_soc_component_init_regmap(component, priv->regmap);
-
-	if (!priv->version) {
-		/*
-		 * In order for the ADIE RTC to differentiate between targets
-		 * version info is used.
-		 * Assign 1.0 for target with only one macro
-		 * Assign 1.1 for target with two macros
-		 * Assign 1.2 for target with more than two macros
-		 */
-		if (priv->num_macros_registered == 1)
-			priv->version = LPASS_CDC_VERSION_1_0;
-		else if (priv->num_macros_registered == 2)
-			priv->version = LPASS_CDC_VERSION_1_1;
-		else if (priv->num_macros_registered > 2)
-			priv->version = LPASS_CDC_VERSION_1_2;
-	}
-
-	/* Assign lpass_cdc version */
-	core_id_0 = snd_soc_component_read(component,
-					LPASS_CDC_VA_TOP_CSR_CORE_ID_0);
-	core_id_1 = snd_soc_component_read(component,
-					LPASS_CDC_VA_TOP_CSR_CORE_ID_1);
-	core_id_2 = snd_soc_component_read(component,
-					LPASS_CDC_VA_TOP_CSR_CORE_ID_2);
-	if ((core_id_0 == 0x01) && (core_id_1 == 0x0F))
-		priv->version = LPASS_CDC_VERSION_2_0;
-	if ((core_id_0 == 0x02) && (core_id_1 == 0x0E))
-		priv->version = LPASS_CDC_VERSION_2_1;
-	if ((core_id_0 == 0x02) && (core_id_1 == 0x0F))
-		priv->version = LPASS_CDC_VERSION_2_5;
-	if ((core_id_0 == 0x02) && (core_id_1 == 0x0F) && (core_id_2 == 0x60 || core_id_2 == 0x61))
-		priv->version = LPASS_CDC_VERSION_2_6;
 
 	/* call init for supported macros */
 	for (macro_idx = START_MACRO; macro_idx < MAX_MACRO; macro_idx++) {
