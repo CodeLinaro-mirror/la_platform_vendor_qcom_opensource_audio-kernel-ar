@@ -1,5 +1,6 @@
 /* Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -23,6 +24,8 @@
 #include <ipc/gpr-lite.h>
 #include <dsp/spf-core.h>
 #include <dsp/digital-cdc-rsc-mgr.h>
+#include <linux/platform_device.h>
+#include <linux/version.h>
 
 #define Q6_READY_TIMEOUT_MS 1000
 #define Q6_CLOSE_ALL_TIMEOUT_MS 5000
@@ -398,13 +401,19 @@ static int spf_core_platform_driver_probe(struct platform_device *pdev)
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void spf_core_platform_driver_remove(struct platform_device *pdev)
+#else
 static int spf_core_platform_driver_remove(struct platform_device *pdev)
+#endif
 {
 	//snd_event_client_deregister(&pdev->dev);
         gpr_driver_unregister(&qcom_spf_core_driver);
 	spf_core_priv = NULL;
-    digital_cdc_rsc_mgr_exit();
+	digital_cdc_rsc_mgr_exit();
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id spf_core_of_match[]  = {

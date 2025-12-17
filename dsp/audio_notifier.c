@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2017, 2020-2021 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/init.h>
@@ -16,6 +17,7 @@
 #include <linux/remoteproc.h>
 #include <linux/remoteproc/qcom_rproc.h>
 #include <dsp/audio_notifier.h>
+#include <linux/version.h>
 #include "audio_ssr.h"
 #include "audio_pdr.h"
 #include <trace/events/rproc_qcom.h>
@@ -719,9 +721,15 @@ static int audio_notify_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void audio_notify_remove(struct platform_device *pdev)
+#else
 static int audio_notify_remove(struct platform_device *pdev)
+#endif
 {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 static const struct of_device_id adsp_notify_dt_match[] = {
