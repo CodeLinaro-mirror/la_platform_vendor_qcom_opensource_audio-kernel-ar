@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2017, 2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -132,7 +133,11 @@ static int wcd_config_get(struct pinctrl_dev *pctldev,
 	case PIN_CONFIG_INPUT_ENABLE:
 		arg = pad->output_enabled;
 		break;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	case PIN_CONFIG_LEVEL:
+#else
 	case PIN_CONFIG_OUTPUT:
+#endif
 		arg = pad->value;
 		break;
 	default:
@@ -176,7 +181,11 @@ static int wcd_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		case PIN_CONFIG_INPUT_ENABLE:
 			pad->output_enabled = false;
 			break;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+		case PIN_CONFIG_LEVEL:
+#else
 		case PIN_CONFIG_OUTPUT:
+#endif
 			pad->output_enabled = true;
 			pad->value = arg;
 			break;
@@ -225,7 +234,11 @@ static int wcd_gpio_direction_output(struct gpio_chip *chip,
 	struct wcd_gpio_priv *priv_data = gpiochip_get_data(chip);
 	unsigned long config;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	config = pinconf_to_config_packed(PIN_CONFIG_LEVEL, val);
+#else
 	config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, val);
+#endif
 
 	return wcd_config_set(priv_data->ctrl, pin, &config, 1);
 }
@@ -254,7 +267,11 @@ static void wcd_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
 	struct wcd_gpio_priv *priv_data = gpiochip_get_data(chip);
 	unsigned long config;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	config = pinconf_to_config_packed(PIN_CONFIG_LEVEL, value);
+#else
 	config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
+#endif
 
 	wcd_config_set(priv_data->ctrl, pin, &config, 1);
 

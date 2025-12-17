@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -336,7 +336,11 @@ static int lpi_config_get(struct pinctrl_dev *pctldev,
 		arg = pad->pullup == LPI_GPIO_PULL_UP;
 		break;
 	case PIN_CONFIG_INPUT_ENABLE:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	case PIN_CONFIG_LEVEL:
+#else
 	case PIN_CONFIG_OUTPUT:
+#endif
 		arg = pad->output_enabled;
 		break;
 	default:
@@ -391,7 +395,11 @@ static int lpi_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		case PIN_CONFIG_INPUT_ENABLE:
 			pad->output_enabled = false;
 			break;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+		case PIN_CONFIG_LEVEL:
+#else
 		case PIN_CONFIG_OUTPUT:
+#endif
 			pad->output_enabled = true;
 			pad->value = arg;
 			break;
@@ -496,7 +504,11 @@ static int lpi_gpio_direction_output(struct gpio_chip *chip,
 	struct lpi_gpio_state *state = gpiochip_get_data(chip);
 	unsigned long config;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	config = pinconf_to_config_packed(PIN_CONFIG_LEVEL, val);
+#else
 	config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, val);
+#endif
 
 	return lpi_config_set(state->ctrl, pin, &config, 1);
 }
@@ -522,7 +534,11 @@ static void lpi_gpio_set(struct gpio_chip *chip, unsigned int pin, int value)
 	struct lpi_gpio_state *state = gpiochip_get_data(chip);
 	unsigned long config;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 18, 0)
+	config = pinconf_to_config_packed(PIN_CONFIG_LEVEL, value);
+#else
 	config = pinconf_to_config_packed(PIN_CONFIG_OUTPUT, value);
+#endif
 
 	lpi_config_set(state->ctrl, pin, &config, 1);
 
