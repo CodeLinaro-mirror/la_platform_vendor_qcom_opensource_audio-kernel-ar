@@ -71,7 +71,10 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
 
     enabled_modules = _get_enabled_module_objs(registry, modules)
     options = _combine_target_module_options(enabled_modules, config_options)
-    headers = ["//msm-kernel:all_headers"] + registry.hdrs
+    headers = select({
+        "//build/kernel/kleaf:socrepo_true": ["//soc-repo:all_headers"] + registry.hdrs,
+        "//build/kernel/kleaf:socrepo_false": ["//msm-kernel:all_headers"] + registry.hdrs
+        })
     submodule_rules = []
 
     for module in enabled_modules:
@@ -91,10 +94,12 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
         )
 
         submodule_rules.append(rule_name)
-
     ddk_module(
         name = "{}_audio".format(kernel_build),
-        kernel_build = "//msm-kernel:{}_{}".format(target, variant),
+        kernel_build = select({
+        "//build/kernel/kleaf:socrepo_true": "//soc-repo:{}_{}_base_kernel".format(target, variant),
+        "//build/kernel/kleaf:socrepo_false": "//msm-kernel:{}_{}".format(target, variant),
+        }),
         deps = submodule_rules
     )
 
