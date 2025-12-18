@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #define CONFIG_PINCTRL_LPI 1
@@ -8,6 +8,7 @@
 #define CONFIG_SND_SOC_WCD9XXX_V2 1
 #define CONFIG_SND_SOC_WCD_MBHC 1
 #define CONFIG_SND_SOC_WSA881X_ANALOG 1
+#define CONFIG_WCD9XXX_CODEC_CORE 1
 #define CONFIG_WCD9XXX_CODEC_CORE_V2 1
 #define CONFIG_MSM_CDC_PINCTRL 1
 #define CONFIG_MSM_QDSP6V2_CODECS 1
@@ -40,8 +41,8 @@
 #define CONFIG_SND_SOC_WCD_IRQ 1
 #define CONFIG_SND_SOC_WCD937X 1
 #define CONFIG_SND_SOC_WCD937X_SLAVE 1
-#define CONFIG_SND_SOC_ROULEUR 1
-#define CONFIG_SND_SOC_ROULEUR_SLAVE 1
+// #define CONFIG_SND_SOC_ROULEUR 1
+// #define CONFIG_SND_SOC_ROULEUR_SLAVE 1
 #define CONFIG_PM2250_SPMI 1
 #define CONFIG_SND_SOC_BENGAL 1
 #define CONFIG_SND_EVENT 1
@@ -50,3 +51,4 @@
 #define CONFIG_AUXPCM_DISABLE 1
 #define CONFIG_DIGITAL_CDC_RSC_MGR 1
 #define CONFIG_MI2S_BOLERO_V2_1 1
+#define CONFIG_WSA881X_TEMP_SENSOR_DISABLE 1

@@ -4,15 +4,15 @@ ifeq ($(AUDIO_DLKM_ENABLE), true)
 
 LOCAL_PATH := $(call my-dir)
 
-ifeq ($(call is-board-platform, taro),true)
+ifeq ($(call is-board-platform-in-list,taro),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_WAIPIO=m
 endif
 
-ifeq ($(call is-board-platform, kalama),true)
+ifeq ($(call is-board-platform-in-list,kalama),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_KALAMA=m
 endif
 
-ifeq ($(call is-board-platform, bengal),true)
+ifeq ($(call is-board-platform-in-list,bengal),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_BENGAL=m
 endif
 
@@ -22,7 +22,7 @@ endif
 
 ifeq ($(ENABLE_AUDIO_LEGACY_TECHPACK),true)
 include $(call all-subdir-makefiles)
-LOCAL_PATH    := vendor/qcom/opensource/audio-kernel
+LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
@@ -113,6 +113,15 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
+# include $(CLEAR_VARS)
+# LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+# LOCAL_MODULE              := q6codec_core_dlkm.ko
+# LOCAL_MODULE_KBUILD_NAME  := dsp/q6codec_core_dlkm.ko
+# LOCAL_MODULE_TAGS         := optional
+# LOCAL_MODULE_DEBUG_ENABLE := true
+# LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+# include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
 
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -175,7 +184,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 
 ###########################################################
-ifneq ($(call is-board-platform-in-list, gen4),true)
+ifneq ($(call is-board-platform-in-list, gen4 bengal),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := coupled_ssr_dlkm.ko
@@ -260,7 +269,6 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -270,8 +278,7 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-###########################  ASOC CODEC ################################
-ifneq ($(call is-board-platform-in-list, msmnile gen4),true)
+
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := wcd_core_dlkm.ko
@@ -280,7 +287,11 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-###########################################################
+
+endif
+###########################  ASOC CODEC ################################
+ifneq ($(call is-board-platform-in-list, msmnile gen4),true)
+
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := mbhc_dlkm.ko
@@ -330,8 +341,8 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-ifneq ($(call is-board-platform-in-list, gen4),true)
 ########################### ASOC MACHINE ################################
+ifneq ($(call is-board-platform-in-list, gen4),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := machine_dlkm.ko
@@ -455,18 +466,18 @@ include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 
 ########################### HDMI ################################
-ifeq ($(call is-board-platform-in-list, kalama),true)
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
-LOCAL_MODULE              := hdmi_dlkm.ko
-LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/hdmi_dlkm.ko
-LOCAL_MODULE_TAGS         := optional
-LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-LOCAL_REQUIRED_MODULES    := msm-ext-disp-module-symvers
-LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
-include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
+# ifeq ($(call is-board-platform-in-list, kalama),true)
+# include $(CLEAR_VARS)
+# LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+# LOCAL_MODULE              := hdmi_dlkm.ko
+# LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/hdmi_dlkm.ko
+# LOCAL_MODULE_TAGS         := optional
+# LOCAL_MODULE_DEBUG_ENABLE := true
+# LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+# LOCAL_REQUIRED_MODULES    := msm-ext-disp-module-symvers
+# LOCAL_ADDITIONAL_DEPENDENCIES := $(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
+# include $(DLKM_DIR)/Build_external_kernelmodule.mk
+# endif
 
 ########################## BOLERO #################################
 ifeq ($(call is-board-platform-in-list, bengal monaco),true)
@@ -568,39 +579,39 @@ include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 
 ########################### CC ################################
-ifeq ($(call is-board-platform-in-list, bengal),true)
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
-LOCAL_MODULE              := rouleur_dlkm.ko
-LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/rouleur_dlkm.ko
-LOCAL_MODULE_TAGS         := optional
-LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
+# ifneq ($(call is-board-platform-in-list, bengal),true)
+# include $(CLEAR_VARS)
+# LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+# LOCAL_MODULE              := rouleur_dlkm.ko
+# LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/rouleur_dlkm.ko
+# LOCAL_MODULE_TAGS         := optional
+# LOCAL_MODULE_DEBUG_ENABLE := true
+# LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+# include $(DLKM_DIR)/Build_external_kernelmodule.mk
+# endif
 
-########################### CC ################################
-ifeq ($(call is-board-platform-in-list, bengal),true)
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
-LOCAL_MODULE              := rouleur_slave_dlkm.ko
-LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/rouleur_slave_dlkm.ko
-LOCAL_MODULE_TAGS         := optional
-LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
-########################### CC ################################
-ifeq ($(call is-board-platform-in-list, bengal),true)
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
-LOCAL_MODULE              := pm2250_spmi_dlkm.ko
-LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/pm2250_spmi_dlkm.ko
-LOCAL_MODULE_TAGS         := optional
-LOCAL_MODULE_DEBUG_ENABLE := true
-LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
-include $(DLKM_DIR)/Build_external_kernelmodule.mk
-endif
+# ########################### CC ################################
+# ifneq ($(call is-board-platform-in-list, bengal),true)
+# include $(CLEAR_VARS)
+# LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+# LOCAL_MODULE              := rouleur_slave_dlkm.ko
+# LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/rouleur_slave_dlkm.ko
+# LOCAL_MODULE_TAGS         := optional
+# LOCAL_MODULE_DEBUG_ENABLE := true
+# LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+# include $(DLKM_DIR)/Build_external_kernelmodule.mk
+# endif
+# ########################### CC ################################
+# ifneq ($(call is-board-platform-in-list, bengal),true)
+# include $(CLEAR_VARS)
+# LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+# LOCAL_MODULE              := pm2250_spmi_dlkm.ko
+# LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/pm2250_spmi_dlkm.ko
+# LOCAL_MODULE_TAGS         := optional
+# LOCAL_MODULE_DEBUG_ENABLE := true
+# LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+# include $(DLKM_DIR)/Build_external_kernelmodule.mk
+# endif
 ########################## BOLERO #################################
 ifeq ($(call is-board-platform-in-list, monaco),true)
 ifeq ($(TARGET_SUPPORTS_WEAR_AON),true)

@@ -12,7 +12,6 @@
 #include <linux/printk.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
-#include <linux/version.h>
 #include <linux/clk.h>
 #include <soc/snd_event.h>
 #include <linux/pm_runtime.h>
@@ -24,6 +23,7 @@
 #include "bolero-clk-rsc.h"
 #include "asoc/bolero-slave-internal.h"
 #include <linux/qti-regmap-debugfs.h>
+#include <linux/version.h>
 
 #define DRV_NAME "bolero_codec"
 

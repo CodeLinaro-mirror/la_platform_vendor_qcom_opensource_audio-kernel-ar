@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024. Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -14,7 +15,9 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/of_device.h>
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 #include <linux/soc/qcom/fsa4480-i2c.h>
+#endif
 #include <linux/pm_qos.h>
 #include <linux/nvmem-consumer.h>
 #include <sound/control.h>
@@ -131,7 +134,11 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component,
 	if (!pdata->fsa_handle)
 		return false;
 
+	#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
+	#else
+	return 0;
+	#endif
 }
 
 static bool msm_swap_gnd_mic(struct snd_soc_component *component, bool active)
@@ -267,7 +274,11 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 {
 	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
 	unsigned int tx_ch[WCN_CDC_SLIM_TX_CH_MAX]  = {159, 160, 161};
-	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+#if (KERNEL_VERSION(6, 7, 0) <= LINUX_VERSION_CODE)
+        struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
+#else
+        struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+#endif
 	int ret = 0;
 
 	ret = snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
@@ -1158,9 +1169,10 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 		card = &snd_soc_card_stub_msm;
 		len_1 = ARRAY_SIZE(msm_stub_be_dai_links);
 
-		memcpy(msm_stub_dai_links + len_1,
-		       msm_stub_be_dai_links,
-		       sizeof(msm_stub_be_dai_links));
+		/* Copy into start of stub array */
+		memcpy(msm_stub_dai_links,
+			msm_stub_be_dai_links,
+			sizeof(msm_stub_be_dai_links));
 
 		dailink = msm_stub_dai_links;
 		total_links = len_1;
@@ -1230,8 +1242,9 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	bolero_register_wake_irq(bolero_component, false);
 
 	component = snd_soc_rtdcom_lookup(rtd, WCD937X_DRV_NAME);
-	if (!component)
+	if (!component) {
 		component = snd_soc_rtdcom_lookup(rtd, "rouleur_codec");
+	}
 
 	if (!component)
 		component = snd_soc_rtdcom_lookup(rtd, DRV_NAME);
@@ -1492,11 +1505,11 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
         /* Get maximum WSA device count for this platform */
 	ret = of_property_read_u32(pdev->dev.of_node,
-		"qcom,wsa-max-devs", &pdata->wsa_max_devs);
+				   "qcom,wsa-max-devs", &pdata->wsa_max_devs);
 	if (ret) {
 		dev_info(&pdev->dev,
-		"%s: wsa-max-devs property missing in DT %s, ret = %d\n",
-		__func__, pdev->dev.of_node->full_name, ret);
+			 "%s: wsa-max-devs property missing in DT %s, ret = %d\n",
+			 __func__, pdev->dev.of_node->full_name, ret);
 		pdata->wsa_max_devs = 0;
 	}
 
@@ -1505,8 +1518,8 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 					"qcom,wsa-aux-dev-prefix");
 	if (!ret) {
 		dev_err(&pdev->dev,
-			"property %s not defined in DT\n",
-			__func__, "qcom,wsa-aux-dev-prefix");
+				"%s: property wsa-aux-dev-prefix not defined in dt",
+				__func__);
 	}
 
 	ret = devm_snd_soc_register_card(&pdev->dev, card);
@@ -1578,13 +1591,13 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 
 	if (wcd_mbhc_cfg.enable_usbc_analog)
 		wcd_mbhc_cfg.swap_gnd_mic = msm_usbc_swap_gnd_mic;
-
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 	pdata->fsa_handle = of_parse_phandle(pdev->dev.of_node,
 					"fsa4480-i2c-handle", 0);
 	if (!pdata->fsa_handle)
 		dev_dbg(&pdev->dev, "property %s not detected in node %s\n",
 			"fsa4480-i2c-handle", pdev->dev.of_node->full_name);
-
+#endif
 	pdata->dmic01_gpio_p = of_parse_phandle(pdev->dev.of_node,
 					      "qcom,cdc-dmic01-gpios",
 					       0);
@@ -1624,7 +1637,7 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 		goto ret;
 	}
 	if (len <= 0 || len > sizeof(u32)) {
-		dev_dbg(&pdev->dev, "%s: nvmem cell length out of range: %d\n",
+		dev_dbg(&pdev->dev, "%s: nvmem cell length out of range: %zu\n",
 			__func__, len);
 		kfree(buf);
 		goto ret;
@@ -1644,7 +1657,11 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void msm_asoc_machine_remove(struct platform_device *pdev)
+#else
 static int msm_asoc_machine_remove(struct platform_device *pdev)
+#endif
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct msm_asoc_mach_data *pdata = NULL;
@@ -1660,7 +1677,9 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	snd_event_master_deregister(&pdev->dev);
 	snd_soc_unregister_card(card);
 
-	return 0;
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+        return 0;
+#endif
 }
 
 static struct platform_driver bengal_asoc_machine_driver = {
