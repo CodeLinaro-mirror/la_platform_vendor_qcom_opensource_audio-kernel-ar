@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2016, 2018-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -29,6 +30,7 @@
 #include <soc/internal.h>
 #include <linux/regmap.h>
 #include <asoc/msm-cdc-pinctrl.h>
+#include <asoc/msm-cdc-supply.h>
 #include "wsa881x-analog.h"
 #include "wsa881x-temp-sensor.h"
 
@@ -922,7 +924,7 @@ static void wsa881x_ocp_ctl_work(struct work_struct *work)
 	struct wsa881x_pdata *wsa881x;
 	struct delayed_work *dwork;
 	struct snd_soc_component *component;
-	int temp_val;
+	int temp_val = 0;
 
 	dwork = to_delayed_work(work);
 	wsa881x = container_of(dwork, struct wsa881x_pdata, ocp_ctl_work);
@@ -1330,7 +1332,8 @@ static int check_wsa881x_presence(struct i2c_client *client)
 	if (ret < 0) {
 		dev_err(&client->dev, "failed to read wsa881x with addr %x\n",
 				client->addr);
-		return ret;
+		pr_err("%s Ignore read error ret =  %d ",__func__, ret);
+		//return ret;
 	}
 	ret = wsa881x_i2c_write_device(&wsa_pdata[wsa881x_index],
 					WSA881X_CDC_RST_CTL, 0x01);
@@ -1367,8 +1370,7 @@ static int wsa881x_populate_dt_pdata(struct device *dev, int wsa881x_index)
 	return ret;
 }
 
-static int wsa881x_i2c_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int wsa881x_i2c_probe(struct i2c_client *client)
 {
 	int ret = 0;
 	int wsa881x_index = 0;
@@ -1486,7 +1488,7 @@ static int wsa881x_i2c_probe(struct i2c_client *client,
 				"failed to ping wsa with addr:%x, ret = %d\n",
 						client->addr, ret);
 			wsa881x_probing_count++;
-			goto err1;
+			//goto err1;
 		}
 		pdata->version = wsa881x_i2c_read_device(pdata,
 					WSA881X_CHIP_ID1);
@@ -1585,7 +1587,11 @@ err:
 	return ret;
 }
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
+static void wsa881x_i2c_remove(struct i2c_client *client)
+#else
 static int wsa881x_i2c_remove(struct i2c_client *client)
+#endif
 {
 	struct wsa881x_pdata *wsa881x = client->dev.platform_data;
 
@@ -1602,7 +1608,10 @@ static int wsa881x_i2c_remove(struct i2c_client *client)
 	}
 	i2c_set_clientdata(client, NULL);
 	kfree(wsa881x);
+
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
+#endif
 }
 
 #ifdef CONFIG_PM_SLEEP
