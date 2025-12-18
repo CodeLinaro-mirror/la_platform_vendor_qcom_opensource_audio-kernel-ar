@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _SWR_WCD_CTRL_H
@@ -30,7 +32,7 @@
 #define SWR_MAX_COL		7 /* Cols = 16 */
 #define SWR_MIN_COL		0 /* Cols = 2 */
 
-#define SWR_WCD_NAME	"swr-wcd"
+#define SWR_NAME	"swr-mgr"
 
 #define SWR_MSTR_PORT_LEN	13 /* Number of master ports */
 
@@ -189,6 +191,7 @@ struct swr_mstr_ctrl {
 	int hw_core_clk_en;
 	int aud_core_clk_en;
 	int clk_src;
+	u32 pcm_enable_count;
 	u32 disable_div2_clk_switch;
 	u32 rd_fifo_depth;
 	u32 wr_fifo_depth;
@@ -204,6 +207,7 @@ struct swr_mstr_ctrl {
 	struct dentry *debugfs_reg_dump;
 	unsigned int read_data;
 #endif
+	struct proc_dir_entry *swr_mstr_ctrl_proc_entry;
 };
 
 #endif /* _SWR_WCD_CTRL_H */

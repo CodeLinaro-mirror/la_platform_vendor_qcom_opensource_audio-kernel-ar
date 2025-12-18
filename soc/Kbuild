@@ -9,18 +9,8 @@ endif
 ifeq ($(KERNEL_BUILD), 1)
 	# These are configurable via Kconfig for kernel-based builds
 	# Need to explicitly configure for Android-based builds
-	ifeq ($(TARGET_SUPPORT), sa525m)
-		AUDIO_ROOT := $(shell pwd)/../../../../vendor/qcom/opensource/audio-kernel
-	else
-		AUDIO_BLD_DIR := $(shell pwd)/kernel/msm-5.4
-		AUDIO_ROOT := $(AUDIO_BLD_DIR)/techpack/audio
-	endif
-endif
-
-ifeq ($(TARGET_SUPPORT), sa525m)
-	include $(AUDIO_ROOT)/config/sa525mauto.conf
-	export
-	INCS    +=  -include $(AUDIO_ROOT)/config/sa525mautoconf.h
+	AUDIO_BLD_DIR := $(shell pwd)/kernel/msm-5.4
+	AUDIO_ROOT := $(AUDIO_BLD_DIR)/techpack/audio
 endif
 
 ifeq ($(CONFIG_SND_SOC_AUTO), y)
@@ -33,16 +23,6 @@ ifeq ($(CONFIG_SND_SOC_AUTO), y)
 		include $(AUDIO_ROOT)/config/sa6155auto.conf
 		export
 		INCS    +=  -include $(AUDIO_ROOT)/config/sa6155autoconf.h
-	endif
-	ifdef CONFIG_SND_SOC_GVM
-		include $(AUDIO_ROOT)/config/gvmauto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/gvmautoconf.h
-	endif
-	ifdef CONFIG_SND_SOC_SA8255
-		include $(AUDIO_ROOT)/config/sa8255auto.conf
-		export
-		INCS    +=  -include $(AUDIO_ROOT)/config/sa8255autoconf.h
 	endif
 else
 ifeq ($(KERNEL_BUILD), 0)
@@ -190,12 +170,13 @@ ifdef CONFIG_SOUNDWIRE_MSTR_CTRL
 endif
 
 ifdef CONFIG_SOUNDWIRE
+	INCS += -include $(KERNEL_SRC)/drivers/base/regmap/internal.h
 	SWR_OBJS += regmap-swr.o
 	SWR_OBJS += soundwire.o
 endif
 
 ifdef CONFIG_SND_EVENT
-	SND_EVENT_OBJS += snd_event.o
+	SND_EVENT_OBJS += snd-event.o
 endif
 
 ifdef CONFIG_WCD_SPI_AC
