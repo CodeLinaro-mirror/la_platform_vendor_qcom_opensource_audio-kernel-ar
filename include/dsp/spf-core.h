@@ -1,5 +1,4 @@
 /* Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
- * Changes from Qualcomm Technologies, Inc. are provided under the following license:
  * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  *
  * This program is free software; you can redistribute it and/or modify

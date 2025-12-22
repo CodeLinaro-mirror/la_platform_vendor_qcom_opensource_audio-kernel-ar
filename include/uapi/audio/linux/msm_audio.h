@@ -3,7 +3,6 @@
  *
  * Copyright (C) 2008 Google, Inc.
  * Copyright (c) 2012, 2014, 2017, 2020, 2021 The Linux Foundation. All rights reserved.
- * Changes from Qualcomm Technologies, Inc. are provided under the following license:
  * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
