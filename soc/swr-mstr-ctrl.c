@@ -1611,7 +1611,7 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->blk_grp_count = mport->blk_grp_count;
 		port_req->lane_ctrl = mport->lane_ctrl;
 	}
-	if (swrm->master_id == MASTER_ID_WSA) {
+	if (swrm->master_id == MASTER_ID_WSA || swrm->master_id == MASTER_ID_WSA2) {
 		uc = swrm_get_uc(swrm->bus_clk);
 		port_id_offset = (port_req->dev_num - 1) *
 					SWR_MAX_DEV_PORT_NUM +
