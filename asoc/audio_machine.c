@@ -2369,8 +2369,9 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 				return -EINVAL;
 			}
 			pdata->wcd_used = WCD937X_DEV_INDEX;
+		} else {
+			pdata->wcd_used = WCD9378_DEV_INDEX;
 		}
-		pdata->wcd_used = WCD9378_DEV_INDEX;
 	} else {
 		pdata->wcd_used = WCD939X_DEV_INDEX;
 	}
