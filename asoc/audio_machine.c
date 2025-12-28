@@ -1318,27 +1318,6 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 		SND_SOC_DAILINK_REG(sec_tdm_tx_0),
 	},
 	{
-		.name = LPASS_BE_TERT_TDM_RX_0,
-		.stream_name = LPASS_BE_TERT_TDM_RX_0,
-		.playback_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ops = &msm_common_be_ops,
-		.ignore_suspend = 1,
-		.ignore_pmdown_time = 1,
-		SND_SOC_DAILINK_REG(tert_tdm_rx_0),
-	},
-	{
-		.name = LPASS_BE_TERT_TDM_TX_0,
-		.stream_name = LPASS_BE_TERT_TDM_TX_0,
-		.capture_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ops = &msm_common_be_ops,
-		.ignore_suspend = 1,
-		SND_SOC_DAILINK_REG(tert_tdm_tx_0),
-	},
-	{
 		.name = LPASS_BE_QUAT_TDM_RX_0,
 		.stream_name = LPASS_BE_QUAT_TDM_RX_0,
 		.playback_only = 1,
@@ -1406,6 +1385,27 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 
 static struct snd_soc_dai_link msm_tdm_sen_dai_links[] = {
 	{
+		.name = LPASS_BE_TERT_TDM_RX_0,
+		.stream_name = LPASS_BE_TERT_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(tert_tdm_rx_0),
+	},
+	{
+		.name = LPASS_BE_TERT_TDM_TX_0,
+		.stream_name = LPASS_BE_TERT_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(tert_tdm_tx_0),
+	},
+	{
 		.name = LPASS_BE_SEN_TDM_RX_0,
 		.stream_name = LPASS_BE_SEN_TDM_RX_0,
 		.playback_only = 1,
@@ -1430,6 +1430,27 @@ static struct snd_soc_dai_link msm_tdm_sen_dai_links[] = {
 
 
 static struct snd_soc_dai_link wsa885x_tdm_dai_links[] = {
+	{
+		.name = LPASS_BE_TERT_TDM_RX_0,
+		.stream_name = LPASS_BE_TERT_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_rx),
+	},
+	{
+		.name = LPASS_BE_TERT_TDM_TX_0,
+		.stream_name = LPASS_BE_TERT_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(sen_tdm_wsa885x_i2c_tx),
+	},
 	{
 		.name = LPASS_BE_SEN_TDM_RX_0,
 		.stream_name = LPASS_BE_SEN_TDM_RX_0,

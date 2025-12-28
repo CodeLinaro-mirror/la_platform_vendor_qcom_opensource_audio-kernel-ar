@@ -116,9 +116,18 @@
 #define ANA_TOP_SPK_TOP_PWRSTG_CH1_TUNE3       0x810b
 #define ANA_TOP_SPK_TOP_PWRSTG_CH2_CTRL3       0x810e
 #define ANA_TOP_SPK_TOP_PWRSTG_CH2_TUNE3       0x8111
-#define ANA_TOP_SPK_TOP_SPARE3 0x813c
-
-/* Digital Control 0 Registers - Clock and Power Management */
+#define ANA_TOP_SPK_TOP_SPARE3       0x813c
+#define SPK_TOP_LF_CH1_CTRL11       0x811c
+#define SPK_TOP_LF_CH1_TUNE1       0x811d
+#define SPK_TOP_LF_CH2_TUNE1       0x8129
+#define SPK_TOP_LF_CH1_CTRL9       0x811a
+#define SPK_TOP_LF_CH2_CTRL9       0x8126
+#define SPK_TOP_LF_CH2_CTRL11       0x8128
+#define SPK_TOP_COMMON_CTRL2        0x8102
+#define SPK_TOP_COMMON_TUNE1       0x8103
+#define IVSENSE_VSNS_ISNS_CTL_CH1       0x80ba
+#define DIG_CTRL0_CDC_CLK_CTL       0x841c
+#define PON_CKSK_CTL_0       0x800d
 #define DIG_CTRL0_TOP_CLK_CFG  0x8418
 #define DIG_CTRL0_SDCA_COMMIT          0x8419
 #define DIG_CTRL0_CLK_SOURCE_ENABLE    0x841a
@@ -202,9 +211,18 @@
 /* PLL Status Register Bits */
 #define WSA885X_PLL_LOCK_BIT            0x01    /* PLL lock status bit (bit 0) */
 
+/* FU21 volume support */
+#define FU21_VOL_STEPS 124
+static const DECLARE_TLV_DB_SCALE(fu21_digital_gain, -8400, 100, 0);
+
 static const char *const supply_name[] = {
 	"vdd-io",
 	"vdd-1p8",
+};
+
+enum {
+	batt_1s = 1,
+	batt_2s,
 };
 
 enum {
@@ -277,6 +295,8 @@ struct wsa885x_i2c_priv {
 	uint8_t virq[WSA885X_IRQ_MAX];
 	struct gpio_desc *intr_pin;
 	atomic_t open_count;
+	uint32_t batt_conf;
+	int stereo_voldB; /* in dB, -84..+40, encoded as signed 8-bit in MSB register */
 };
 
 static const struct regmap_irq wsa885x_irqs[WSA885X_IRQ_MAX] = {
@@ -365,6 +385,19 @@ static const struct reg_default codec_reg_defaults[] = {
 	{ANA_TOP_BOOST_BYP_CTRL2, 0xc5},
 	{ANA_TOP_BOOST_BYP_CTRL3, 0x13},
 	{ANA_TOP_BOOST_MISC, 0x79},
+	{ANA_TOP_SPK_TOP_SPARE3, 0x00},
+	{SPK_TOP_COMMON_CTRL2, 0x08},
+	{SPK_TOP_LF_CH1_CTRL11, 0x09},
+	{SPK_TOP_LF_CH1_TUNE1, 0x00},
+	{SPK_TOP_LF_CH2_TUNE1, 0x00},
+	{SPK_TOP_LF_CH1_CTRL9, 0x00},
+	{SPK_TOP_LF_CH2_CTRL9, 0x00},
+	{SPK_TOP_LF_CH2_CTRL11, 0x09},
+	{SPK_TOP_COMMON_TUNE1, 0x08},
+	{SPK_TOP_COMMON_TUNE1, 0x03},
+	{IVSENSE_VSNS_ISNS_CTL_CH1, 0x00},
+	{DIG_CTRL0_CDC_CLK_CTL, 0x0e},
+	{PON_CKSK_CTL_0, 0x00},
 	{ANA_TOP_BOOST_PWRSTAGE_CTRL2, 0x40},
 	{ANA_TOP_BOOST_PWRSTAGE_CTRL4, 0xff},
 	{ANA_TOP_PLL_STATUS_0, 0x00},
@@ -399,6 +432,7 @@ static const struct reg_default codec_reg_defaults[] = {
 	{DIG_CTRL1_I2S_TDM_CTL1, 0x05},
 	{DIG_CTRL1_I2S_TDM_CH_TX, 0x00},
 	{DIG_CTRL1_I2S_RESET_CTL, 0x00},
+	{DIG_CTRL1_I2S_TDM_CH_RX, 0x08},
 	{CDC_RX0_RX_PATH_CFG0, 0x80},
 	{CDC_RX0_RX_PATH_CFG1, 0x64},
 	{CDC_RX0_RX_PATH_CTL, 0x04},
@@ -486,7 +520,7 @@ static int wsa885x_handle_ssr_reset(struct wsa885x_i2c_priv *wsa885x)
  */
 static void reg_update_sequence(struct regmap *regmap)
 {
-	/* Configure TDM control register 1 */
+	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL1, 0x15);
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL1, 0x11);
 
 	/* Configure TDM control register 0 */
@@ -546,6 +580,15 @@ static int wait_for_pll_lock(struct wsa885x_i2c_priv *wsa885x)
  *
  * Return: 0 on success, -EINVAL on timeout or failure
  */
+static void wsa885x_2s_conf(struct wsa885x_i2c_priv *wsa885x)
+{
+	regmap_write(wsa885x->regmap, SPK_TOP_COMMON_TUNE1, 0x03);
+	regmap_write(wsa885x->regmap, SPK_TOP_LF_CH1_CTRL11, 0x0d);
+	regmap_write(wsa885x->regmap, SPK_TOP_LF_CH2_CTRL11, 0x0d);
+	regmap_write(wsa885x->regmap, CDC_CLSH_V1P8_BP_CTL1, 0x71);
+	regmap_write(wsa885x->regmap, CDC_CLSH_V1P8_BP_CTL0, 0xAA);
+}
+
 static int wait_for_pde_state(struct wsa885x_i2c_priv *wsa885x,
 			       int ps, int reg)
 {
@@ -678,6 +721,13 @@ static int codec_hw_params(struct snd_pcm_substream *substream,
 	/* Set VI (voltage/current sensing) sample rate index */
 	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_CS24_SAMPLERATEINDEX,
 				 cs24_sample_rate_idx);
+
+	/* Program FU21 volume with current dB value (MSB) and zero LSB, then commit */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+	regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
 
 	return 0;
 }
@@ -847,10 +897,16 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 
 	/* Apply codec-specific initialization table from device tree */
 	for (i = 0; i < wsa885x->init_table_size / 2; i++) {
-		regmap_write(wsa885x->regmap, wsa885x->init_table[2 * i],
-			     wsa885x->init_table[2 * i + 1]);
+		if (wsa885x->batt_conf == batt_2s && wsa885x->init_table[2 * i] ==
+			SPK_TOP_LF_CH1_CTRL11)
+			wsa885x_2s_conf(wsa885x);
+		else if (wsa885x->batt_conf == batt_2s &&
+			wsa885x->init_table[2 * i] == SPK_TOP_COMMON_TUNE1)
+			regmap_write(wsa885x->regmap, SPK_TOP_COMMON_TUNE1, 0x26);
+		else
+			regmap_write(wsa885x->regmap, wsa885x->init_table[2 * i],
+					  wsa885x->init_table[2 * i + 1]);
 	}
-
 	return 0;
 }
 
@@ -873,15 +929,19 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 {
 	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
-	int ret = 0, ps0 = 0, ps3 = 3;
+	int ret = 0, ps0 = 0, ps3 = 3, open_count = 0;
 
 	dev_dbg(wsa885x->dev, "%s: Stream is %s\n", __func__, mute ? "muted" : "unmuted");
 
 	if (mute) {
+		open_count = atomic_dec_return(&wsa885x->open_count);
+		if (open_count > 0)
+			return 0;
 		/* Handle SSR (SubSystem Restart) scenario */
 		if (gpr_get_q6_state() == GPR_SUBSYS_DOWN)
 			return wsa885x_handle_ssr_reset(wsa885x);
 
+		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
 		/* Request power state 3 (low power/standby mode) */
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS, 0x03);
 		ret = wait_for_pde_state(wsa885x, ps3, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
@@ -890,6 +950,9 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 				"Successfully transitioned to power state %d\n", ps3);
 		}
 	} else {
+		open_count = atomic_read(&wsa885x->open_count);
+		if (open_count > 1)
+			return 0;
 		/* Disable power amplifier FSM before configuration */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
 
@@ -903,10 +966,10 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 		/* Set posture number for speaker configuration */
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER, 0x01);
 
-		/* Set volume to maximum (0x00 = max volume) for both channels */
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, 0x00);
+		/* Apply requested volume */
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, wsa885x->stereo_voldB);
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
-		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, 0x00);
+		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, wsa885x->stereo_voldB);
 		regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
 
 		/* Commit SDCA (Smart Device Class Audio) changes */
@@ -1159,6 +1222,7 @@ static int codec_hw_free(struct snd_pcm_substream *substream,
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x00);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_TX, 0x00);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_CTL0, 0x06);
+	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_RX, 0x08);
 
 	/* Reset Clock */
 	regmap_write(wsa885x->regmap, DIG_CTRL0_CLK_SOURCE_ENABLE, 0x00);
@@ -1423,6 +1487,36 @@ static void wsa885x_regulator_disable(void *data)
 	regulator_bulk_disable(SUPPLIES_NUM, data);
 }
 
+/* Stereo FU21 Gain Offset control */
+static int wsa885x_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
+						  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct wsa885x_i2c_priv *wsa885x =
+		snd_soc_component_get_drvdata(component);
+
+	/* UI range 0..124 maps to dB = value - 84; return slider value */
+	ucontrol->value.integer.value[0] = wsa885x->stereo_voldB + 84;
+	return 0;
+}
+
+static int wsa885x_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
+						  struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct wsa885x_i2c_priv *wsa885x =
+		snd_soc_component_get_drvdata(component);
+	long val = ucontrol->value.integer.value[0];
+
+	if (val < 0 || val > FU21_VOL_STEPS) {
+		dev_err(component->dev, "%s: Invalid range, Val: %ld\n", __func__, val);
+		return -EINVAL;
+	}
+	wsa885x->stereo_voldB = (int)val - 84;
+	dev_dbg(component->dev, "%s: Volume dB: %d\n", __func__, wsa885x->stereo_voldB);
+	return 0;
+}
+
 /**
  * wsa885x_i2c_usage_modes_get() - Get current usage mode setting
  * @kcontrol: ALSA control structure
@@ -1528,12 +1622,18 @@ static int wsa885x_i2c_rx_slot_mask_put(struct snd_kcontrol *kcontrol,
 
 static const struct snd_kcontrol_new wsa885x_snd_controls[] = {
 	SOC_SINGLE_EXT("OT23 Usage Mode", SND_SOC_NOPM, 0, 8, 0,
-				   wsa885x_i2c_usage_modes_get,
-				   wsa885x_i2c_usage_modes_put),
+			   wsa885x_i2c_usage_modes_get,
+			   wsa885x_i2c_usage_modes_put),
+
+	SOC_SINGLE_EXT_TLV("SA1 FU21 Stereo Gain Offset dB", SND_SOC_NOPM,
+			   0, FU21_VOL_STEPS, 0,
+			   wsa885x_stereo_gain_offset_get,
+			   wsa885x_stereo_gain_offset_put,
+			   fu21_digital_gain),
 
 	SOC_SINGLE_EXT("Rx Slot Mask", SND_SOC_NOPM, 0, 4, 0,
-				   wsa885x_i2c_rx_slot_mask_get,
-				   wsa885x_i2c_rx_slot_mask_put),
+			   wsa885x_i2c_rx_slot_mask_get,
+			   wsa885x_i2c_rx_slot_mask_put),
 };
 
 static const struct snd_soc_component_driver wsa885x_i2c_component = {
@@ -1542,9 +1642,9 @@ static const struct snd_soc_component_driver wsa885x_i2c_component = {
 	.remove = wsa885x_component_remove,
 	.controls = wsa885x_snd_controls,
 	.num_controls = ARRAY_SIZE(wsa885x_snd_controls),
-	.dapm_widgets = NULL, // Add DAPM widgets if needed
+	.dapm_widgets = NULL,
 	.num_dapm_widgets = 0,
-	.dapm_routes = NULL, // Add DAPM routes if needed
+	.dapm_routes = NULL,
 	.num_dapm_routes = 0,
 };
 
@@ -1769,6 +1869,7 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 
 	wsa885x->client = client;
 	wsa885x->dev = dev;
+
 	wsa885x->regmap = devm_regmap_init_i2c(client, &regmap_cfg);
 	atomic_set(&wsa885x->open_count, 0);
 
@@ -1776,19 +1877,33 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 		return PTR_ERR(wsa885x->regmap);
 
 	wsa885x->dev = dev;
+	/* Default stereo volume: -84 dB */
+	wsa885x->stereo_voldB = -84;
+
+	/* Check for wsa885x version version property to determine which table to use */
+	const char *init_table_prop = "wsa885x-init-table";
+	bool use_v2_table = false;
+
+	if (of_property_read_bool(dev->of_node, "qcom,wsa885x-v2")) {
+		use_v2_table = true;
+		init_table_prop = "wsa885x-init-table-v2";
+		dev_dbg(dev, "Using wsa885x-init-table-v2\n");
+	} else {
+		dev_dbg(dev, "Using wsa885x-init-table\n");
+	}
 
 	wsa885x->init_table_size =
-		of_property_count_u32_elems(dev->of_node, "wsa885x-init-table");
+		of_property_count_u32_elems(dev->of_node, init_table_prop);
 
 	if (wsa885x->init_table_size <= 0) {
-		dev_err(dev, "%s: Failed to count elements from init table\n",
-				__func__);
+		dev_err(dev, "%s: Failed to count elements from %s\n",
+				__func__, init_table_prop);
 		return -EINVAL;
 	}
 
 	if (wsa885x->init_table_size % 2 != 0) {
-		dev_err(dev, "%s: Invalid number of elements in init table\n",
-				__func__);
+		dev_err(dev, "%s: Invalid number of elements in %s\n",
+				__func__, init_table_prop);
 		return -EINVAL;
 	}
 
@@ -1797,14 +1912,24 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 	if (!wsa885x->init_table)
 		return -ENOMEM;
 
-	if (of_property_read_u32_array(dev->of_node, "wsa885x-init-table",
+	if (of_property_read_u32_array(dev->of_node, init_table_prop,
 					wsa885x->init_table,
 					wsa885x->init_table_size)) {
 		dev_err(dev,
-				"%s: Failed to read wsa885x-initialization-table\n",
-				__func__);
+				"%s: Failed to read %s\n",
+				__func__, init_table_prop);
 		return -EINVAL;
 	}
+
+	dev_dbg(dev, "Loaded %s with %d elements\n", init_table_prop,
+					wsa885x->init_table_size);
+
+	ret = of_property_read_u32(dev->of_node, "qcom,battery_config", &wsa885x->batt_conf);
+	if (ret) {
+		dev_err(dev, "battery_config not specified, 1S is default: %d\n", ret);
+		wsa885x->batt_conf = batt_1s;
+	}
+
 	for (i = 0; i < SUPPLIES_NUM; i++)
 		wsa885x->supplies[i].supply = supply_name[i];
 
