@@ -1120,9 +1120,10 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 				}
 			}
 		} else {
+			if (tx_priv->version >= LPASS_CDC_VERSION_2_8)
 			//Disable adapt block
-			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
-			if (tx_priv->version < LPASS_CDC_VERSION_2_8)
+				snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
+			else
 				snd_soc_component_update_bits(component, dec_gain_reg, 0x10, 0x00);
 		}
 
