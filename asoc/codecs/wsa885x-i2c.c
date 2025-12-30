@@ -1447,7 +1447,7 @@ static int wsa885x_component_probe(struct snd_soc_component *component)
 	regmap_write(wsa885x->regmap, DIG_CTRL1_PIN_CT, 0x04);
 	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0, 0x00);
 	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 1, 0x00);
-	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 2, 0x78);
+	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 2, 0xf8);
 
 	return 0;
 }
