@@ -1,6 +1,7 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2018, 2020 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __CPE_CORE_H__
@@ -8,7 +9,7 @@
 
 #include <linux/types.h>
 #include <linux/wait.h>
-#include <linux/dma-map-ops.h>
+#include <linux/dma-mapping.h>
 #include <audio/sound/lsm_params.h>
 
 enum {

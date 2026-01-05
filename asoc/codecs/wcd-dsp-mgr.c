@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
 #include <linux/platform_device.h>
@@ -634,7 +635,6 @@ static void wdsp_collect_ramdumps(struct wdsp_mgr_priv *wdsp)
 	struct wdsp_err_signal_arg *data = &wdsp->dump_data.err_data;
 	struct qcom_dump_segment rd_seg;
 	struct list_head head;
-
 	int ret = 0;
 
 	if (wdsp->ssr_type != WDSP_SSR_TYPE_WDSP_DOWN ||
@@ -694,7 +694,7 @@ static void wdsp_collect_ramdumps(struct wdsp_mgr_priv *wdsp)
 	list_add(&rd_seg.node, &head);
 	ret = qcom_dump(&head,wdsp->dump_data.rd_dev);
 	if (ret < 0)
-		WDSP_ERR(wdsp, "qcom_elf_dump failed with error %d", ret);
+		WDSP_ERR(wdsp, "do_ramdump failed with error %d", ret);
 
 err_read_dumps:
 	dma_free_coherent(wdsp->mdev, data->dump_size,

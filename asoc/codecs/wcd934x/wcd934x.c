@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+/*
+ * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -151,6 +153,7 @@ static const struct snd_kcontrol_new name##_mux = \
 
 #define WCD934X_DIG_CORE_COLLAPSE_TIMER_MS  (5 * 1000)
 
+#define ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT	0x1
 #define TAVIL_SIDETONE_IIR_COEFF_MAX 5
 #define TAVIL_IIR_FILTER_SIZE (sizeof(u32) * BAND_MAX)
 struct tavil_iir_filter_ctl {
@@ -594,7 +597,7 @@ struct tavil_priv {
 	/* to track the status */
 	unsigned long status_mask;
 
-	struct afe_param_cdc_slimbus_slave_cfg slimbus_slave_cfg;
+	//struct afe_param_cdc_slimbus_slave_cfg slimbus_slave_cfg;
 
 	/* num of slim ports required */
 	struct wcd9xxx_codec_dai_data  dai[NUM_CODEC_DAIS];
@@ -769,30 +772,30 @@ EXPORT_SYMBOL(tavil_get_afe_config);
 #endif
 
 int tavil_set_port_map(struct snd_soc_component *component,
-                        u32 size, void *data)
+			u32 size, void *data)
 {
 
-        struct swr_mstr_port_map *map = NULL;
-        struct swrm_port_config port_cfg;
-        struct tavil_priv *priv = NULL;
+	struct swr_mstr_port_map *map = NULL;
+	struct swrm_port_config port_cfg;
+	struct tavil_priv *priv = NULL;
 
-        if (!component || (size == 0) || !data)
-                return -EINVAL;
+	if (!component || (size == 0) || !data)
+		return -EINVAL;
 
-        priv = snd_soc_component_get_drvdata(component);
+	priv = snd_soc_component_get_drvdata(component);
 
-        map = (struct swr_mstr_port_map *)data;
+	map = (struct swr_mstr_port_map *)data;
 
-        port_cfg.uc = map->uc;
-        port_cfg.size = SWR_MSTR_PORT_LEN;
-        port_cfg.params = map->swr_port_params;
+	port_cfg.uc = map->uc;
+	port_cfg.size = SWR_MSTR_PORT_LEN;
+	port_cfg.params = map->swr_port_params;
 
 
-        swrm_wcd_notify(
-                priv->swr.ctrl_data[0].swr_pdev,
-                SWR_SET_PORT_MAP, &port_cfg);
+	swrm_wcd_notify(
+		priv->swr.ctrl_data[0].swr_pdev,
+		SWR_SET_PORT_MAP, &port_cfg);
 
-        return 0;
+	return 0;
 }
 EXPORT_SYMBOL(tavil_set_port_map);
 
@@ -1578,6 +1581,14 @@ static void tavil_codec_enable_slim_port_intr(
 				val = wcd9xxx_interface_reg_read(
 					tavil_p->wcd9xxx, reg);
 			}
+			/* Enable auto recovery from slim port overflow on port_num */
+			reg = WCD934X_SLIM_PGD_PORT_TX_OR_UR_CFG_0 + port_num;
+			val = wcd9xxx_interface_reg_read(tavil_p->wcd9xxx, reg);
+			if(!(val & (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT))) {
+				val = val | (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT);
+				wcd9xxx_interface_reg_write(tavil_p->wcd9xxx, reg, val);
+				val = wcd9xxx_interface_reg_read(tavil_p->wcd9xxx, reg);
+			}
 		}
 	}
 }
@@ -1968,7 +1979,7 @@ static int tavil_codec_enable_tx(struct snd_soc_dapm_widget *w,
 			ret = tavil_codec_enable_slim_chmask(dai, false);
 		if (ret < 0) {
                       ret = wcd9xxx_disconnect_port_tx(core);			
-                      dev_dbg(component->dev, "%s: Disconnect RX port, ret = %d\n",
+                      dev_dbg(component->dev, "%s: Disconnect TX port, ret = %d\n",
 				 __func__, ret);
 		}
 		break;
@@ -4853,7 +4864,7 @@ static u8 tavil_get_dmic_clk_val(struct snd_soc_component *component,
 	u32 div_factor;
 	u8 dmic_ctl_val;
 
-	dev_dbg(component->dev,
+	dev_err(component->dev,
 		"%s: mclk_rate = %d, dmic_sample_rate = %d\n",
 		__func__, mclk_rate, dmic_clk_rate);
 
@@ -6868,7 +6879,7 @@ static int tavil_int_dem_inp_mux_put(struct snd_kcontrol *kcontrol,
 	if (val >= e->items)
 		return -EINVAL;
 
-	dev_dbg(component->dev, "%s: wname: %s, val: 0x%x\n", __func__,
+	dev_err(component->dev, "%s: wname: %s, val: 0x%x\n", __func__,
 		widget->name, val);
 
 	if (e->reg == WCD934X_CDC_RX0_RX_PATH_SEC0)
@@ -7838,9 +7849,11 @@ static const struct snd_kcontrol_new lo2_mixer[] = {
 };
 
 static const struct snd_soc_dapm_widget tavil_dapm_slim_widgets[] = {
-	SND_SOC_DAPM_AIF_IN_E("AIF4 PB", "AIF4 Playback", 0, SND_SOC_NOPM,
-			      AIF4_PB, 0, tavil_codec_enable_rx,
-			      SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_AIF_IN("AIF4 PB", "AIF4 Playback", 0, SND_SOC_NOPM, 0, 0),
+
+	SND_SOC_DAPM_MIXER_E("AIF4 PB MIX", SND_SOC_NOPM, AIF4_PB, 0,
+		NULL, 0, tavil_codec_enable_rx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_AIF_OUT_E("AIF4 VI", "VIfeed", 0, SND_SOC_NOPM,
 			       AIF4_VIFEED, 0,
@@ -7887,15 +7900,19 @@ static const struct snd_soc_dapm_widget tavil_dapm_slim_widgets[] = {
 };
 
 static const struct snd_soc_dapm_widget tavil_dapm_widgets[] = {
-	SND_SOC_DAPM_AIF_IN_E("AIF1 PB", "AIF1 Playback", 0, SND_SOC_NOPM,
-			      AIF1_PB, 0, tavil_codec_enable_rx,
-			      SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_AIF_IN_E("AIF2 PB", "AIF2 Playback", 0, SND_SOC_NOPM,
-			      AIF2_PB, 0, tavil_codec_enable_rx,
-			      SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_AIF_IN_E("AIF3 PB", "AIF3 Playback", 0, SND_SOC_NOPM,
-			      AIF3_PB, 0, tavil_codec_enable_rx,
-			      SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_AIF_IN("AIF1 PB", "AIF1 Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("AIF2 PB", "AIF2 Playback", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_IN("AIF3 PB", "AIF3 Playback", 0, SND_SOC_NOPM, 0, 0),
+
+	SND_SOC_DAPM_MIXER_E("AIF1 PB MIX", SND_SOC_NOPM, AIF1_PB, 0,
+		NULL, 0, tavil_codec_enable_rx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_MIXER_E("AIF2 PB MIX", SND_SOC_NOPM, AIF2_PB, 0,
+		NULL, 0, tavil_codec_enable_rx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_MIXER_E("AIF3 PB MIX", SND_SOC_NOPM, AIF3_PB, 0,
+		NULL, 0, tavil_codec_enable_rx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	WCD_DAPM_MUX("CDC_IF RX0 MUX", WCD934X_RX0, cdc_if_rx0),
 	WCD_DAPM_MUX("CDC_IF RX1 MUX", WCD934X_RX1, cdc_if_rx1),
@@ -8184,15 +8201,21 @@ static const struct snd_soc_dapm_widget tavil_dapm_widgets[] = {
 		tavil_codec_force_enable_micbias,
 		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),
 
-	SND_SOC_DAPM_AIF_OUT_E("AIF1 CAP", "AIF1 Capture", 0, SND_SOC_NOPM,
-			       AIF1_CAP, 0, tavil_codec_enable_tx,
-			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_AIF_OUT_E("AIF2 CAP", "AIF2 Capture", 0, SND_SOC_NOPM,
-			       AIF2_CAP, 0, tavil_codec_enable_tx,
-			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_AIF_OUT_E("AIF3 CAP", "AIF3 Capture", 0, SND_SOC_NOPM,
-			       AIF3_CAP, 0, tavil_codec_enable_tx,
-			       SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+	SND_SOC_DAPM_AIF_OUT("AIF1 CAP", "AIF1 Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("AIF2 CAP", "AIF2 Capture", 0, SND_SOC_NOPM, 0, 0),
+	SND_SOC_DAPM_AIF_OUT("AIF3 CAP", "AIF3 Capture", 0, SND_SOC_NOPM, 0, 0),
+
+	SND_SOC_DAPM_MIXER_E("AIF1_CAP_MIX", SND_SOC_NOPM, AIF1_CAP, 0,
+		NULL, 0, tavil_codec_enable_tx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_MIXER_E("AIF2_CAP_MIX", SND_SOC_NOPM, AIF2_CAP, 0,
+		NULL, 0, tavil_codec_enable_tx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+
+	SND_SOC_DAPM_MIXER_E("AIF3_CAP_MIX", SND_SOC_NOPM, AIF3_CAP, 0,
+		NULL, 0, tavil_codec_enable_tx,
+		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
 
 	SND_SOC_DAPM_MIXER("SLIM TX0", SND_SOC_NOPM, 0, 0, NULL, 0),
 	SND_SOC_DAPM_MIXER("SLIM TX1", SND_SOC_NOPM, 0, 0, NULL, 0),
@@ -8930,6 +8953,7 @@ static int tavil_hw_params(struct snd_pcm_substream *substream,
 
 	switch (substream->stream) {
 	case SNDRV_PCM_STREAM_PLAYBACK:
+		tavil->dai[dai->id].direction = substream->stream;
 		ret = tavil_set_interpolator_rate(dai, params_rate(params));
 		if (ret) {
 			dev_err(tavil->dev, "%s: cannot set sample rate: %u\n",
@@ -8952,6 +8976,7 @@ static int tavil_hw_params(struct snd_pcm_substream *substream,
 		tavil->dai[dai->id].rate = params_rate(params);
 		break;
 	case SNDRV_PCM_STREAM_CAPTURE:
+		tavil->dai[dai->id].direction = substream->stream;
 		if (dai->id != AIF4_MAD_TX)
 			ret = tavil_set_decimator_rate(dai,
 						       params_rate(params));
@@ -10009,6 +10034,15 @@ static irqreturn_t tavil_slimbus_irq(int irq, void *data)
 			WARN(!cleared,
 			     "Couldn't find slimbus %s port %d for closing\n",
 			     (tx ? "TX" : "RX"), port_id);
+
+			/* Enable auto recovery from slim port overflow on port_num */
+			reg = WCD934X_SLIM_PGD_PORT_TX_OR_UR_CFG_0 + port_id;
+			val = wcd9xxx_interface_reg_read(tavil->wcd9xxx, reg);
+			if((val & (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT))) {
+				val = val ^ (1 << ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT);
+				wcd9xxx_interface_reg_write(tavil->wcd9xxx, reg, val);
+				val = wcd9xxx_interface_reg_read(tavil->wcd9xxx, reg);
+			}
 		}
 		wcd9xxx_interface_reg_write(tavil->wcd9xxx,
 					    WCD934X_SLIM_PGD_PORT_INT_CLR_RX_0 +
@@ -10044,34 +10078,28 @@ static int tavil_setup_irqs(struct tavil_priv *tavil)
 
 	return ret;
 }
-
+/*
 static void tavil_init_slim_slave_cfg(struct snd_soc_component *component)
 {
 	struct tavil_priv *priv = snd_soc_component_get_drvdata(component);
 	struct afe_param_cdc_slimbus_slave_cfg *cfg;
 	struct wcd9xxx *wcd9xxx = priv->wcd9xxx;
 	uint64_t eaddr = 0;
-dev_err(component->dev, "%s: line=%d\n",
-                __func__, __LINE__);
+
 	cfg = &priv->slimbus_slave_cfg;
 	cfg->minor_version = 1;
 	cfg->tx_slave_port_offset = 0;
 	cfg->rx_slave_port_offset = 16;
 
-	dev_err(component->dev, "%s: line=%d\n",
-                __func__, __LINE__);
-
 	memcpy(&eaddr, &wcd9xxx->slim->e_addr, sizeof(wcd9xxx->slim->e_addr));
 	WARN_ON(sizeof(wcd9xxx->slim->e_addr) != 6);
 	cfg->device_enum_addr_lsw = eaddr & 0xFFFFFFFF;
 	cfg->device_enum_addr_msw = eaddr >> 32;
-dev_err(component->dev, "%s: line=%d\n",
-                __func__, __LINE__);
 
-	dev_err(component->dev, "%s: slimbus logical address 0x%llx\n",
+	dev_dbg(component->dev, "%s: slimbus logical address 0x%llx\n",
 		__func__, eaddr);
 }
-
+*/
 static void tavil_cleanup_irqs(struct tavil_priv *tavil)
 {
 	struct wcd9xxx *wcd9xxx = tavil->wcd9xxx;
@@ -10410,11 +10438,7 @@ static int tavil_post_reset_cb(struct wcd9xxx *wcd9xxx)
 	mutex_lock(&tavil->codec_mutex);
 
 	tavil_vote_svs(tavil, true);
-	/*tavil_slimbus_slave_port_cfg.slave_dev_intfdev_la =
-				control->slim_slave->laddr;
-	tavil_slimbus_slave_port_cfg.slave_dev_pgd_la =
-					control->slim->laddr;*/
-	tavil_init_slim_slave_cfg(component);
+	//tavil_init_slim_slave_cfg(component);
 #if IS_ENABLED(CONFIG_AUDIO_QGKI)
 	if (!is_snd_event_fwk_enabled())
 		snd_soc_card_change_online_state(component->card, 1);
@@ -10508,14 +10532,14 @@ static int tavil_soc_codec_probe(struct snd_soc_component *component)
 
 	snd_soc_component_init_regmap(component, control->regmap);
 
-	dev_err(component->dev, "%s()\n", __func__);
+	dev_info(component->dev, "%s()\n", __func__);
 	tavil = snd_soc_component_get_drvdata(component);
 	tavil->intf_type = wcd9xxx_get_intf_type();
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	control->dev_down = tavil_device_down;
 	control->post_reset = tavil_post_reset_cb;
 	control->ssr_priv = (void *)component;
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	/* Resource Manager post Init */
 	ret = wcd_resmgr_post_init(tavil->resmgr, &tavil_resmgr_cb, component);
 	if (ret) {
@@ -10523,7 +10547,6 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 			__func__);
 		goto err;
 	}
-	pr_err("%s: line=%d\n", __func__,__LINE__);
 	/* Class-H Init */
 	wcd_clsh_init(&tavil->clsh_d);
 	/* Default HPH Mode to Class-H Low HiFi */
@@ -10533,7 +10556,7 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 				      GFP_KERNEL);
 	if (!tavil->fw_data)
 		goto err;
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	set_bit(WCD9XXX_ANC_CAL, tavil->fw_data->cal_bit);
 	set_bit(WCD9XXX_MBHC_CAL, tavil->fw_data->cal_bit);
 	set_bit(WCD9XXX_MAD_CAL, tavil->fw_data->cal_bit);
@@ -10552,13 +10575,13 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 		pr_err("%s: mbhc initialization failed\n", __func__);
 		goto err_hwdep;
 	}
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	tavil->component = component;
 	for (i = 0; i < COMPANDER_MAX; i++)
 		tavil->comp_enabled[i] = 0;
 
 	tavil_codec_init_reg(tavil);
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	pdata = dev_get_platdata(component->dev->parent);
 	ret = tavil_handle_pdata(tavil, pdata);
 	if (ret < 0) {
@@ -10572,7 +10595,7 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 		ret = -ENOMEM;
 		goto err_hwdep;
 	}
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	for (i = 0; i < NUM_CODEC_DAIS; i++) {
 		INIT_LIST_HEAD(&tavil->dai[i].wcd9xxx_ch_list);
 		init_waitqueue_head(&tavil->dai[i].dai_wait);
@@ -10583,21 +10606,14 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 			ARRAY_SIZE(tavil_dapm_slim_widgets));
 		snd_soc_dapm_add_routes(dapm, tavil_slim_audio_map,
 				ARRAY_SIZE(tavil_slim_audio_map));
-		pr_err("%s: line=%d\n", __func__,__LINE__);
-		/*tavil_slimbus_slave_port_cfg.slave_dev_intfdev_la =
-					control->slim_slave->laddr;
-		tavil_slimbus_slave_port_cfg.slave_dev_pgd_la =
-					control->slim->laddr;
-		tavil_slimbus_slave_port_cfg.slave_port_mapping[0] =
-					WCD934X_TX13;*/
-		tavil_init_slim_slave_cfg(component);
+		//tavil_init_slim_slave_cfg(component);
 	} else {
 		snd_soc_dapm_new_controls(dapm, tavil_dapm_i2s_widgets,
 			ARRAY_SIZE(tavil_dapm_i2s_widgets));
 		snd_soc_dapm_add_routes(dapm, tavil_i2s_audio_map,
 				ARRAY_SIZE(tavil_i2s_audio_map));
 	}
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	control->num_rx_port = WCD934X_RX_MAX;
 	control->rx_chs = ptr;
 	memcpy(control->rx_chs, tavil_rx_chs, sizeof(tavil_rx_chs));
@@ -10623,17 +10639,17 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 		INIT_DELAYED_WORK(&tavil->tx_mute_dwork[i].dwork,
 				  tavil_tx_mute_update_callback);
 	}
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	tavil->spk_anc_dwork.tavil = tavil;
 	INIT_DELAYED_WORK(&tavil->spk_anc_dwork.dwork,
 			  tavil_spk_anc_update_callback);
 
 	tavil_mclk2_reg_defaults(tavil);
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	/* DSD initialization */
 	tavil->dsd_config = tavil_dsd_init(component);
 	if (IS_ERR_OR_NULL(tavil->dsd_config))
-		dev_info(tavil->dev, "%s: DSD init failed\n", __func__);
+		dev_dbg(tavil->dev, "%s: DSD init failed\n", __func__);
 
 	mutex_lock(&tavil->codec_mutex);
 	snd_soc_dapm_disable_pin(dapm, "ANC EAR PA");
@@ -10660,9 +10676,9 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 	}
 
 	snd_soc_dapm_sync(dapm);
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	tavil_wdsp_initialize(component);
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	/*
 	 * Once the codec initialization is completed, the svs vote
 	 * can be released allowing the codec to go to SVS2.
@@ -10971,17 +10987,15 @@ static int tavil_swrm_handle_irq(void *handle,
 	struct tavil_priv *tavil;
 	int ret = 0;
 	struct wcd9xxx *wcd9xxx;
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	if (!handle) {
 		pr_err("%s: NULL handle\n", __func__);
 		return -EINVAL;
 	}
-	pr_err("%s: line=%d\n", __func__,__LINE__);
 	tavil = (struct tavil_priv *) handle;
 	wcd9xxx = tavil->wcd9xxx;
-pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	if (action) {
-		pr_err("%s: line=%d\n", __func__,__LINE__);
 		ret = wcd9xxx_request_irq(&wcd9xxx->core_res,
 					  WCD934X_IRQ_SOUNDWIRE,
 					  swrm_irq_handler,
@@ -10992,7 +11006,7 @@ pr_err("%s: line=%d\n", __func__,__LINE__);
 	} else
 		wcd9xxx_free_irq(&wcd9xxx->core_res, WCD934X_IRQ_SOUNDWIRE,
 				 swrm_handle);
-	pr_err("%s: line=%d\n", __func__,__LINE__);
+
 	return ret;
 }
 
@@ -11107,7 +11121,7 @@ static void tavil_add_child_devices(struct work_struct *work)
 	int ret, ctrl_num = 0;
 	struct wcd_swr_ctrl_platform_data *platdata;
 	char plat_dev_name[WCD934X_STRING_LEN];
- pr_err("%s: enter line =%d\n",__func__,__LINE__);
+
 	tavil = container_of(work, struct tavil_priv,
 			     tavil_add_child_devices_work);
 	if (!tavil) {
@@ -11129,10 +11143,9 @@ static void tavil_add_child_devices(struct work_struct *work)
 
 	platdata = &tavil->swr.plat_data;
 	tavil->child_count = 0;
-	dev_err(wcd9xxx->dev , "parent DT node %s\n", wcd9xxx->dev->of_node->full_name);
+
 	for_each_child_of_node(wcd9xxx->dev->of_node, node) {
 
-		dev_err(wcd9xxx->dev , "Child node %s\n", node->full_name);
 		/* Parse and add the SPI device node */
 		if (!strcmp(node->name, "wcd_spi")) {
 			//tavil_codec_add_spi_device(tavil, node);
@@ -11140,17 +11153,13 @@ static void tavil_add_child_devices(struct work_struct *work)
 		}
 
 		/* Parse other child device nodes and add platform device */
-		if (!strcmp(node->name, "swr_master")){
-			pr_err("%s: enter line =%d\n",__func__,__LINE__);
+		if (!strcmp(node->name, "swr_master"))
 			strlcpy(plat_dev_name, "tavil_swr_ctrl",
 				(WCD934X_STRING_LEN - 1));
-		}
 		else if (strnstr(node->name, "msm_cdc_pinctrl",
-				 strlen("msm_cdc_pinctrl")) != NULL){
-			pr_err("%s: enter line =%d\n",__func__,__LINE__);
+				 strlen("msm_cdc_pinctrl")) != NULL)
 			strlcpy(plat_dev_name, node->name,
 				(WCD934X_STRING_LEN - 1));
-		}
 		else
 			continue;
 
@@ -11162,16 +11171,11 @@ static void tavil_add_child_devices(struct work_struct *work)
 			goto err_mem;
 		}
 		pdev->dev.parent = tavil->dev;
-		dev_info(&pdev->dev, "Tavil device name: %s\n", tavil->dev->init_name);
 		pdev->dev.of_node = node;
-//pr_err("%s: enter line =%d parent=%s node=%s\n",__func__,__LINE__,pdev->dev.parent->name,pdev->dev.of_node->name);
-		if (strcmp(node->name, "swr_master") == 0) {
-			pr_err("%s: enter line =%d\n",__func__,__LINE__);
 
+		if (strcmp(node->name, "swr_master") == 0) {
 			ret = platform_device_add_data(pdev, platdata,
 						       sizeof(*platdata));
-			pr_err("%s: enter line =%d\n",__func__,__LINE__);
-
 			if (ret) {
 				dev_err(&pdev->dev,
 					"%s: cannot add plat data ctrl:%d\n",
@@ -11179,7 +11183,6 @@ static void tavil_add_child_devices(struct work_struct *work)
 				goto err_pdev_add;
 			}
 		}
-pr_err("%s: enter line =%d\n",__func__,__LINE__);
 
 		ret = platform_device_add(pdev);
 		if (ret) {
@@ -11202,7 +11205,7 @@ pr_err("%s: enter line =%d\n",__func__,__LINE__);
 			swr_ctrl_data = temp;
 			swr_ctrl_data[ctrl_num].swr_pdev = pdev;
 			ctrl_num++;
-			dev_err(&pdev->dev,
+			dev_dbg(&pdev->dev,
 				"%s: Added soundwire ctrl device(s)\n",
 				__func__);
 			tavil->swr.ctrl_data = swr_ctrl_data;
@@ -11212,14 +11215,12 @@ pr_err("%s: enter line =%d\n",__func__,__LINE__);
 		else
 			goto err_mem;
 	}
-pr_err("%s: exit success line =%d\n",__func__,__LINE__);
+
 	return;
 
 err_pdev_add:
-	pr_err("%s: exit err line =%d\n",__func__,__LINE__);
 	platform_device_put(pdev);
 err_mem:
-	pr_err("%s: exit err line =%d\n",__func__,__LINE__);
 	return;
 }
 
@@ -11348,19 +11349,18 @@ static int tavil_probe(struct platform_device *pdev)
 	struct wcd9xxx_power_region *cdc_pwr;
 	const __be32 *micb_prop;
 
-	dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	tavil = devm_kzalloc(&pdev->dev, sizeof(struct tavil_priv),
 			    GFP_KERNEL);
 	if (!tavil)
 		return -ENOMEM;
-dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
+
 	tavil->intf_type = wcd9xxx_get_intf_type();
 	if (tavil->intf_type != WCD9XXX_INTERFACE_TYPE_I2C &&
 		tavil->intf_type != WCD9XXX_INTERFACE_TYPE_SLIMBUS) {
 		devm_kfree(&pdev->dev, tavil);
 		return -EPROBE_DEFER;
 	}
-dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
+
 	if (tavil->intf_type == WCD9XXX_INTERFACE_TYPE_I2C) {
 		if (gpr_get_modem_state() == GPR_SUBSYS_DOWN) {
 			dev_dbg(&pdev->dev, "%s: dsp down\n", __func__);
@@ -11390,7 +11390,7 @@ dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	 * state in the driver.
 	 */
 	tavil->svs_ref_cnt = 1;
-dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
+
 	cdc_pwr = devm_kzalloc(&pdev->dev, sizeof(struct wcd9xxx_power_region),
 				GFP_KERNEL);
 	if (!cdc_pwr) {
@@ -11403,7 +11403,6 @@ dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	wcd9xxx_set_power_state(tavil->wcd9xxx,
 				WCD_REGION_POWER_COLLAPSE_REMOVE,
 				WCD9XXX_DIG_CORE_REGION_1);
-	dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	/*
 	 * Init resource manager so that if child nodes such as SoundWire
 	 * requests for clock, resource manager can honor the request
@@ -11415,17 +11414,14 @@ dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 			__func__);
 		goto err_resmgr;
 	}
-dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	tavil->resmgr = resmgr;
 	tavil->swr.plat_data.handle = (void *) tavil;
 	tavil->swr.plat_data.read = tavil_swrm_read;
 	tavil->swr.plat_data.write = tavil_swrm_write;
 	tavil->swr.plat_data.bulk_write = tavil_swrm_bulk_write;
 	tavil->swr.plat_data.clk = tavil_swrm_clock;
-	//tavil->swr.plat_data.handle_irq = tavil_swrm_handle_irq;
 	tavil->swr.plat_data.reg_irq = tavil_swrm_handle_irq;
 	tavil->swr.spkr_gain_offset = WCD934X_RX_GAIN_OFFSET_0_DB;
-dev_err(&pdev->dev, "%s: kiran line=%d handl_irq=%p\n", __func__,__LINE__,(void *)tavil->swr.plat_data.reg_irq);
 	/* Register for Clock */
 	wcd_ext_clk = clk_get(tavil->wcd9xxx->dev, "wcd_clk");
 	if (IS_ERR(wcd_ext_clk)) {
@@ -11436,7 +11432,7 @@ dev_err(&pdev->dev, "%s: kiran line=%d handl_irq=%p\n", __func__,__LINE__,(void 
 	tavil->wcd_ext_clk = wcd_ext_clk;
 	set_bit(AUDIO_NOMINAL, &tavil->status_mask);
 	/* Update codec register default values */
-	dev_err(&pdev->dev, "%s: MCLK Rate = %x\n", __func__,
+	dev_dbg(&pdev->dev, "%s: MCLK Rate = %x\n", __func__,
 		tavil->wcd9xxx->mclk_rate);
 	if (tavil->wcd9xxx->mclk_rate == WCD934X_MCLK_CLK_12P288MHZ)
 		regmap_update_bits(tavil->wcd9xxx->regmap,
@@ -11496,20 +11492,17 @@ dev_err(&pdev->dev, "%s: kiran line=%d handl_irq=%p\n", __func__,__LINE__,(void 
 		}
 		tavil->micb_load = regulator_get(&pdev->dev, MICB_LOAD_PROP);
 		if (IS_ERR(tavil->micb_load))
-			dev_err(tavil->dev, "%s micb load get failed\n",
+			dev_dbg(tavil->dev, "%s micb load get failed\n",
 				__func__);
 	}
-dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
+
 	return ret;
 
 err_cdc_reg:
-	dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	clk_put(tavil->wcd_ext_clk);
 err_clk:
-	dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	wcd_resmgr_remove(tavil->resmgr);
 err_resmgr:
-	dev_err(&pdev->dev, "%s: kiran line=%d\n", __func__,__LINE__);
 	mutex_destroy(&tavil->micb_lock);
 	mutex_destroy(&tavil->svs_mutex);
 	mutex_destroy(&tavil->codec_mutex);
@@ -11517,6 +11510,7 @@ err_resmgr:
 	mutex_destroy(&tavil->swr.write_mutex);
 	mutex_destroy(&tavil->swr.clk_mutex);
 	devm_kfree(&pdev->dev, tavil);
+	platform_set_drvdata(pdev, NULL);
 
 	return ret;
 }

@@ -1,5 +1,7 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
-/* Copyright (c) 2011-2019, The Linux Foundation. All rights reserved.
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2011-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef __MFD_TABLA_CORE_H__
@@ -245,12 +247,12 @@ struct wcd9xxx_core_resource {
  * Some of fields are only used in smilbus mode
  */
 struct wcd9xxx_ch {
-
+	u32 sph;		/* share channel handle - slimbus only	*/
 	u32 ch_num;		/*
 				 * vitrual channel number, such as 128 -144.
 				 * apply for slimbus only
 				 */
-
+	u16 ch_h;		/* chanel handle - slimbus only */
 	u16 port;		/*
 				 * tabla port for RX and TX
 				 * such as 0-9 for TX and 10 -16 for RX

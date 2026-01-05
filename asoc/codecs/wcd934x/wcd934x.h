@@ -1,11 +1,12 @@
-/* SPDX-License-Identifier: GPL-2.0-only */
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2018, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef WCD934X_H
 #define WCD934X_H
 
-#include <dsp/apr_audio-v2.h>
+//#include <dsp/apr_audio-v2.h>
 #include "wcd934x-dsp-cntl.h"
 #include <asoc/wcd9xxx-slimslave.h>
 #include <asoc/wcd9xxx-common-v2.h>
@@ -168,7 +169,6 @@ extern int tavil_set_port_map(struct snd_soc_component *component,
 {
         return 0;
 }
-
 extern int tavil_cdc_mclk_enable(struct snd_soc_component *component,
 				 bool enable)
 {
