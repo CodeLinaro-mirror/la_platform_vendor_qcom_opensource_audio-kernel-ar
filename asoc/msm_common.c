@@ -266,7 +266,7 @@ static int get_mi2s_tdm_auxpcm_intf_index(const char *stream_name)
 	if (!strnstr(stream_name, "TDM", strlen(stream_name)) &&
 	    !strnstr(stream_name, "MI2S", strlen(stream_name)) &&
 	    !strnstr(stream_name, "AUXPCM", strlen(stream_name)) &&
-	    !strnstr(stream_name, "QAIF", strlen(stream_name)))
+	    !strnstr(stream_name, "QAIF-QAIF", strlen(stream_name)))
 		return -EINVAL;
 
 	/* Check for QAIF interfaces */
@@ -525,7 +525,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 						__func__, ret);
 					goto done;
 				}
-			} else if ((strnstr(stream_name, "QAIF", strlen(stream_name)))) {
+			} else if ((strnstr(stream_name, "QAIF-QAIF", strlen(stream_name)))) {
 				slots = pdata->tdm_max_slots;
 				rate = params_rate(params);
 
@@ -695,7 +695,7 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 						pr_err("%s: prm tdm clk cfg set failed ret %d\n",
 						__func__, ret);
 				}
-			} else if ((strnstr(stream_name, "QAIF", strlen(stream_name)))) {
+			} else if ((strnstr(stream_name, "QAIF-QAIF", strlen(stream_name)))) {
 				ret = get_aud_intf_clk_id((enum qaif_intf_index)index);
 				if (ret > 0) {
 					intf_clk_cfg.clk_id = ret;

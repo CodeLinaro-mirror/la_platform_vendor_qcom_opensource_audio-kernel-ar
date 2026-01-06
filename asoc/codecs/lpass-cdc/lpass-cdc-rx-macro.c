@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -2807,13 +2807,22 @@ static int lpass_cdc_rx_macro_enable_interp_clk(struct snd_soc_component *compon
 			lpass_cdc_rx_macro_config_classh(component, rx_priv,
 						interp_idx, event);
 			/*select PCM path and swr clk is 9.6MHz*/
-			if (rx_priv->is_pcm_enabled && !rx_priv->is_native_on &&
-					interp_idx != INTERP_AUX) {
-				if (rx_priv->pcm_select_users == 0)
-					snd_soc_component_update_bits(component,
-						LPASS_CDC_RX_TOP_SWR_CTRL, 0x02, 0x02);
-				++rx_priv->pcm_select_users;
-			}
+#ifdef CONFIG_BOLERO_VER_4P0
+		if (rx_priv->is_pcm_enabled && interp_idx != INTERP_AUX) {
+			if (rx_priv->pcm_select_users == 0)
+				snd_soc_component_update_bits(component,
+					LPASS_CDC_RX_TOP_SWR_CTRL, 0x10, 0x10);
+			++rx_priv->pcm_select_users;
+		}
+#else
+		if (rx_priv->is_pcm_enabled && !rx_priv->is_native_on &&
+				interp_idx != INTERP_AUX) {
+			if (rx_priv->pcm_select_users == 0)
+				snd_soc_component_update_bits(component,
+					LPASS_CDC_RX_TOP_SWR_CTRL, 0x02, 0x02);
+			++rx_priv->pcm_select_users;
+		}
+#endif
 			lpass_cdc_notify_wcd_rx_clk(rx_dev, rx_priv->is_native_on);
 		}
 		rx_priv->main_clk_users[interp_idx]++;
@@ -2827,16 +2836,28 @@ static int lpass_cdc_rx_macro_enable_interp_clk(struct snd_soc_component *compon
 			snd_soc_component_update_bits(component, main_reg,
 					0x10, 0x10);
 			/*Unselect PCM path*/
-			if (rx_priv->is_pcm_enabled && !rx_priv->is_native_on &&
-					interp_idx != INTERP_AUX) {
-				if (rx_priv->pcm_select_users == 1)
-					snd_soc_component_update_bits(component,
-						LPASS_CDC_RX_TOP_SWR_CTRL, 0x02, 0x00);
-				--rx_priv->pcm_select_users;
-				if (rx_priv->pcm_select_users < 0)
-					rx_priv->pcm_select_users = 0;
-			}
+#ifdef CONFIG_BOLERO_VER_4P0
+		if (rx_priv->is_pcm_enabled && interp_idx != INTERP_AUX) {
+			if (rx_priv->pcm_select_users == 1)
+				snd_soc_component_update_bits(component,
+					LPASS_CDC_RX_TOP_SWR_CTRL, 0x10, 0x00);
 
+			--rx_priv->pcm_select_users;
+			if (rx_priv->pcm_select_users < 0)
+				rx_priv->pcm_select_users = 0;
+		}
+#else
+		if (rx_priv->is_pcm_enabled && !rx_priv->is_native_on &&
+				interp_idx != INTERP_AUX) {
+			if (rx_priv->pcm_select_users == 1)
+				snd_soc_component_update_bits(component,
+					LPASS_CDC_RX_TOP_SWR_CTRL, 0x02, 0x00);
+
+			--rx_priv->pcm_select_users;
+			if (rx_priv->pcm_select_users < 0)
+				rx_priv->pcm_select_users = 0;
+		}
+#endif
 			/* Clk Disable */
 			snd_soc_component_update_bits(component, dsm_reg,
 						0x01, 0x00);

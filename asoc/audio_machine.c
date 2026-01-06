@@ -603,6 +603,7 @@ static struct snd_soc_dai_link msm_swr_haptics_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(rx_dma_rx6),
 	},
+#ifndef SND_SOC_CONFIG_QAIF
 	{
 		.name = LPASS_BE_WSA_CDC_DMA_RX_4,
 		.stream_name = LPASS_BE_WSA_CDC_DMA_RX_4,
@@ -614,6 +615,7 @@ static struct snd_soc_dai_link msm_swr_haptics_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(wsa_dma_rx4),
 	},
+#endif
 };
 
 #ifndef CONFIG_AUDIO_BTFM_PROXY
@@ -1635,6 +1637,8 @@ static const struct of_device_id canoe_asoc_machine_of_match[]  = {
 	{ .compatible = "qcom,canoe-asoc-snd-stub", .data = "stub_codec"},
 	{ .compatible = "qcom,art-asoc-snd", .data = "codec"},
 	{ .compatible = "qcom,art-asoc-snd-stub", .data = "stub_codec"},
+	{ .compatible = "qcom,shikra-asoc-snd", .data = "codec"},
+	{ .compatible = "qcom,shikra-asoc-snd-stub", .data = "stub_codec"},
 	{},
 };
 
@@ -1882,7 +1886,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 					sizeof(msm_swr_haptics_be_dai_links));
 			total_links += ARRAY_SIZE(msm_swr_haptics_be_dai_links);
 
-			if (wsa_max_devs != QUAD_SPEAKER) {
+			if (wsa_max_devs > 0 && wsa_max_devs != QUAD_SPEAKER) {
 				if (of_find_property(dev->of_node, "qcom,dedicated-wsa2",
 					NULL)) {
 					memcpy(msm_canoe_dai_links + total_links,

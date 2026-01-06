@@ -432,6 +432,7 @@ static const struct reg_default codec_reg_defaults[] = {
 	{DIG_CTRL1_I2S_TDM_CTL1, 0x05},
 	{DIG_CTRL1_I2S_TDM_CH_TX, 0x00},
 	{DIG_CTRL1_I2S_RESET_CTL, 0x00},
+	{DIG_CTRL1_I2S_TDM_CH_RX, 0x08},
 	{CDC_RX0_RX_PATH_CFG0, 0x80},
 	{CDC_RX0_RX_PATH_CFG1, 0x64},
 	{CDC_RX0_RX_PATH_CTL, 0x04},
@@ -928,11 +929,14 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 {
 	struct wsa885x_i2c_priv *wsa885x = snd_soc_dai_get_drvdata(dai);
-	int ret = 0, ps0 = 0, ps3 = 3;
+	int ret = 0, ps0 = 0, ps3 = 3, open_count = 0;
 
 	dev_dbg(wsa885x->dev, "%s: Stream is %s\n", __func__, mute ? "muted" : "unmuted");
 
 	if (mute) {
+		open_count = atomic_dec_return(&wsa885x->open_count);
+		if (open_count > 0)
+			return 0;
 		/* Handle SSR (SubSystem Restart) scenario */
 		if (gpr_get_q6_state() == GPR_SUBSYS_DOWN)
 			return wsa885x_handle_ssr_reset(wsa885x);
@@ -946,6 +950,9 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 				"Successfully transitioned to power state %d\n", ps3);
 		}
 	} else {
+		open_count = atomic_read(&wsa885x->open_count);
+		if (open_count > 1)
+			return 0;
 		/* Disable power amplifier FSM before configuration */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
 
@@ -1215,6 +1222,7 @@ static int codec_hw_free(struct snd_pcm_substream *substream,
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x00);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_TX, 0x00);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_CTL0, 0x06);
+	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_RX, 0x08);
 
 	/* Reset Clock */
 	regmap_write(wsa885x->regmap, DIG_CTRL0_CLK_SOURCE_ENABLE, 0x00);
@@ -1439,7 +1447,7 @@ static int wsa885x_component_probe(struct snd_soc_component *component)
 	regmap_write(wsa885x->regmap, DIG_CTRL1_PIN_CT, 0x04);
 	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0, 0x00);
 	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 1, 0x00);
-	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 2, 0x78);
+	regmap_write(wsa885x->regmap, WSA885X_INTR_MASK0 + 2, 0xf8);
 
 	return 0;
 }
