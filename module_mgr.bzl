@@ -1,5 +1,6 @@
-load("//build/bazel_common_rules/dist:dist.bzl", "copy_to_dist_dir")
 load("//build/kernel/kleaf:kernel.bzl", "ddk_module", "kernel_module_group")
+load("@rules_pkg//pkg:install.bzl", "pkg_install")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 
 def _create_module_conditional_src_map(conditional_srcs):
     processed_conditional_srcs = {}
@@ -100,15 +101,17 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
         srcs = submodule_rules
     )
 
-    copy_to_dist_dir(
+    pkg_files(
+        name = rule_prefix + "_dist_files",
+        srcs = submodule_rules,
+        visibility = ["//visibility:private"],
+        strip_prefix = strip_prefix.files_only(),
+    )
+
+    pkg_install(
         name = "{}_modules_dist".format(rule_prefix),
-        data = submodule_rules,
-        dist_dir = "out/target/product/{}/dlkm/lib/modules/".format(target),
-        flat = True,
-        wipe_dist_dir = False,
-        allow_duplicate_filenames = False,
-        mode_overrides = {"**/*": "644"},
-        log = "info",
+        srcs = [":{}_dist_files".format(rule_prefix)],
+        destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
     )
 
 def create_module_registry(hdrs = []):
