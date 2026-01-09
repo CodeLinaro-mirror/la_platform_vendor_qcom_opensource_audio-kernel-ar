@@ -2394,11 +2394,12 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 		codec_variant = wcd939x_get_codec_variant(component);
 		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
 	}
+#ifndef CONFIG_BOLERO_VER_2P2
 	if (codec_variant == WCD9395)
 		ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, true);
 	else
 		ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, false);
-
+#endif
 	if (ret < 0) {
 		dev_err_ratelimited(component->dev, "%s: set fir capability failed: %d\n",
 			__func__, ret);
