@@ -215,6 +215,31 @@
 #define FU21_VOL_STEPS 124
 static const DECLARE_TLV_DB_SCALE(fu21_digital_gain, -8400, 100, 0);
 
+/* Temperature reading support */
+#define T1_TEMP -10
+#define T2_TEMP 150
+#define LOW_TEMP_THRESHOLD 5
+#define HIGH_TEMP_THRESHOLD 60
+#define TEMP_INVALID	0xFFFF
+#define WSA885X_TEMP_RETRY 3
+
+/* Temperature registers */
+#define WSA885X_DIG_CTRL0_TEMP_DIN_MSB   0x8452
+#define WSA885X_DIG_CTRL0_TEMP_DIN_LSB   0x8453
+#define WSA885X_DIG_TRIM_OTP_REG_1       0x8881
+#define WSA885X_DIG_TRIM_OTP_REG_2       0x8882
+#define WSA885X_DIG_TRIM_OTP_REG_3       0x8883
+#define WSA885X_DIG_TRIM_OTP_REG_4       0x8884
+
+struct wsa885x_temp_register {
+	int d1_msb;
+	int d1_lsb;
+	int d2_msb;
+	int d2_lsb;
+	int dmeas_msb;
+	int dmeas_lsb;
+};
+
 static const char *const supply_name[] = {
 	"vdd-io",
 	"vdd-1p8",
@@ -297,6 +322,10 @@ struct wsa885x_i2c_priv {
 	atomic_t open_count;
 	uint32_t batt_conf;
 	int stereo_voldB; /* in dB, -84..+40, encoded as signed 8-bit in MSB register */
+	struct work_struct temperature_work;
+	struct completion tmp_th_complete;
+	int curr_temp;
+	bool trigger_die_temp_enable;
 };
 
 static const struct regmap_irq wsa885x_irqs[WSA885X_IRQ_MAX] = {
@@ -1213,7 +1242,6 @@ static int codec_hw_free(struct snd_pcm_substream *substream,
 	if (open_count > 0)
 		return 0;
 
-	wsa885x->rx_slot_mask = 0x00;
 	/* Reset I2S register in any case */
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_RESET_CTL, 0x00);
 	regmap_write(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX, 0x00);
@@ -1620,6 +1648,282 @@ static int wsa885x_i2c_rx_slot_mask_put(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/**
+ * wsa885x_temp_reg_read() - Read temperature sensor registers
+ * @wsa885x: WSA885X private data structure
+ * @temp_reg: Structure to store temperature register values
+ *
+ * This function reads the temperature sensor registers from the codec.
+ * It performs the following sequence:
+ * 1. Enable RCO clock source
+ * 2. Switch system clock to RCO
+ * 3. Transition to PS0 (active power state)
+ * 4. Read temperature and calibration registers
+ * 5. Transition back to PS3 (standby)
+ * 6. Disable RCO clock and restore clock settings
+ *
+ * Return: 0 on success, negative error code on failure
+ */
+static int wsa885x_temp_reg_read(struct wsa885x_i2c_priv *wsa885x,
+				  struct wsa885x_temp_register *temp_reg)
+{
+	int rc, i;
+	unsigned char ps0 = 0x0, ps3 = 0x3;
+
+	if (!wsa885x) {
+		pr_err_ratelimited("%s: wsa885x is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	uint32_t reg[6] = {
+		WSA885X_DIG_CTRL0_TEMP_DIN_MSB,
+		WSA885X_DIG_CTRL0_TEMP_DIN_LSB,
+		WSA885X_DIG_TRIM_OTP_REG_1,
+		WSA885X_DIG_TRIM_OTP_REG_2,
+		WSA885X_DIG_TRIM_OTP_REG_3,
+		WSA885X_DIG_TRIM_OTP_REG_4
+	};
+
+	int *val[] = {
+		&temp_reg->dmeas_msb,
+		&temp_reg->dmeas_lsb,
+		&temp_reg->d1_msb,
+		&temp_reg->d1_lsb,
+		&temp_reg->d2_msb,
+		&temp_reg->d2_lsb
+	};
+
+	/* Step 1: Enable RCO clock source */
+	regmap_write(wsa885x->regmap, DIG_CTRL0_CLK_SOURCE_ENABLE, 0x01);
+	usleep_range(1000, 1100);
+
+	/* Step 2: Switch system clock to RCO */
+	regmap_write(wsa885x->regmap, DIG_CTRL0_SYS_CLK_SEL, 0x01);
+
+	/* Step 3: Transition to PS0 for temperature reading */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS, ps0);
+	usleep_range(5000, 5100);
+
+	rc = wait_for_pde_state(wsa885x, ps0, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+	if (rc) {
+		dev_err(wsa885x->dev, "%s: PS0 transition failed\n", __func__);
+		goto exit;
+	}
+
+	/* Step 4: Read temperature registers */
+	for (i = 0; i < 6; i++) {
+		rc = regmap_read(wsa885x->regmap, reg[i], val[i]);
+		if (rc) {
+			dev_err(wsa885x->dev,
+				"%s: Regmap read failed for reg %u: %d\n",
+				__func__, reg[i], rc);
+			goto exit;
+		}
+	}
+
+exit:
+	/* Step 5: Return to PS3 */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS, ps3);
+
+	rc = wait_for_pde_state(wsa885x, ps3, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+	if (rc) {
+		dev_err(wsa885x->dev, "PS3 request failed\n");
+	}
+
+	/* Step 6: Turn off RCO clock and restore clock settings */
+	regmap_write(wsa885x->regmap, DIG_CTRL0_CLK_SOURCE_ENABLE, 0x00);
+	regmap_write(wsa885x->regmap, DIG_CTRL0_SYS_CLK_SEL, 0x00);
+
+	return rc;
+}
+
+/**
+ * wsa885x_temperature_work() - Work function to read die temperature
+ * @work: Work structure
+ *
+ * This function is scheduled to read the die temperature from the codec.
+ * It reads calibration data and current temperature measurement, then
+ * calculates the actual temperature using a two-point calibration formula.
+ */
+static void wsa885x_temperature_work(struct work_struct *work)
+{
+	struct wsa885x_temp_register reg = {0};
+	int dmeas, d1, d2;
+	int ret = 0;
+	int temp_val = 0;
+	int t1 = T1_TEMP;
+	int t2 = T2_TEMP;
+	u8 retry = WSA885X_TEMP_RETRY;
+
+	struct wsa885x_i2c_priv *wsa885x =
+		container_of(work, struct wsa885x_i2c_priv, temperature_work);
+
+	do {
+		ret = wsa885x_temp_reg_read(wsa885x, &reg);
+		if (ret) {
+			dev_err_ratelimited(wsa885x->dev,
+				"%s: temp read failed: %d, current temp: %d\n",
+				__func__, ret, wsa885x->curr_temp);
+			complete(&wsa885x->tmp_th_complete);
+			return;
+		}
+
+		/* Validate temperature register values */
+		if ((reg.d1_msb < 68 || reg.d1_msb > 92) ||
+		    (!(reg.d1_lsb == 0 || reg.d1_lsb == 64 || reg.d1_lsb == 128 ||
+			reg.d1_lsb == 192)) ||
+		    (reg.d2_msb < 185 || reg.d2_msb > 218) ||
+		    (!(reg.d2_lsb == 0 || reg.d2_lsb == 64 || reg.d2_lsb == 128 ||
+			reg.d2_lsb == 192))) {
+			dev_err_ratelimited(wsa885x->dev,
+				"%s: Temperature registers[%d %d %d %d] are out of range\n",
+				 __func__, reg.d1_msb, reg.d1_lsb, reg.d2_msb, reg.d2_lsb);
+		}
+
+		/* Calculate temperature using two-point calibration */
+		dmeas = ((reg.dmeas_msb << 0x8) | reg.dmeas_lsb) >> 0x6;
+		d1 = ((reg.d1_msb << 0x8) | reg.d1_lsb) >> 0x6;
+		d2 = ((reg.d2_msb << 0x8) | reg.d2_lsb) >> 0x6;
+
+		if (d1 == d2)
+			temp_val = TEMP_INVALID;
+		else
+			temp_val = t1 + (((dmeas - d1) * (t2 - t1))/(d2 - d1));
+
+		if (temp_val <= LOW_TEMP_THRESHOLD ||
+			temp_val >= HIGH_TEMP_THRESHOLD) {
+			dev_err(wsa885x->dev,
+				"%s: T0: %d is out of range[%d, %d]\n", __func__,
+				temp_val, LOW_TEMP_THRESHOLD, HIGH_TEMP_THRESHOLD);
+			if (retry--)
+				msleep(10);
+		} else {
+			break;
+		}
+	} while (retry);
+
+	wsa885x->curr_temp = temp_val;
+	dev_dbg(wsa885x->dev,
+			"%s: t0 measured: %d dmeas = %d, d1 = %d, d2 = %d\n",
+			__func__, temp_val, dmeas, d1, d2);
+
+	complete(&wsa885x->tmp_th_complete);
+}
+
+/**
+ * wsa885x_trigger_die_temp_get() - Get trigger die temperature enable state
+ * @kcontrol: ALSA control structure
+ * @ucontrol: ALSA control element value
+ *
+ * Return: 0 on success
+ */
+static int wsa885x_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct wsa885x_i2c_priv *wsa885x =
+				snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.integer.value[0] = wsa885x->trigger_die_temp_enable;
+	return 0;
+}
+
+/**
+ * wsa885x_trigger_die_temp_put() - Set trigger die temperature enable state
+ * @kcontrol: ALSA control structure
+ * @ucontrol: ALSA control element value
+ *
+ * Return: 0 on success
+ */
+static int wsa885x_trigger_die_temp_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct wsa885x_i2c_priv *wsa885x =
+				snd_soc_component_get_drvdata(component);
+
+	wsa885x->trigger_die_temp_enable = ucontrol->value.integer.value[0];
+
+	dev_dbg(component->dev, "%s: Trigger Die Temp Enable: %d\n", __func__,
+			wsa885x->trigger_die_temp_enable);
+	return 0;
+}
+
+/**
+ * wsa885x_get_temp() - Get die temperature reading
+ * @kcontrol: ALSA control structure
+ * @ucontrol: ALSA control element value
+ *
+ * This function triggers a temperature reading if enabled and returns
+ * the current die temperature. It schedules a work function to perform
+ * the actual temperature reading and waits for completion.
+ *
+ * Return: 0 on success, -EINVAL on error
+ */
+static int wsa885x_get_temp(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	struct wsa885x_i2c_priv *wsa885x =
+				snd_soc_component_get_drvdata(component);
+	int ret = 0;
+	int act_ps;
+
+	if (!wsa885x->trigger_die_temp_enable) {
+		dev_dbg(wsa885x->dev, "%s: Trigger Die Temp Disabled\n",
+				__func__);
+		ucontrol->value.integer.value[0] = wsa885x->curr_temp;
+		return 0;
+	}
+
+	cancel_work_sync(&wsa885x->temperature_work);
+	reinit_completion(&wsa885x->tmp_th_complete);
+
+	/* Check if PDE is in PS3 (standby) - required for temperature reading */
+	ret = regmap_read(wsa885x->regmap,
+		SMP_AMP_CTRL_STEREO_PDE23_ACT_PS,
+		&act_ps);
+
+	if (ret != 0) {
+		dev_err(wsa885x->dev,
+		"%s: Failed to read PDE state: %d\n",
+			__func__, ret);
+	return -EINVAL;
+	}
+
+	if (act_ps != 3) {
+		dev_err(wsa885x->dev,
+		"%s: Invalid PDE state for temperature reading. Expected PS3, got PS%d\n",
+			__func__, act_ps);
+	return -EINVAL;
+	}
+
+	schedule_work(&wsa885x->temperature_work);
+
+	ret = wait_for_completion_timeout(&wsa885x->tmp_th_complete,
+				msecs_to_jiffies(500));
+	/* Clear trigger flag after work completes or times out */
+	wsa885x->trigger_die_temp_enable = false;
+
+	if (ret == 0) {
+		dev_err(component->dev,
+		"%s: Timeout occurred before work function completed\n", __func__);
+		return -EINVAL;
+	} else if (wsa885x->curr_temp <= LOW_TEMP_THRESHOLD ||
+			wsa885x->curr_temp >= HIGH_TEMP_THRESHOLD) {
+			dev_err(component->dev, "%s: Temp range Invalid\n", __func__);
+			return -EINVAL;
+	} else {
+		dev_dbg(component->dev, "%s: Temp Work function completed\n",
+				__func__);
+	}
+
+	ucontrol->value.integer.value[0] = wsa885x->curr_temp;
+
+	return 0;
+}
+
 static const struct snd_kcontrol_new wsa885x_snd_controls[] = {
 	SOC_SINGLE_EXT("OT23 Usage Mode", SND_SOC_NOPM, 0, 8, 0,
 			   wsa885x_i2c_usage_modes_get,
@@ -1634,6 +1938,13 @@ static const struct snd_kcontrol_new wsa885x_snd_controls[] = {
 	SOC_SINGLE_EXT("Rx Slot Mask", SND_SOC_NOPM, 0, 4, 0,
 			   wsa885x_i2c_rx_slot_mask_get,
 			   wsa885x_i2c_rx_slot_mask_put),
+
+	SOC_SINGLE_EXT("Trigger Die Temperature", SND_SOC_NOPM, 0, 1, 0,
+			   wsa885x_trigger_die_temp_get,
+			   wsa885x_trigger_die_temp_put),
+
+	SOC_SINGLE_EXT("Die Temperature", SND_SOC_NOPM, 0, UINT_MAX, 0,
+			   wsa885x_get_temp, NULL),
 };
 
 static const struct snd_soc_component_driver wsa885x_i2c_component = {
@@ -1869,16 +2180,19 @@ static int wsa885x_i2c_probe(struct i2c_client *client)
 
 	wsa885x->client = client;
 	wsa885x->dev = dev;
-
+	/* Default stereo volume: -84 dB (same default as SDCA simple-amp) */
+	wsa885x->stereo_voldB = -84;
+	/* Default temperature: 24 degrees celsius */
+	wsa885x->curr_temp = 24;
 	wsa885x->regmap = devm_regmap_init_i2c(client, &regmap_cfg);
 	atomic_set(&wsa885x->open_count, 0);
 
 	if (IS_ERR(wsa885x->regmap))
 		return PTR_ERR(wsa885x->regmap);
 
-	wsa885x->dev = dev;
-	/* Default stereo volume: -84 dB */
-	wsa885x->stereo_voldB = -84;
+	/* Initialize temperature work and completion */
+	INIT_WORK(&wsa885x->temperature_work, wsa885x_temperature_work);
+	init_completion(&wsa885x->tmp_th_complete);
 
 	/* Check for wsa885x version version property to determine which table to use */
 	const char *init_table_prop = "wsa885x-init-table";
