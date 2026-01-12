@@ -68,8 +68,13 @@ do {									      \
 
 #define MODULE_NAME "audio-pkt"
 #define MINOR_NUMBER_COUNT 1
+#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+#define AUDPKT_DRIVER_NAME "aud_pasthru_modem"
+#define CHANNEL_NAME "modem_apps"
+#else
 #define AUDPKT_DRIVER_NAME "aud_pasthru_adsp"
 #define CHANNEL_NAME "adsp_apps"
+#endif
 #define MAX_PACKET_SIZE 4096
 
 enum audio_pkt_state {
