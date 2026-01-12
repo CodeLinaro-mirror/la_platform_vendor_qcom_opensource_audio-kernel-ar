@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -2671,7 +2671,7 @@ static void lpass_cdc_rx_macro_idle_detect_control(struct snd_soc_component *com
 	if (!rx_priv->idle_det_cfg.hph_idle_detect_en)
 		return;
 
-	if (!rx_priv->is_pcm_enabled)
+	if (rx_priv->is_pcm_enabled)
 		return;
 
 	if (interp == INTERP_HPHL) {

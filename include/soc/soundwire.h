@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _LINUX_SOUNDWIRE_H
@@ -159,6 +159,8 @@ struct swr_dev_frame_config {
  * be configured
  * @ch_en: array of channels mask for all the ports
  * @port_type: the required master port type
+ * @bit_width: array of bit-width of different channels that need to
+ * be configured
  */
 struct swr_params {
 	u8 tid;
@@ -169,6 +171,7 @@ struct swr_params {
 	u32 ch_rate[SWR_MAX_DEV_PORT_NUM];
 	u8 ch_en[SWR_MAX_DEV_PORT_NUM];
 	u8 port_type[SWR_MAX_DEV_PORT_NUM];
+	unsigned int bit_width[SWR_MAX_DEV_PORT_NUM];
 };
 
 /*
@@ -381,6 +384,9 @@ extern int swr_write(struct swr_device *dev, u8 dev_num, u16 reg_addr,
 
 extern int swr_bulk_write(struct swr_device *dev, u8 dev_num, void *reg_addr,
 			  const void *buf, size_t len);
+
+int swr_connect_port_v2(struct swr_device *dev, u8 *port_id, u8 num_port,
+		u8 *ch_mask, u32 *ch_rate, u8 *num_ch, u8 *port_type, unsigned int *bit_width);
 
 extern int swr_connect_port(struct swr_device *dev, u8 *port_id, u8 num_port,
 				u8 *ch_mask, u32 *ch_rate, u8 *num_ch,

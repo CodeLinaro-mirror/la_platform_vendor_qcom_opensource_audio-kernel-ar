@@ -599,8 +599,12 @@ static int swr_haptics_parse_port_mapping(struct swr_device *sdev)
 	if (of_find_property(sdev->dev.of_node, "qcom,hap-visense-supported", NULL)) {
 		rc = of_property_read_u32(sdev->dev.of_node, "qcom,hap-visense-supported",
 								&val);
-		pr_debug("%s qcom,hap-visense-supported = %d ",__func__, val);
-		vi_sense_supported = val;
+		if (rc == 0) {
+		    pr_debug("%s: qcom,hap-visense-supported = %d", __func__, val);
+		    vi_sense_supported = val;
+		} else {
+		    pr_debug("%s: Failed to read qcom,hap-visense-supported, rc=%d\n", __func__, rc);
+		}
 	}
 
 	if (vi_sense_supported) {
