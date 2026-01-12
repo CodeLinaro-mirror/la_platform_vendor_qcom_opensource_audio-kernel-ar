@@ -125,6 +125,11 @@ audio_modules.register(
 )
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
+    name = "spf_machine_dlkm",
+    path = ASOC_PATH,
+    srcs = ["gvm_auto_spf_dummy.c"]
+)
+audio_modules.register(
     name = "machine_dlkm",
     path = ASOC_PATH,
     srcs = [

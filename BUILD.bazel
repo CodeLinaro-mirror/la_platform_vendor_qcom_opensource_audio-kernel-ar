@@ -46,5 +46,7 @@ ddk_headers(
 )
 
 load(":build/audio_target.bzl", "define_audio_target")
+load(":build/gen4-5_gvm.bzl", "define_gen4_5_target")
 
 define_audio_target()
+define_gen4_5_target()
