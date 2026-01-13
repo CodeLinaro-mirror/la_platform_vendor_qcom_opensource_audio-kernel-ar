@@ -207,7 +207,10 @@ audio_modules.register(
         "CONFIG_SND_SOC_ART": [
             "audio_machine.c"
         ],
-        "CONFIG_SND_SOC_ALOR": [
+        "CONFIG_SND_SOC_HAMOA": [
+            "audio_machine.c"
+        ],
+	"CONFIG_SND_SOC_ALOR": [
             "audio_machine.c"
         ]
     },
@@ -221,6 +224,7 @@ audio_modules.register(
             ":%b_wsa884x_dlkm",
             ":%b_snd_event_dlkm",
             ":%b_wcd9378_dlkm",
+            ":%b_wcd938x_dlkm",
 	],
 )
 # >>>> ASOC/CODEC MODULES <<<<
