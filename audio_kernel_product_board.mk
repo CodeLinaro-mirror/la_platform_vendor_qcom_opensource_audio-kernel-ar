@@ -44,21 +44,36 @@ ifeq ($(call is-board-platform-in-list,sun canoe alor whale art hamoa), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko \
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd9378_dlkm.ko \
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko \
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/qmp_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/simple_amp_dlkm.ko
 endif
 ifeq ($(call is-board-platform-in-list,bengal holi blair), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/va_macro_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/tx_macro_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/rx_macro_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/wsa881x_analog_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/va_macro_dlkm.ko \
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/tx_macro_dlkm.ko \
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/rx_macro_dlkm.ko \
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wsa881x_analog_dlkm.ko \
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
 endif
 ifeq ($(call is-board-platform-in-list, holi blair hamoa), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
+endif
+
+ifeq ($(call is-board-platform-in-list, parrot), true)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/swr_haptics_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wsa884x_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd939x_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd939x_slave_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd9378_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
 endif
 
 ifeq ($(call is-board-platform-in-list, gen4 msmnile), true)

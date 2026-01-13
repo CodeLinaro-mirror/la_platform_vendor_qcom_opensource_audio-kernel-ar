@@ -39,6 +39,8 @@ def define_art(target):
             "wsa884x_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
+            "wcd937x_dlkm",
+            "wcd937x_slave_dlkm",
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
             "wcd9378_dlkm",
