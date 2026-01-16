@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef LPASS_CDC_H
@@ -9,13 +9,19 @@
 #include <sound/soc.h>
 #include <linux/regmap.h>
 
-#define LPASS_CDC_VERSION_1_0 0x0001
-#define LPASS_CDC_VERSION_1_1 0x0002
-#define LPASS_CDC_VERSION_1_2 0x0003
-#define LPASS_CDC_VERSION_2_0 0x0004
-#define LPASS_CDC_VERSION_2_1 0x0005
-#define LPASS_CDC_VERSION_2_5 0x0006
-#define LPASS_CDC_VERSION_2_6 0x0007
+enum lpass_cdc_version {
+	LPASS_CDC_VERSION_UNKNOWN,
+	LPASS_CDC_VERSION_1_0,
+	LPASS_CDC_VERSION_1_1,
+	LPASS_CDC_VERSION_1_2,
+	LPASS_CDC_VERSION_2_0,
+	LPASS_CDC_VERSION_2_1,
+	LPASS_CDC_VERSION_2_5,
+	LPASS_CDC_VERSION_2_6,
+	LPASS_CDC_VERSION_2_7,
+	LPASS_CDC_VERSION_2_8,
+	LPASS_CDC_VERSION_4_0
+};
 
 enum {
 	START_MACRO,

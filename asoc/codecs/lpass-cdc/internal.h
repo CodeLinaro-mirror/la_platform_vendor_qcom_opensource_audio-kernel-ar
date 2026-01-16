@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _LPASS_CDC_INTERNAL_H
@@ -9,6 +9,7 @@
 #include "lpass-cdc-registers.h"
 
 #define LPASS_CDC_CHILD_DEVICES_MAX 6
+#define VA_CSR_TOP_REGS 3
 
 /* from lpass_cdc to WCD events */
 enum {
@@ -104,6 +105,7 @@ struct lpass_cdc_priv {
 	u8 dmic_4_5_clk_div;
 	u8 dmic_6_7_clk_div;
 	struct proc_dir_entry *lpass_cdc_proc_entry;
+	u32 va_top_csr_core_reg[VA_CSR_TOP_REGS];
 };
 
 struct regmap *lpass_cdc_regmap_init(struct device *dev,

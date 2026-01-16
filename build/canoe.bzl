@@ -41,6 +41,8 @@ def define_canoe():
             "wcd938x_slave_dlkm",
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
+            "wcd937x_dlkm",
+            "wcd937x_slave_dlkm",
             "wcd9378_dlkm",
             "wcd9378_slave_dlkm",
             "lpass_bt_swr_dlkm",
