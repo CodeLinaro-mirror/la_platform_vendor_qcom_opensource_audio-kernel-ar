@@ -430,7 +430,6 @@ static const struct snd_soc_dapm_widget msm_int_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Digital Mic7", msm_dmic_event),
 };
 
-#ifndef CONFIG_AUDIO_BTFM_PROXY
 static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 {
 	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
@@ -446,7 +445,29 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 	msm_common_dai_link_init(rtd);
     return ret;
 }
-#endif
+
+static int msm_wcn_init_btfm(struct snd_soc_pcm_runtime *rtd)
+{
+	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
+	unsigned int tx_ch[WCN_CDC_SLIM_TX_CH_MAX]  = {159, 160};
+	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	int ret = 0;
+
+	if (!codec_dai) {
+		pr_err("%s: codec_dai is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	ret = snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
+			tx_ch, ARRAY_SIZE(rx_ch), rx_ch);
+	if (ret) {
+		pr_err("%s: failed to set channel map, ret=%d\n", __func__, ret);
+		return ret;
+	}
+
+	msm_common_dai_link_init(rtd);
+	return ret;
+}
 
 static struct snd_info_entry *msm_snd_info_create_subdir(struct module *mod,
 				const char *name,
@@ -621,7 +642,6 @@ static struct snd_soc_dai_link msm_swr_haptics_be_dai_links[] = {
 	},
 };
 
-#ifndef CONFIG_AUDIO_BTFM_PROXY
 static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 	{
 		.name = LPASS_BE_SLIMBUS_7_RX,
@@ -647,14 +667,15 @@ static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 		SND_SOC_DAILINK_REG(slimbus_7_tx),
 	},
 };
-#else
-static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
+
+static struct snd_soc_dai_link  msm_wcn_btfm_proxy_be_dai_links[] = {
         {
                 .name = LPASS_BE_BTFM_PROXY_RX_0,
                 .stream_name = LPASS_BE_BTFM_PROXY_RX_0,
                 .playback_only = 1,
                 .trigger = {SND_SOC_DPCM_TRIGGER_POST,
                         SND_SOC_DPCM_TRIGGER_POST},
+                .init = &msm_wcn_init_btfm,
                 .ops = &msm_common_be_ops,
                 /* dai link has playback support */
                 .ignore_pmdown_time = 1,
@@ -671,8 +692,19 @@ static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
                 .ignore_suspend = 1,
                 SND_SOC_DAILINK_REG(btfm_0_tx),
         },
+        {
+                .name = LPASS_BE_BTFM_PROXY_TX_2,
+                .stream_name = LPASS_BE_BTFM_PROXY_TX_2,
+                .capture_only = 1,
+                .trigger = {SND_SOC_DPCM_TRIGGER_POST,
+                        SND_SOC_DPCM_TRIGGER_POST},
+                .ops = &msm_common_be_ops,
+                .ignore_suspend = 1,
+                SND_SOC_DAILINK_REG(btfm_2_tx),
+        },
+
 };
-#endif
+
 static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	/* DISP PORT BACK END DAI Link for DP0 */
 	{
@@ -1694,6 +1726,16 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 			       msm_wcn_be_dai_links,
 			       sizeof(msm_wcn_be_dai_links));
 			total_links += ARRAY_SIZE(msm_wcn_be_dai_links);
+		} else {
+			rc = of_property_read_u32(dev->of_node, "qcom,wcn-btfm-proxy", &val);
+			if (!rc && val) {
+				dev_dbg(dev, "%s(): WCN BT support present\n",
+					__func__);
+				memcpy(msm_sun_dai_links + total_links,
+					msm_wcn_btfm_proxy_be_dai_links,
+					sizeof(msm_wcn_btfm_proxy_be_dai_links));
+				total_links += ARRAY_SIZE(msm_wcn_btfm_proxy_be_dai_links);
+			}
 		}
 
 		rc = of_property_read_u32(dev->of_node, "qcom,qmp-mic", &val);
@@ -2556,11 +2598,8 @@ static void __exit msm_asoc_machine_exit(void)
 }
 module_exit(msm_asoc_machine_exit);
 
-#ifndef CONFIG_AUDIO_BTFM_PROXY
 MODULE_SOFTDEP("pre: bt_fm_slim");
-#else
 MODULE_SOFTDEP("pre: btfmcodec");
-#endif
 MODULE_DESCRIPTION("ALSA SoC msm");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("platform:" DRV_NAME);
