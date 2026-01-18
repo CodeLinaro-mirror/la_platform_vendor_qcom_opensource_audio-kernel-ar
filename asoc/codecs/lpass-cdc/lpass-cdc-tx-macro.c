@@ -1012,11 +1012,13 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 adc_mux_reg = 0;
 	u16 adc_mux0_reg = 0;
 	u16 dmic_clk_reg = 0;
+#ifndef CONFIG_BOLERO_VER_2P2
 	u16 adapt_ctrl = 0;
 	u16 adapt_pdm_ctl0 = 0;
 	u16 adapt_pdm_ctl1 = 0;
 	u16 adc_bypass_reg = 0;
 	u8 i = 0;
+#endif
 	int hpf_delay = LPASS_CDC_TX_MACRO_DMIC_HPF_DELAY_MS;
 	int unmute_delay = LPASS_CDC_TX_MACRO_DMIC_UNMUTE_DELAY_MS;
 	struct device *tx_dev = NULL;
@@ -1048,6 +1050,7 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	tx_fs_reg = LPASS_CDC_TX0_TX_PATH_CTL +
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 
+#ifndef CONFIG_BOLERO_VER_2P2
 	if( tx_priv->version >= LPASS_CDC_VERSION_2_8) {
 		adapt_ctrl = LPASS_TX_CDC_ADPT0_ADPT_CTRL +
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
@@ -1058,7 +1061,7 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		adc_bypass_reg = LPASS_CDC_TX0_TX_PATH_CFG2 +
 			LPASS_CDC_TX_MACRO_TX_PATH_OFFSET * decimator;
 	}
-
+#endif
 	tx_priv->pcm_rate[decimator] = (snd_soc_component_read(component,
 				     tx_fs_reg) & 0x0F);
 
@@ -1093,6 +1096,7 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 					/* TODO: Add all DIV support */
 		}
 		usleep_range(5000, 5050);
+#ifndef CONFIG_BOLERO_VER_2P2
 		if (tx_priv->version >= LPASS_CDC_VERSION_2_8 &&
 			tx_priv->adapt_tuning_registers > 0) {
 			snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
@@ -1120,12 +1124,13 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 				}
 			}
 		} else {
+			if (tx_priv->version >= LPASS_CDC_VERSION_2_8)
 			//Disable adapt block
-			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
-			if (tx_priv->version < LPASS_CDC_VERSION_2_8)
+				snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
+			else
 				snd_soc_component_update_bits(component, dec_gain_reg, 0x10, 0x00);
 		}
-
+#endif
 		snd_soc_component_update_bits(component,
 			tx_vol_ctl_reg, 0x20, 0x20);
 		if (!is_amic_enabled(component, decimator)) {
@@ -1229,11 +1234,11 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 			snd_soc_component_update_bits(component,
 				LPASS_CDC_TX_TOP_CSR_SWR_CTRL,
 				0x01, 0x00);
-
+#ifndef CONFIG_BOLERO_VER_2P2
 		if (tx_priv->swr_dmic_gain_disable)
 			snd_soc_component_update_bits(component, dec_gain_reg,
 					0x01, 0x01);
-
+#endif
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		snd_soc_component_update_bits(component, tx_vol_ctl_reg,
@@ -1258,9 +1263,11 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 					LPASS_CDC_VA_TOP_CSR_SWR_CTRL, 0x0F,
 					0x00);
 		}
+#ifndef CONFIG_BOLERO_VER_2P2
 		/* bypass active detection during usecase teardown */
 		if (tx_priv->version >= LPASS_CDC_VERSION_2_8)
 			snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x3);
+#endif
 		break;
 	}
 	return 0;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2019-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/of_platform.h>
@@ -30,11 +30,23 @@ static char clk_src_name[MAX_CLK][LPASS_CDC_CLK_NAME_LENGTH] = {
 	"wsa2_tx_core_clk",
 };
 
+static char npl_clk_src_name[MAX_CLK][LPASS_CDC_CLK_NAME_LENGTH] = {
+	"tx_npl_clk",
+	"rx_npl_clk",
+	"wsa_npl_clk",
+	"va_npl_clk",
+	"wsa2_npl_clk",
+	"rx_tx_npl_clk",
+	"wsa_tx_npl_clk",
+	"wsa2_tx_npl_clk",
+};
+
 struct lpass_cdc_clk_rsc {
 	struct device *dev;
 	struct mutex rsc_clk_lock;
 	struct mutex fs_gen_lock;
 	struct clk *clk[MAX_CLK];
+	struct clk *npl_clk[MAX_CLK];
 	int clk_cnt[MAX_CLK];
 	int reg_seq_en_cnt;
 	int va_tx_clk_cnt;
@@ -107,7 +119,7 @@ int lpass_cdc_rsc_clk_reset(struct device *dev, int clk_id)
 {
 	struct device *clk_dev = NULL;
 	struct lpass_cdc_clk_rsc *priv = NULL;
-	int count = 0;
+	int count = 0, npl_count = 0;
 
 	if (!dev) {
 		pr_err("%s: dev is null\n", __func__);
@@ -136,12 +148,20 @@ int lpass_cdc_rsc_clk_reset(struct device *dev, int clk_id)
 		clk_disable_unprepare(priv->clk[clk_id]);
 		count++;
 	}
-	dev_dbg(priv->dev,
-		"%s: clock reset after ssr, count %d\n", __func__, count);
-
-	while (count--) {
-		clk_prepare_enable(priv->clk[clk_id]);
+	if (priv->npl_clk[clk_id]) {
+		while (__clk_is_enabled(priv->npl_clk[clk_id])) {
+			clk_disable_unprepare(priv->npl_clk[clk_id]);
+			npl_count++;
+		}
 	}
+	dev_dbg(priv->dev, "%s: clock reset after ssr, count %d, npl_count %d\n",
+			__func__, count, npl_count);
+
+	while (count--)
+		clk_prepare_enable(priv->clk[clk_id]);
+	while (npl_count--)
+		clk_prepare_enable(priv->npl_clk[clk_id]);
+
 	mutex_unlock(&priv->rsc_clk_lock);
 	return 0;
 }
@@ -174,9 +194,13 @@ void lpass_cdc_clk_rsc_enable_all_clocks(struct device *dev, bool enable)
 		if (enable) {
 			if (priv->clk[i])
 				clk_prepare_enable(priv->clk[i]);
+			if (priv->npl_clk[i])
+				clk_prepare_enable(priv->npl_clk[i]);
 		} else {
 			if (priv->clk[i] && __clk_is_enabled(priv->clk[i]))
 				clk_disable_unprepare(priv->clk[i]);
+			if (priv->npl_clk[i] && __clk_is_enabled(priv->npl_clk[i]))
+				clk_disable_unprepare(priv->npl_clk[i]);
 		}
 	}
 	mutex_unlock(&priv->rsc_clk_lock);
@@ -199,6 +223,17 @@ static int lpass_cdc_clk_rsc_mux0_clk_request(struct lpass_cdc_clk_rsc *priv,
 							__func__, clk_id);
 				goto done;
 			}
+
+			if (priv->npl_clk[clk_id]) {
+				ret = clk_prepare_enable(priv->npl_clk[clk_id]);
+				if (ret < 0) {
+					dev_err_ratelimited(priv->dev,
+						"%s:NPL clk_id %d enable failed\n",
+						__func__, clk_id);
+					clk_disable_unprepare(priv->clk[clk_id]);
+					goto done;
+				}
+			}
 		}
 		priv->clk_cnt[clk_id]++;
 	} else {
@@ -209,8 +244,11 @@ static int lpass_cdc_clk_rsc_mux0_clk_request(struct lpass_cdc_clk_rsc *priv,
 			goto done;
 		}
 		priv->clk_cnt[clk_id]--;
-		if (priv->clk_cnt[clk_id] == 0)
+		if (priv->clk_cnt[clk_id] == 0) {
 			clk_disable_unprepare(priv->clk[clk_id]);
+			if (priv->npl_clk[clk_id])
+				clk_disable_unprepare(priv->npl_clk[clk_id]);
+		}
 	}
 done:
 	return ret;
@@ -246,6 +284,17 @@ static int lpass_cdc_clk_rsc_mux1_clk_request(struct lpass_cdc_clk_rsc *priv,
 				dev_err_ratelimited(priv->dev, "%s:clk_id %d enable failed\n",
 					__func__, clk_id);
 				goto err_clk;
+			}
+
+			if (priv->npl_clk[clk_id]) {
+				ret = clk_prepare_enable(priv->npl_clk[clk_id]);
+				if (ret < 0) {
+					dev_err_ratelimited(priv->dev,
+						"%s:NPL clk_id %d enable failed\n",
+						__func__, clk_id);
+					clk_disable_unprepare(priv->clk[clk_id]);
+					goto err_clk;
+				}
 			}
 			/*
 			 * Temp SW workaround to address a glitch issue of
@@ -288,6 +337,8 @@ static int lpass_cdc_clk_rsc_mux1_clk_request(struct lpass_cdc_clk_rsc *priv,
 				}
 			}
 			clk_disable_unprepare(priv->clk[clk_id]);
+			if (priv->npl_clk[clk_id])
+				clk_disable_unprepare(priv->npl_clk[clk_id]);
 			if (clk_id != VA_CORE_CLK && !ret)
 				lpass_cdc_clk_rsc_mux0_clk_request(priv,
 						default_clk_id, false);
@@ -543,6 +594,7 @@ static int lpass_cdc_clk_rsc_probe(struct platform_device *pdev)
 {
 	int ret = 0, fs_gen_size, i, j;
 	const char **clk_name_array;
+	const char **npl_clk_name_array;
 	int clk_cnt;
 	struct clk *clk;
 	struct lpass_cdc_clk_rsc *priv = NULL;
@@ -615,6 +667,45 @@ static int lpass_cdc_clk_rsc_probe(struct platform_device *pdev)
 			}
 		}
 	}
+
+	/* Get npl clk details from device tree */
+	clk_cnt = of_property_count_strings(pdev->dev.of_node, "npl-clock-names");
+	if (clk_cnt <= 0 || clk_cnt > MAX_CLK) {
+		dev_info(&pdev->dev, "%s: Invalid number of NPL clocks %d\n",
+				__func__, clk_cnt);
+		ret = -EINVAL;
+		goto skip_npl_clk;
+	}
+	npl_clk_name_array = devm_kzalloc(&pdev->dev, clk_cnt * sizeof(char *),
+					  GFP_KERNEL);
+	if (!npl_clk_name_array) {
+		ret = -ENOMEM;
+		goto skip_npl_clk;
+	}
+
+	ret = of_property_read_string_array(pdev->dev.of_node, "npl-clock-names",
+					npl_clk_name_array, clk_cnt);
+
+	for (i = 0; i < MAX_CLK; i++) {
+		priv->npl_clk[i] = NULL;
+		for (j = 0; j < clk_cnt; j++) {
+			if (!strcmp(npl_clk_src_name[i], npl_clk_name_array[j])) {
+				clk = devm_clk_get(&pdev->dev, npl_clk_src_name[i]);
+				if (IS_ERR(clk)) {
+					ret = PTR_ERR(clk);
+					dev_err(&pdev->dev, "%s: clk get failed for %s with ret %d\n",
+						__func__, npl_clk_src_name[i], ret);
+					goto err;
+				}
+				priv->npl_clk[i] = clk;
+				dev_dbg(&pdev->dev, "%s: clk get success for clk name %s\n",
+						__func__, npl_clk_src_name[i]);
+				break;
+			}
+		}
+	}
+skip_npl_clk:
+
 	ret = of_property_read_u32(pdev->dev.of_node,
 				 "qcom,rx_mclk_mode_muxsel", &muxsel);
 	if (ret) {
