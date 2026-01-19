@@ -338,7 +338,7 @@ static int get_tdm_clk_id(int index)
 		clk_id = CLOCK_ID_SEC_TDM_IBIT;
 		break;
 	case TER_MI2S_TDM_AUXPCM:
-		clk_id = CLOCK_ID_TER_TDM_IBIT;
+		clk_id = CLOCK_ID_SEN_TDM_IBIT;
 		break;
 	case QUAT_MI2S_TDM_AUXPCM:
 		clk_id = CLOCK_ID_QUAD_TDM_IBIT;
@@ -398,7 +398,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 	int slot_width = TDM_SLOT_WIDTH_BITS;
 	int slots = 0;
 	int sample_width = 0;
-	unsigned int rate = 0;
+	unsigned int rate = params_rate(params);
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	const char *stream_name = rtd->dai_link->stream_name;
 	struct snd_soc_card *card = rtd->card;
@@ -427,7 +427,8 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				if ( ret < 0)
 					goto done;
 
-				if (index == SEN_MI2S_TDM_AUXPCM)
+				if (index == SEN_MI2S_TDM_AUXPCM ||
+					index == TER_MI2S_TDM_AUXPCM)
 					slots = 0x04;
 
 				intf_clk_cfg.clk_id = ret;
@@ -789,7 +790,7 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 	common_pdata->mi2s_gpio_p[SEC_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
 			"qcom,sec-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[TER_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
-			"qcom,tert-mi2s-gpios", 0);
+			"qcom,sen-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[QUAT_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
 			"qcom,quat-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[QUIN_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
