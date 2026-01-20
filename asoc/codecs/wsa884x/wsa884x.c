@@ -148,6 +148,19 @@ static const struct wsa_reg_mask_val reg_init_2S[] = {
 	{REG_FIELD_VALUE(DAC_VCM_CTRL_REG7, DAC_VCM_SHIFT_FINAL_OVERRIDE, 0x01)},
 };
 
+static const struct wsa_reg_mask_val reg_init_3S[] = {
+	{REG_FIELD_VALUE(CLSH_CTL_1, SLR_MAX, 0x02)},
+	{REG_FIELD_VALUE(CLSH_V_HD_PA, V_HD_PA, 0x19)},
+	{REG_FIELD_VALUE(UVLO_PROG, UVLO1_VTH, 0x90)},
+	{REG_FIELD_VALUE(UVLO_PROG, UVLO1_HYST, 0x00)},
+	{REG_FIELD_VALUE(DAC_VCM_CTRL_REG2, DAC_VCM_SHIFT, 0x0B)},
+	{REG_FIELD_VALUE(DAC_VCM_CTRL_REG3, DAC_VCM_SHIFT, 0x1E)},
+	{REG_FIELD_VALUE(DAC_VCM_CTRL_REG4, DAC_VCM_SHIFT, 0x36)},
+	{REG_FIELD_VALUE(DAC_VCM_CTRL_REG5, DAC_VCM_SHIFT, 0x3B)},
+	{REG_FIELD_VALUE(DAC_VCM_CTRL_REG6, DAC_VCM_SHIFT, 0x6F)},
+	{REG_FIELD_VALUE(DAC_VCM_CTRL_REG7, DAC_VCM_SHIFT_FINAL_OVERRIDE, 0x01)},
+};
+
 static const struct wsa_reg_mask_val reg_init_uvlo[] = {
 	{WSA884X_UVLO_PROG, 0xFF, 0x77},
 	{WSA884X_PA_FSM_TIMER0, 0xFF, 0xC0},
@@ -1552,6 +1565,12 @@ static void wsa884x_codec_init(struct snd_soc_component *component)
 		for (i = 0; i < ARRAY_SIZE(reg_init_2S); i++)
 			snd_soc_component_update_bits(component, reg_init_2S[i].reg,
 						reg_init_2S[i].mask, reg_init_2S[i].val);
+	}
+	/* Register updates for 3S battery configuration */
+	if (wsa884x->bat_cfg == CONFIG_3S) {
+		for (i = 0; i < ARRAY_SIZE(reg_init_3S); i++)
+			snd_soc_component_update_bits(component, reg_init_3S[i].reg,
+						reg_init_3S[i].mask, reg_init_3S[i].val);
 	}
 
 	for (i = 0; i < ARRAY_SIZE(reg_init_uvlo); i++)
