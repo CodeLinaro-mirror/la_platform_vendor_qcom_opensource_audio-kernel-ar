@@ -436,7 +436,7 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 {
 	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
 	unsigned int tx_ch[WCN_CDC_SLIM_TX_CH_MAX]  = {159, 160};
-	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
     int ret = 0;
 
 	ret = snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
@@ -650,6 +650,13 @@ static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 		SND_SOC_DAILINK_REG(slimbus_7_tx),
 	},
 };
+/*
+Adding empty structure for non-BTFM_PROXY configuration - (Slimbus)
+This ensures msm_wcn_be_dai_links_ext is always defined regardless of CONFIG_AUDIO_BTFM_PROXY
+When CONFIG_AUDIO_BTFM_PROXY is not set, this empty structure provides a valid symbol with size 0
+*/
+static struct snd_soc_dai_link msm_wcn_be_dai_links_ext[0];
+
 #else
 static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
         {

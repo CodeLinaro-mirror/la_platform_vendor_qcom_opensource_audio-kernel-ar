@@ -62,7 +62,6 @@ def define_hamoa():
             "CONFIG_SND_SOC_WCD9XXX_V2",
             "CONFIG_SND_SOC_WCD_MBHC_ADC",
             "CONFIG_LPASS_BT_SWR",
-            "CONFIG_AUDIO_BTFM_PROXY",
             "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
             "CONFIG_SND_SOC_WSA885X_I2C",
