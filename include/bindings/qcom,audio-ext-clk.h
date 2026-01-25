@@ -26,4 +26,5 @@
 #define AUDIO_LPASS_MCLK_14           17 /* HW SEQUNCER MCLK */
 #define AUDIO_LPASS_MCLK_15           18 /* BT_SWR CLK */
 #define AUDIO_LPASS_MCLK_16           19 /* BT_SWR 2X CLK */
+#define AUDIO_LPASS_MCLK_17           20 /* WSA ANA CLK */
 #endif
