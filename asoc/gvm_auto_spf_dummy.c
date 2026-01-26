@@ -542,6 +542,30 @@ static struct snd_soc_dai_link msm_gvm_auto_dai_links[] = {
 	.ignore_pmdown_time = 1,
 	SND_SOC_DAILINK_REG(pcm_dummy_tx0),
 	},
+	{
+	.name = "PCM_DUMMY-RX-0",
+	.stream_name = "PCM_DUMMY-RX-0",
+	.dpcm_playback = 1,
+	.trigger = {
+		SND_SOC_DPCM_TRIGGER_POST,
+		SND_SOC_DPCM_TRIGGER_POST
+		},
+	.ignore_pmdown_time = 1,
+	.ignore_suspend = 1,
+	SND_SOC_DAILINK_REG(pcm_dummy_rx0),
+	},
+	{
+	.name = "PCM_DUMMY-TX-1",
+	.stream_name = "PCM_DUMMY-TX-1",
+	.dpcm_capture = 1,
+	.trigger = {
+		SND_SOC_DPCM_TRIGGER_POST,
+		SND_SOC_DPCM_TRIGGER_POST
+		},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(pcm_dummy_tx1),
+	},
 };
 
 int snd_card_notify_user(snd_card_status_t card_status)
@@ -980,7 +1004,8 @@ static void msm_asoc_machine_remove(struct platform_device *pdev)
 static int msm_asoc_machine_remove(struct platform_device *pdev)
 #endif
 {
-	/* kobject_put decrease the kref count, once the count reaches 0.
+	/*
+	 * kobject_put decrease the kref count, once the count reaches 0.
 	 * Kobject core will automatically clean up the memory allocated by kobject.
 	 * The snd_card_sysfs_release release will help clean up memory allocated by us
 	 */

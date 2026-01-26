@@ -7,12 +7,14 @@ targets = [
     "lahaina",
     "sun",
     "vienna",
+    "volcano",
     "x1p42100",
 ]
 
 la_variants = [
     # keep sorted
     "consolidate",
+    "gki",
     "perf",
 ]
 
