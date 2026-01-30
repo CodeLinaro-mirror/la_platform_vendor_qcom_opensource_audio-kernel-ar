@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015-2016, 2018-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -1366,8 +1366,7 @@ static int wsa881x_populate_dt_pdata(struct device *dev, int wsa881x_index)
 	return ret;
 }
 
-static int wsa881x_i2c_probe(struct i2c_client *client,
-			const struct i2c_device_id *id)
+static int wsa881x_i2c_probe(struct i2c_client *client)
 {
 	int ret = 0;
 	int wsa881x_index = 0;

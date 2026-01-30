@@ -631,6 +631,7 @@ static int swrm_clk_request(struct swr_mstr_ctrl *swrm, bool enable)
 	} else if (--swrm->clk_ref_count == 0) {
 		swrm->clk(swrm->handle, false);
 		complete(&swrm->clk_off_complete);
+		swrm->mstr_init_required = true;
 	}
 	if (swrm->clk_ref_count < 0) {
 		dev_err_ratelimited(swrm->dev, "%s: swrm clk count mismatch\n", __func__);
@@ -3764,6 +3765,7 @@ static int swrm_probe(struct platform_device *pdev)
 		ret = -EPROBE_DEFER;
 		goto err_mstr_init_fail;
 	}
+	swrm->mstr_init_required = false;
 
 	mutex_unlock(&swrm->mlock);
 	INIT_WORK(&swrm->wakeup_work, swrm_wakeup_work);
@@ -4013,11 +4015,12 @@ static int swrm_runtime_resume(struct device *dev)
 				}
 			}
 
-			if (swrm_first_after_clk_enabled(swrm)) {
+			if (swrm_first_after_clk_enabled(swrm) || swrm->mstr_init_required) {
 				swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
 				swr_master_write(swrm, SWRM_COMP_SW_RESET, 0x01);
 				swr_master_write(swrm, SWRM_MCP_BUS_CTRL, 0x01);
 				swrm_master_init(swrm);
+				swrm->mstr_init_required = false;
 
 				/* wait for hw enumeration to complete */
 				usleep_range(100, 105);
