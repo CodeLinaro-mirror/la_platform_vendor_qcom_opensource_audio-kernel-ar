@@ -25,8 +25,7 @@ void wcd9xxx_disable_irq_sync(struct wcd9xxx_core_resource *wcd9xxx_res,
 
 int wcd9xxx_irq_init(struct wcd9xxx_core_resource *wcd9xxx_res);
 void wcd9xxx_irq_exit(struct wcd9xxx_core_resource *wcd9xxx_res);
-int wcd9xxx_irq_drv_init(void);
-void wcd9xxx_irq_drv_exit(void);
+
 #else
 bool wcd9xxx_lock_sleep(struct wcd9xxx_core_resource *wcd9xxx_res)
 {
@@ -74,7 +73,6 @@ int wcd9xxx_irq_drv_init(void)
 {
 	return 0;
 }
-
 void wcd9xxx_irq_drv_exit(void)
 {
 }

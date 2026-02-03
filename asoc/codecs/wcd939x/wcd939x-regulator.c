@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/regulator/driver.h>
 #include <linux/device.h>
@@ -11,6 +11,8 @@
 #include "wcd939x.h"
 
 #define WCD939X_MAX_MICBIAS 4
+
+int wcd_init_mb_regulator(struct device *dev);
 
 struct wcd_reg_priv {
 	struct device *dev;

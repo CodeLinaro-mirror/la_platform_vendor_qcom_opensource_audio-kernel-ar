@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _LINUX_SOUNDWIRE_H
@@ -47,6 +47,11 @@ struct swr_device;
 #define SWR_MAX_MSTR_PORT_NUM	(SWR_MAX_DEV_NUM * SWR_MAX_DEV_PORT_NUM)
 /* SWR slave port params count */
 #define SWR_PORT_PARAMS 2
+
+struct regmap *__regmap_init_swr(struct swr_device *swr,
+                                 const struct regmap_config *config,
+                                 struct lock_class_key *lock_key,
+                                 const char *lock_name);
 
 /* Regmap support for soundwire interface */
 struct regmap *__devm_regmap_init_swr(struct swr_device *dev,

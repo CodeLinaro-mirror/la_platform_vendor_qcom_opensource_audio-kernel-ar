@@ -1,5 +1,6 @@
 /* Copyright (c) 2011-2017, 2019-2021 The Linux Foundation. All rights reserved.
  * Copyright (c) 2018, Linaro Limited
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -285,4 +286,7 @@ int gpr_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt);
 
 enum gpr_subsys_state gpr_get_modem_state(void);
 enum gpr_subsys_state gpr_get_q6_state(void);
+
+void gpr_set_modem_state(enum gpr_subsys_state state);
+int gpr_set_q6_state(enum gpr_subsys_state state);
 #endif /* __QCOM_GPR_H_ */
