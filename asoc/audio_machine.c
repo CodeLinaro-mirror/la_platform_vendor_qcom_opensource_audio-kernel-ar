@@ -145,6 +145,7 @@ static struct wcd_mbhc_config wcd_mbhc_cfg = {
 
 static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool active)
 {
+#if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 	int ret = 0;
 	struct snd_soc_card *card = component->card;
 	struct msm_asoc_mach_data *pdata =
@@ -153,7 +154,6 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	if (!pdata->wcd_usbss_handle)
 		return false;
 
-#if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 	if (wcd_mbhc_cfg.usbss_hsj_connect_enable)
 		ret = wcd_usbss_switch_update(WCD_USBSS_GND_MIC_SWAP_HSJ,
 							WCD_USBSS_CABLE_CONNECT);
