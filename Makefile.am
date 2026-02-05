@@ -21,6 +21,10 @@ ifeq ($(TARGET_SUPPORT), sdxlemur))
 KBUILD_OPTIONS += CONFIG_ARCH_SDXLEMUR=y
 endif
 
+ifeq ($(TARGET_SUPPORT), $(filter $(TARGET_SUPPORT), ravelin taycan qmb415))
+KBUILD_OPTIONS += CONFIG_ARCH_RAVELIN=y
+endif
+
 subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
 
 subdir-ccflags-y += -I$(AUDIO_ROOT)/include/uapi/
