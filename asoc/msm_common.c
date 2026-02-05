@@ -546,8 +546,6 @@ static int vote_against_sleep(int vote_against_sleep_enable)
 int msm_common_snd_startup(struct snd_pcm_substream *substream)
 {
 	int ret = 0;
-	int rc = 0;
-	int val = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
 	struct msm_common_pdata *pdata = msm_common_get_pdata(card);
@@ -558,13 +556,8 @@ int msm_common_snd_startup(struct snd_pcm_substream *substream)
 		"%s: substream = %s  stream = %d\n",
 		__func__, substream->name, substream->stream);
 
-	rc = of_property_read_u32(rtd->card->dev->of_node, "qcom,vote_against_sleep", &val);
-	if (!rc && val) {
-		pr_debug("%s(), vote_against_sleep supported\n", __func__);
-		if (!strnstr(stream_name, "LPAIF_VA", strlen(stream_name))){
-			vote_against_sleep(1);
-			pr_err("In %s: after audio_prm_set_vote_against_sleep :success!!\n",__func__);
-		}
+	if (!strnstr(stream_name, "LPAIF_VA", strlen(stream_name))) {
+	  ret = vote_against_sleep(1);
 	}
 	if (!pdata) {
 		dev_err(rtd->card->dev, "%s: pdata is NULL\n", __func__);
@@ -597,8 +590,6 @@ done:
 void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 {
 	int ret;
-	int rc = 0;
-	int val = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
 	struct msm_common_pdata *pdata = msm_common_get_pdata(card);
@@ -666,13 +657,8 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 				atomic_set(&pdata->mi2s_gpio_ref_cnt[index], 0);
 			}
 		}
-		rc = of_property_read_u32(rtd->card->dev->of_node, "qcom,vote_against_sleep", &val);
-		if (!rc && val) {
-			pr_debug("%s(), vote_against_sleep supported\n", __func__);
-			if (!strnstr(stream_name, "LPAIF_VA", strlen(stream_name))){
-				vote_against_sleep(1);
-				pr_debug("In %s: after audio_prm_set_vote_against_sleep :success!!\n",__func__);
-			}
+	if (!strnstr(stream_name, "LPAIF_VA", strlen(stream_name))) {
+		ret =	vote_against_sleep(0);
 		}
 		mutex_unlock(&pdata->lock[index]);
 	}
@@ -1174,33 +1160,10 @@ static int msm_lpi_logging_enable_get(struct snd_kcontrol *kcontrol,
 static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	int ret = 0;
 
-	mutex_lock(&vote_against_sleep_lock);
 	vote_against_sleep_enable = ucontrol->value.integer.value[0];
-	pr_debug("%s: vote against sleep enable: %d sleep cnt: %d", __func__,
-			vote_against_sleep_enable, vote_against_sleep_cnt);
+	return vote_against_sleep(vote_against_sleep_enable);
 
-	if (vote_against_sleep_enable) {
-		vote_against_sleep_cnt++;
-		if (vote_against_sleep_cnt ==  1) {
-			ret = audio_prm_set_vote_against_sleep(1);
-			if (ret < 0) {
-				if (vote_against_sleep_cnt > 0)
-					--vote_against_sleep_cnt;
-				pr_err("%s: failed to vote against sleep ret: %d\n", __func__, ret);
-			}
-		}
-	} else {
-		if (vote_against_sleep_cnt == 1)
-			ret = audio_prm_set_vote_against_sleep(0);
-		if (vote_against_sleep_cnt > 0)
-			vote_against_sleep_cnt--;
-	}
-
-	pr_debug("%s: vote against sleep vote ret: %d\n", __func__, ret);
-	mutex_unlock(&vote_against_sleep_lock);
-	return ret;
 }
 
 static int msm_vote_against_sleep_ctl_get(struct snd_kcontrol *kcontrol,
