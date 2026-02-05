@@ -609,6 +609,16 @@ static struct snd_soc_dai_link msm_swr_haptics_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(rx_dma_rx6),
 	},
+	{
+		.name = LPASS_BE_TX_CDC_DMA_TX_0,
+		.stream_name = LPASS_BE_TX_CDC_DMA_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(tx_dma_tx0),
+	},
 #ifndef SND_SOC_CONFIG_QAIF
 	{
 		.name = LPASS_BE_WSA_CDC_DMA_RX_4,
@@ -998,16 +1008,6 @@ static struct snd_soc_dai_link msm_rx_cdc_dma_be_dai_links[] = {
 
 static struct snd_soc_dai_link msm_tx_cdc_dma_be_dai_links[] = {
 	/* TX CDC DMA Backend DAI Links */
-	{
-		.name = LPASS_BE_TX_CDC_DMA_TX_0,
-		.stream_name = LPASS_BE_TX_CDC_DMA_TX_0,
-		.capture_only = 1,
-		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
-			SND_SOC_DPCM_TRIGGER_POST},
-		.ignore_suspend = 1,
-		.ops = &msm_common_be_ops,
-		SND_SOC_DAILINK_REG(tx_dma_tx0),
-	},
 	{
 		.name = LPASS_BE_TX_CDC_DMA_TX_4,
 		.stream_name = LPASS_BE_TX_CDC_DMA_TX_4,
