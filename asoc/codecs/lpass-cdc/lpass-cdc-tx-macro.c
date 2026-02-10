@@ -2582,11 +2582,23 @@ static const struct lpass_cdc_tx_macro_reg_mask_val
 
 static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 {
-	struct snd_soc_dapm_context *dapm =
-			snd_soc_component_get_dapm(component);
+	struct snd_soc_dapm_context *dapm = NULL;
 	int ret = 0, i = 0, dai_idx;
 	struct device *tx_dev = NULL;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+
+	/* Add NULL check for component parameter */
+	if (!component) {
+		pr_err("%s: component is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	dapm = snd_soc_component_get_dapm(component);
+	if (!dapm) {
+		dev_err(component->dev,
+			"%s: dapm context is NULL\n", __func__);
+		return -EINVAL;
+	}
 
 	tx_dev = lpass_cdc_get_device_ptr(component->dev, TX_MACRO);
 	if (!tx_dev) {
@@ -2594,32 +2606,41 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 			"%s: null device for macro!\n", __func__);
 		return -EINVAL;
 	}
+
 	tx_priv = dev_get_drvdata(tx_dev);
 	if (!tx_priv) {
 		dev_err(component->dev,
 			"%s: priv is null for macro!\n", __func__);
 		return -EINVAL;
 	}
+
+	/* Add NULL check for dapm->card */
+	if (!dapm->card) {
+		dev_err(tx_dev,
+			"%s: dapm->card is NULL\n", __func__);
+		return -EINVAL;
+	}
 	tx_priv->version = lpass_cdc_get_version(tx_dev);
 	ret = snd_soc_dapm_new_controls(dapm, lpass_cdc_tx_macro_dapm_widgets,
 				ARRAY_SIZE(lpass_cdc_tx_macro_dapm_widgets));
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add controls\n",
-			__func__);
+		dev_err(tx_dev, "%s: Failed to add controls, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
 	ret = snd_soc_dapm_add_routes(dapm, tx_audio_map,
 				ARRAY_SIZE(tx_audio_map));
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add routes\n",
-			__func__);
+		dev_err(tx_dev, "%s: Failed to add routes, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
 	ret = snd_soc_dapm_new_widgets(dapm->card);
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add widgets\n", __func__);
+		dev_err(tx_dev, "%s: Failed to add widgets, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
@@ -2627,8 +2648,8 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 			lpass_cdc_tx_macro_snd_controls,
 			ARRAY_SIZE(lpass_cdc_tx_macro_snd_controls));
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add snd_ctls\n",
-			__func__);
+		dev_err(tx_dev, "%s: Failed to add snd_ctls, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
@@ -2657,6 +2678,7 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 		INIT_DELAYED_WORK(&tx_priv->tx_dec_unmute_work[dai_idx].dwork,
 				mute_stream_dec_unmute);
 	}
+
 	tx_priv->component = component;
 
 	for (i = 0; i < ARRAY_SIZE(lpass_cdc_tx_macro_reg_init); i++)
