@@ -1102,7 +1102,7 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
 			/* enable active detection for amic case */
 			if (is_amic_enabled(component, decimator))
-				snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x1);
+				snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x3);
 			if (tx_priv->adapt_tuning_registers <= MAX_TUNING_REG_VALUE_PAIRS) {
 				if (!tx_priv->bcs_enable) {
 					for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
