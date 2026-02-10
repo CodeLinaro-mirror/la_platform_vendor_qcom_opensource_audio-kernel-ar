@@ -60,6 +60,7 @@ def define_parrot():
             "CONFIG_SND_SOC_WCD9XXX_V2",
             "CONFIG_SND_SOC_WCD_MBHC_ADC",
             "CONFIG_MSM_EXT_DISPLAY",
+	    "CONFIG_QCOM_FSA4480_I2C",
         ]
     )
 

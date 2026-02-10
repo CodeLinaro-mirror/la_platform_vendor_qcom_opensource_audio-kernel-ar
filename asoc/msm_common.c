@@ -25,6 +25,7 @@
 #include <linux/sched/walt.h>
 #endif
 #include "msm_common.h"
+#define PCM_HW_PAGE_SIZE 4096
 
 #ifndef topology_cluster_id
 #define topology_cluster_id(cpu) topology_physical_package_id(cpu)
@@ -86,8 +87,8 @@ static const struct snd_pcm_hardware dummy_dma_hardware = {
 	.info               = SNDRV_PCM_INFO_INTERLEAVED |
 					SNDRV_PCM_INFO_BLOCK_TRANSFER,
 	.buffer_bytes_max   = 128*1024,
-	.period_bytes_min   = PAGE_SIZE,
-	.period_bytes_max   = PAGE_SIZE*2,
+	.period_bytes_min   = PCM_HW_PAGE_SIZE,
+	.period_bytes_max   = PCM_HW_PAGE_SIZE*2,
 	.periods_min        = 2,
 	.periods_max        = 128,
 };
