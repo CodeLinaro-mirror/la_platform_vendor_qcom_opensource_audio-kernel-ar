@@ -28,6 +28,15 @@ struct coupled_ssr_private_list {
 	struct list_head priv_list;
 };
 
+struct coupled_ssr_ctx {
+    struct work_struct ssr_work;
+    const char *reboot_ssr_name;
+    struct mutex lock;
+    atomic_t work_pending;
+};
+
+static struct coupled_ssr_ctx g_ctx;
+
 static struct coupled_ssr_private_list coupled_ssr_list = {0,};
 
 static int strlcmp(const char *s, const char *t, size_t n)
@@ -50,14 +59,30 @@ static struct notifier_block ssr_notifier_general_nb = {
 	.priority = -INT_MAX,
 };
 
+static void coupled_ssr_work_func(struct work_struct *work)
+{
+	struct coupled_ssr_private *coupled_ssr_data_priv = NULL;
+	size_t ssr_name_len = 0;
+	struct coupled_ssr_ctx *ctx = container_of(work, struct coupled_ssr_ctx, ssr_work);
+
+	mutex_lock(&g_ctx.lock);
+	list_for_each_entry(coupled_ssr_data_priv, &coupled_ssr_list.priv_list, list) {
+		ssr_name_len = strlen(coupled_ssr_data_priv->ssr_name);
+		if (strlcmp(ctx->reboot_ssr_name, coupled_ssr_data_priv->ssr_name, ssr_name_len) &&
+				coupled_ssr_data_priv->ssr_rproc) {
+			rproc_shutdown(coupled_ssr_data_priv->ssr_rproc);
+			rproc_boot(coupled_ssr_data_priv->ssr_rproc);
+		}
+        }
+	atomic_set(&g_ctx.work_pending, 0);
+	mutex_unlock(&g_ctx.lock);
+}
 
 /* main entry for all subsystem ssr events */
 static int ssr_notifier_general(struct notifier_block *nb,
 					 unsigned long opcode, void *ptr)
 {
-	struct coupled_ssr_private *coupled_ssr_data_priv = NULL;
 	struct qcom_ssr_notify_data *data = ptr;
-	size_t ssr_name_len = 0;
 
 	pr_debug("%s: ssr name %s opcode 0x%lx \n", __func__, data->name, opcode);
         /*
@@ -65,17 +90,12 @@ static int ssr_notifier_general(struct notifier_block *nb,
          */
 	if (data->crashed && opcode == QCOM_SSR_BEFORE_SHUTDOWN) {
 		pr_debug("%s: coupled ssr start from %s\n", __func__, data->name);
-		list_for_each_entry(coupled_ssr_data_priv,
-				&coupled_ssr_list.priv_list, list) {
-			ssr_name_len = strlen(coupled_ssr_data_priv->ssr_name);
-			if (strlcmp(data->name, coupled_ssr_data_priv->ssr_name, ssr_name_len) &&
-				coupled_ssr_data_priv->ssr_rproc) {
-                                rproc_shutdown(coupled_ssr_data_priv->ssr_rproc);
-				rproc_boot(coupled_ssr_data_priv->ssr_rproc);
-			}
+		if (atomic_cmpxchg(&g_ctx.work_pending, 0, 1) == 0) {
+			pr_debug("%s: %s schedule work calling\n", __func__, data->name);
+			g_ctx.reboot_ssr_name = data->name;
+			schedule_work(&g_ctx.ssr_work);
 		}
 	}
-
 	return NOTIFY_OK;
 }
 
@@ -179,7 +199,7 @@ static int coupled_ssr_probe(struct platform_device *pdev)
 		coupled_ssr_data->ssr_notify_handler = ssr_notify_handler;
 		coupled_ssr_list_update(coupled_ssr_data);
 	}
-
+	INIT_WORK(&g_ctx.ssr_work, coupled_ssr_work_func);
 	return 0;
 }
 
