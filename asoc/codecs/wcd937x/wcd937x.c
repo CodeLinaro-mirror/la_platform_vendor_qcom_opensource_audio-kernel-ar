@@ -64,6 +64,8 @@ enum {
 	HPH_COMP_DELAY,
 	HPH_PA_DELAY,
 	AMIC2_BCS_ENABLE,
+	WCD_HPHL_EN,
+	WCD_EAR_EN,
 };
 
 static const DECLARE_TLV_DB_SCALE(line_gain, 0, 7, 1);
@@ -108,6 +110,10 @@ static struct regmap_irq_chip wcd937x_regmap_irq_chip = {
 //#if IS_ENABLED(CONFIG_AUDIO_QGKI)
 	.clear_ack = 1,
 //#endif
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+	.mask_writeonly = 1,
+	.type_base = WCD937X_DIGITAL_INTR_LEVEL_0,
+#endif
 	.runtime_pm = false,
 	.handle_post_irq = wcd937x_handle_post_irq,
 	.irq_drv_data = NULL,

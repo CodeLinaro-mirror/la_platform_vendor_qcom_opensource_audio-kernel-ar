@@ -39,7 +39,7 @@ def define_bengal():
             "CONFIG_SND_SOC_WCD_IRQ",
             "CONFIG_MSM_QDSP6_SSR",
             "CONFIG_MSM_CDC_PINCTRL",
-            "CONFIG_SWRM_VER_1P7",	
+            "CONFIG_SWRM_VER_1P7",
             "CONFIG_SOUNDWIRE_MSTR_CTRL",
             "CONFIG_WCD9XXX_CODEC_CORE_V2",
             "CONFIG_SND_SOC_WCD9XXX_V2",

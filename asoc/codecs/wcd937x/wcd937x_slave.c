@@ -331,8 +331,8 @@ static int wcd937x_slave_bind(struct device *dev,
 	ret = swr_get_logical_dev_num(pdev, pdev->addr, &devnum);
 	} while (ret && --retry);
 	if (ret) {
-		dev_err(&pdev->dev,
-				"%s get devnum %d for dev addr %llx failed\n",//TODO: to resolve compilation issue
+		dev_dbg(&pdev->dev,
+				"%s get devnum %d for dev addr %llx failed\n",
 				__func__, devnum, pdev->addr);
 		swr_remove_device(pdev);
 		return ret;

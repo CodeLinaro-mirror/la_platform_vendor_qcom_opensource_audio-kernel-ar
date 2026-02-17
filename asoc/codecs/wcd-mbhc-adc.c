@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -763,7 +763,7 @@ correct_plug_type:
 			spl_hs = wcd_mbhc_adc_check_for_spl_headset(mbhc,
 								&spl_hs_count);
 			if (spl_hs)
-				pr_err("%s: Detected special HS (%d)\n",
+				pr_debug("%s: Detected special HS (%d)\n",
 							__func__, spl_hs);
 			output_mv = wcd_measure_adc_once(mbhc, MUX_CTL_IN2P);
 
@@ -1044,6 +1044,11 @@ static irqreturn_t wcd_mbhc_adc_hs_rem_irq(int irq, void *data)
 
 	if (!(test_bit(WCD_MBHC_ELEC_HS_REM, &mbhc->intr_status))) {
 		pr_err("%s: plug removal already reported.\n", __func__);
+		goto exit;
+	}
+
+	if (!(test_bit(WCD_MBHC_ELEC_HS_REM, &mbhc->intr_status))) {
+		pr_debug("%s: plug removal already reported.\n", __func__);
 		goto exit;
 	}
 

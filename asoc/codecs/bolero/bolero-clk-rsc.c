@@ -138,6 +138,8 @@ int bolero_rsc_clk_reset(struct device *dev, int clk_id)
 	dev_dbg(priv->dev,
 		"%s: clock reset after ssr, count %d\n", __func__, count);
 
+	trace_printk("%s: clock reset after ssr, count %d\n", __func__, count);
+
 	while (count--) {
 		clk_prepare_enable(priv->clk[clk_id]);
 		clk_prepare_enable(priv->clk[clk_id + NPL_CLK_OFFSET]);

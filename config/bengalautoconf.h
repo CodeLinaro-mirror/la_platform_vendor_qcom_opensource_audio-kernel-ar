@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2019-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #define CONFIG_PINCTRL_LPI 1
@@ -33,7 +33,6 @@
 #define CONFIG_QTI_PP 1
 #define CONFIG_SND_HWDEP_ROUTING 1
 #define CONFIG_SND_SOC_MSM_STUB 1
-//#define CONFIG_MSM_AVTIMER 1
 #define CONFIG_SND_SOC_BOLERO 1
 #define CONFIG_VA_MACRO 1
 #define CONFIG_RX_MACRO 1
@@ -41,8 +40,6 @@
 #define CONFIG_SND_SOC_WCD_IRQ 1
 #define CONFIG_SND_SOC_WCD937X 1
 #define CONFIG_SND_SOC_WCD937X_SLAVE 1
-// #define CONFIG_SND_SOC_ROULEUR 1
-// #define CONFIG_SND_SOC_ROULEUR_SLAVE 1
 #define CONFIG_PM2250_SPMI 1
 #define CONFIG_SND_SOC_BENGAL 1
 #define CONFIG_SND_EVENT 1

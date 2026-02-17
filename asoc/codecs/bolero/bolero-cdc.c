@@ -11,6 +11,7 @@
 #include <linux/printk.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
+#include <linux/version.h>
 #include <linux/clk.h>
 #include <soc/snd_event.h>
 #include <linux/pm_runtime.h>

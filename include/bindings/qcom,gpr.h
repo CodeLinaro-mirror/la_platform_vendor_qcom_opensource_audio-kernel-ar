@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2020-2021, The Linux Foundation. All rights reserved. */
-/* Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.*/
+/* ​​​​Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.*/
 #ifndef __DT_BINDINGS_QCOM_GPR_H
 #define __DT_BINDINGS_QCOM_GPR_H
 

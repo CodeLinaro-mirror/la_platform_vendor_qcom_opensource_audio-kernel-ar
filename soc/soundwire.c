@@ -165,7 +165,7 @@ struct swr_device *swr_new_device(struct swr_master *master,
 	return swr;
 
 err_out:
-	dev_err(&master->dev, "Failed to register swr device %s at 0x%llx %d\n",
+	dev_dbg(&master->dev, "Failed to register swr device %s at 0x%llx %d\n",
 		swr->name, swr->addr, result);
 	swr_master_put(master);
 	list_del_init(&swr->dev_list);

@@ -295,6 +295,7 @@ static int wsa881x_i2c_read_device(struct wsa881x_pdata *wsa881x,
 			ret = i2c_transfer(
 				wsa881x->client[wsa881x_index]->adapter,
 						wsa881x->xfer_msg, 2);
+		/* Try again if read fails first time */
 			if (ret != 2) {
 				pr_err_ratelimited("failed to read wsa register:%d\n",
 								reg);
