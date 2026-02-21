@@ -579,6 +579,20 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
+		if (pdata->mi2s_gpio_p[index]) {
+			atomic_dec(&pdata->mi2s_gpio_ref_cnt[index]);
+			if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) == 0)  {
+				ret = msm_cdc_pinctrl_select_sleep_state(
+					pdata->mi2s_gpio_p[index]);
+				if (ret)
+					dev_err(card->dev,
+					"%s: pinctrl set actv fail %d\n",
+					__func__, ret);
+			} else if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) < 0) {
+				atomic_set(&pdata->mi2s_gpio_ref_cnt[index], 0);
+			}
+		}
+
 		atomic_dec(&pdata->lpass_intf_clk_ref_cnt[index]);
 		if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) == 0) {
 			if ((strnstr(stream_name, "TDM", strlen(stream_name)))) {
@@ -611,20 +625,6 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 			}
 		} else if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) < 0) {
 			atomic_set(&pdata->lpass_intf_clk_ref_cnt[index], 0);
-		}
-
-		if (pdata->mi2s_gpio_p[index]) {
-			atomic_dec(&pdata->mi2s_gpio_ref_cnt[index]);
-			if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) == 0)  {
-				ret = msm_cdc_pinctrl_select_sleep_state(
-					pdata->mi2s_gpio_p[index]);
-				if (ret)
-					dev_err(card->dev,
-					"%s: pinctrl set actv fail %d\n",
-					__func__, ret);
-			} else if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) < 0) {
-				atomic_set(&pdata->mi2s_gpio_ref_cnt[index], 0);
-			}
 		}
 		mutex_unlock(&pdata->lock[index]);
 	}
