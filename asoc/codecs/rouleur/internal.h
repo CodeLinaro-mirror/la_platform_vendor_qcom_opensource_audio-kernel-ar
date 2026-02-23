@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _ROULEUR_INTERNAL_H
@@ -8,7 +9,9 @@
 #include <asoc/wcd-clsh.h>
 #include <asoc/wcd-mbhc-v2.h>
 #include <asoc/wcd-irq.h>
+#include <soc/soundwire.h>
 #include "rouleur-mbhc.h"
+#include "rouleur.h"
 
 #define ROULEUR_MAX_MICBIAS 3
 
@@ -17,6 +20,7 @@
 #define MAX_PORT 8
 #define MAX_CH_PER_PORT 8
 
+#define SWR_NUM_PORTS  4
 extern struct regmap_config rouleur_regmap_config;
 
 struct codec_port_info {
@@ -51,6 +55,7 @@ struct rouleur_priv {
 	bool comp1_enable;
 	bool comp2_enable;
 	bool dapm_bias_off;
+	bool bcs_dis;
 
 	struct irq_domain *virq;
 	struct wcd_irq_info irq_info;
@@ -65,6 +70,8 @@ struct rouleur_priv {
 			tx_port_mapping[MAX_PORT][MAX_CH_PER_PORT];
 	struct codec_port_info
 			rx_port_mapping[MAX_PORT][MAX_CH_PER_PORT];
+	struct swr_port_params tx_port_params[SWR_UC_MAX][SWR_NUM_PORTS];
+	struct swr_dev_frame_config swr_tx_port_params[SWR_UC_MAX];
 	struct regulator_bulk_data *supplies;
 	struct notifier_block nblock;
 	/* wcd callback to bolero */
@@ -90,6 +97,7 @@ struct rouleur_priv {
 	bool low_soc;
 	int foundry_id_reg;
 	int foundry_id;
+	u8 tx_master_ch_map[ROULEUR_MAX_SLAVE_CH_TYPES];
 };
 
 struct rouleur_micbias_setting {
@@ -143,6 +151,7 @@ enum {
 	ROULEUR_IRQ_LO_OCP_INT,
 	ROULEUR_IRQ_HPHL_PDM_WD_INT,
 	ROULEUR_IRQ_HPHR_PDM_WD_INT,
+	ROULEUR_IRQ_AUX_PDM_WD_INT,
 	ROULEUR_IRQ_RESERVED_0,
 
 	/* INTR_CTRL_INT_MASK_2 */
