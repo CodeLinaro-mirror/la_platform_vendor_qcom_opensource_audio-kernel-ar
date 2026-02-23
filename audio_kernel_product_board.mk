@@ -37,7 +37,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/swr_dmic_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list,canoe alor whale art hamoa shikra), true)
+ifeq ($(call is-board-platform-in-list,canoe alor whale art hamoa shikra hamoa_la), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wsa885x_i2c_dlkm.ko
 endif
 
@@ -46,7 +46,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/pm2250_spmi_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/rouleur_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/rouleur_slave_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list,sun canoe alor whale art hamoa shikra), true)
+ifeq ($(call is-board-platform-in-list,sun canoe alor whale art hamoa shikra hamoa_la), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd9378_slave_dlkm.ko \
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd9378_dlkm.ko \
@@ -64,7 +64,7 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wsa881x_analog_dlkm.ko \
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
 endif
-ifeq ($(call is-board-platform-in-list, holi blair hamoa), true)
+ifeq ($(call is-board-platform-in-list, holi blair hamoa hamoa_la), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif
