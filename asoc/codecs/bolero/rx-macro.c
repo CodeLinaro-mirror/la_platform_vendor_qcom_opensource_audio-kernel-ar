@@ -1378,6 +1378,8 @@ static int rx_macro_mclk_enable(struct rx_macro_priv *rx_priv,
 		}
 	}
 exit:
+	trace_printk("%s: mclk_enable = %u, dapm = %d clk_users= %d\n",
+		__func__, mclk_enable, dapm, rx_priv->rx_mclk_users);
 	mutex_unlock(&rx_priv->mclk_lock);
 	return ret;
 }
@@ -1463,6 +1465,7 @@ static int rx_macro_event_handler(struct snd_soc_component *component,
 		rx_macro_wcd_clsh_imped_config(component, data, false);
 		break;
 	case BOLERO_MACRO_EVT_SSR_DOWN:
+		trace_printk("%s, enter SSR down\n", __func__);
 		rx_priv->dev_up = false;
 		if (rx_priv->swr_ctrl_data) {
 			swrm_wcd_notify(
@@ -1497,6 +1500,7 @@ static int rx_macro_event_handler(struct snd_soc_component *component,
 		rx_macro_core_vote(rx_priv, false);
 		break;
 	case BOLERO_MACRO_EVT_SSR_UP:
+		trace_printk("%s, enter SSR up\n", __func__);
 		rx_priv->dev_up = true;
 		/* reset swr after ssr/pdr */
 		rx_priv->reset_swr = true;
@@ -2663,7 +2667,8 @@ static void rx_macro_hphdelay_lutbypass(struct snd_soc_component *component,
 	}
 
 	if (hph_lut_bypass_reg && SND_SOC_DAPM_EVENT_OFF(event)) {
-		snd_soc_component_update_bits(component,
+		if (!rx_priv->is_ear_mode_on)
+			snd_soc_component_update_bits(component,
 					BOLERO_CDC_RX_RX0_RX_PATH_CFG1,
 					0x02, 0x00);
 		snd_soc_component_update_bits(component, hph_lut_bypass_reg,
@@ -3792,7 +3797,9 @@ static int rx_swrm_clock(void *handle, bool enable)
 
 	mutex_lock(&rx_priv->swr_clk_lock);
 
-	dev_err(rx_priv->dev, "%s: swrm clock %s\n",
+	trace_printk("%s: swrm clock %s\n",
+			__func__, (enable ? "enable" : "disable"));
+	dev_dbg(rx_priv->dev, "%s: swrm clock %s\n",
 		__func__, (enable ? "enable" : "disable"));
 	if (enable) {
 		pm_runtime_get_sync(rx_priv->dev);
@@ -3858,7 +3865,9 @@ static int rx_swrm_clock(void *handle, bool enable)
 			}
 		}
 	}
-	dev_err(rx_priv->dev, "%s: swrm clock users %d\n",
+	trace_printk("%s: swrm clock users %d\n",
+		__func__, rx_priv->swr_clk_users);
+	dev_dbg(rx_priv->dev, "%s: swrm clock users %d\n",
 		__func__, rx_priv->swr_clk_users);
 exit:
 	mutex_unlock(&rx_priv->swr_clk_lock);

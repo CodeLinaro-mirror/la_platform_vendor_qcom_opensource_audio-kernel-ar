@@ -1332,8 +1332,7 @@ static int check_wsa881x_presence(struct i2c_client *client)
 	if (ret < 0) {
 		dev_err(&client->dev, "failed to read wsa881x with addr %x\n",
 				client->addr);
-		pr_err("%s Ignore read error ret =  %d ",__func__, ret);
-		//return ret;
+		return ret;
 	}
 	ret = wsa881x_i2c_write_device(&wsa_pdata[wsa881x_index],
 					WSA881X_CDC_RST_CTL, 0x01);
@@ -1488,7 +1487,7 @@ static int wsa881x_i2c_probe(struct i2c_client *client)
 				"failed to ping wsa with addr:%x, ret = %d\n",
 						client->addr, ret);
 			wsa881x_probing_count++;
-			//goto err1;
+			goto err1;
 		}
 		pdata->version = wsa881x_i2c_read_device(pdata,
 					WSA881X_CHIP_ID1);

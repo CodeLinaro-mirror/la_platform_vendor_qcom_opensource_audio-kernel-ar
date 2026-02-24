@@ -661,7 +661,6 @@ static int swrm_ahb_read(struct swr_mstr_ctrl *swrm,
 		goto err;
 
 	if (is_swr_clk_needed(swrm)) {
-		pr_err("%s is_swr_clk_needed is true, sendin clk_request ",__func__);
 		ret = swrm_clk_request(swrm, TRUE);
 		if (ret) {
 			dev_err_ratelimited(swrm->dev, "%s: clock request failed\n",
@@ -669,7 +668,6 @@ static int swrm_ahb_read(struct swr_mstr_ctrl *swrm,
 			goto err;
 		}
 	} else {
-		pr_err("%s is_swr_clk_needed is false, send swrm_core_vote_request ",__func__);
 		vote_ret = swrm_core_vote_request(swrm, true);
 		if (vote_ret == -ENOTSYNC)
 			goto err_vote;
@@ -3312,7 +3310,6 @@ static int swrm_probe(struct platform_device *pdev)
 			 __func__);
 		swrm->version = SWRM_VERSION_2_0;
 	}
-	pr_err("%s swrm->version  set to : 0x%x ", __func__, swrm->version);
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,swr_master_id",
 				&swrm->master_id);
 	if (ret) {
@@ -3323,7 +3320,7 @@ static int swrm_probe(struct platform_device *pdev)
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,dynamic-port-map-supported",
 				&swrm->dynamic_port_map_supported);
 	if (ret) {
-		dev_err(&pdev->dev,
+		dev_dbg(&pdev->dev,
 			"%s: failed to get dynamic port map support, use default\n",
 			__func__);
 		swrm->dynamic_port_map_supported = 1;
@@ -3611,12 +3608,10 @@ static int swrm_probe(struct platform_device *pdev)
 				& SWRM_COMP_PARAMS_WR_FIFO_DEPTH) >> 10);
 
 	swrm_hw_ver = swr_master_read(swrm, SWRM_COMP_HW_VERSION);
-	if (swrm->version != swrm_hw_ver) {
+	if (swrm->version != swrm_hw_ver)
 		dev_info(&pdev->dev,
 			 "%s: version specified in dtsi: 0x%x not match with HW read version 0x%x\n",
 			 __func__, swrm->version, swrm_hw_ver);
-		//swrm->version = swrm_hw_ver;
-	}
 
 	swrm->num_auto_enum = ((swr_master_read(swrm, SWRM_COMP_PARAMS)
                                 & SWRM_COMP_PARAMS_AUTO_ENUM_SLAVES) >> 20);

@@ -1038,12 +1038,7 @@ static irqreturn_t wcd_mbhc_adc_hs_rem_irq(int irq, void *data)
 				MICB_DISABLE);
 
 	if (wcd_swch_level_remove(mbhc)) {
-		pr_err("%s: Switch level is low ", __func__);
-		goto exit;
-	}
-
-	if (!(test_bit(WCD_MBHC_ELEC_HS_REM, &mbhc->intr_status))) {
-		pr_err("%s: plug removal already reported.\n", __func__);
+		pr_debug("%s: Switch level is low ", __func__);
 		goto exit;
 	}
 

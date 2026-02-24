@@ -23,7 +23,6 @@
 #include "bolero-clk-rsc.h"
 #include "asoc/bolero-slave-internal.h"
 #include <linux/qti-regmap-debugfs.h>
-#include <linux/version.h>
 
 #define DRV_NAME "bolero_codec"
 
