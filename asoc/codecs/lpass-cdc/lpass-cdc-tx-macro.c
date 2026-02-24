@@ -167,6 +167,7 @@ struct lpass_cdc_tx_macro_priv {
 	bool swr_dmic_enable;
 	bool swr_dmic_gain_disable;
 	int wlock_holders;
+	bool hpf_adapt_bypass_en;
 	int adapt_tuning_registers;
 	u32 tuning_reg_values[MAX_TUNING_REG_VALUE_PAIRS];
 };
@@ -920,6 +921,39 @@ static int lpass_cdc_tx_macro_set_bcs(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int lpass_cdc_tx_macro_get_hpf_adapt_bypass(struct snd_kcontrol *kcontrol,
+                            struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+			snd_soc_kcontrol_component(kcontrol);
+	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+	struct device *tx_dev = NULL;
+
+	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
+	return -EINVAL;
+
+	ucontrol->value.integer.value[0] = tx_priv->hpf_adapt_bypass_en;
+
+	return 0;
+}
+
+static int lpass_cdc_tx_macro_set_hpf_adapt_bypass(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+			snd_soc_kcontrol_component(kcontrol);
+	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+	struct device *tx_dev = NULL;
+	int value = ucontrol->value.integer.value[0];
+
+	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
+		return -EINVAL;
+
+	tx_priv->hpf_adapt_bypass_en = value;
+
+	return 0;
+}
+
 static const char * const bcs_ch_sel_mux_text[] = {
 	"SWR_MIC0", "SWR_MIC1", "SWR_MIC2", "SWR_MIC3",
 	"SWR_MIC4", "SWR_MIC5", "SWR_MIC6", "SWR_MIC7",
@@ -1095,7 +1129,7 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		}
 		usleep_range(5000, 5050);
 #ifdef CONFIG_BOLERO_VER_2P85
-		if (tx_priv->adapt_tuning_registers > 0) {
+		if (tx_priv->adapt_tuning_registers > 0 && !tx_priv->hpf_adapt_bypass_en) {
 			snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
 			snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
 			snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
@@ -1154,6 +1188,10 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 			else
 				unmute_delay = LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS;
 		}
+
+		if (tx_priv->hpf_adapt_bypass_en)
+			snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+
 		if (tx_priv->tx_hpf_work[decimator].hpf_cut_off_freq !=
 							CF_MIN_3DB_150HZ) {
 			lpass_cdc_tx_macro_wake_enable(tx_priv, 1);
@@ -2510,6 +2548,10 @@ static const struct snd_kcontrol_new lpass_cdc_tx_macro_snd_controls[] = {
 
 	SOC_SINGLE_EXT("DEC0_BCS Switch", SND_SOC_NOPM, 0, 1, 0,
 		       lpass_cdc_tx_macro_get_bcs, lpass_cdc_tx_macro_set_bcs),
+
+	SOC_SINGLE_EXT("DEC_HPF_ADAPT_BYPASS Enable", SND_SOC_NOPM, 0, 1, 0,
+		       lpass_cdc_tx_macro_get_hpf_adapt_bypass,
+		       lpass_cdc_tx_macro_set_hpf_adapt_bypass),
 
 	SOC_SINGLE_EXT("TX_SWR_DMIC Enable", SND_SOC_NOPM, 0, 1, 0,
 			lpass_cdc_tx_macro_swr_dmic_get, lpass_cdc_tx_macro_swr_dmic_put),
