@@ -543,6 +543,9 @@ struct lpass_cdc_rx_macro_priv {
 	int8_t rx0_gain_val;
 	int8_t rx1_gain_val;
 	int pcm_select_users;
+#ifdef CONFIG_BOLERO_VER_4P0
+	char __iomem *rx0_datahub_ch0;
+#endif
 };
 
 static struct snd_soc_dai_driver lpass_cdc_rx_macro_dai[];
@@ -4866,6 +4869,45 @@ static int lpass_cdc_rx_macro_probe(struct platform_device *pdev)
 	rx_priv->hifi_fir_clk = hifi_fir_clk;
 
 	rx_priv->is_aux_hpf_on = 1;
+
+#ifdef CONFIG_BOLERO_VER_4P0
+	/* Check if DT property for RX0 DATA HUB CH0 physical address exists */
+	if (of_find_property(pdev->dev.of_node, "qcom,rx0-datahub-ch0-addr", NULL)) {
+		u32 rx0_datahub_addr = 0;
+		u32 reg_val = 0x82;
+
+		ret = of_property_read_u32(pdev->dev.of_node, "qcom,rx0-datahub-ch0-addr",
+					   &rx0_datahub_addr);
+		if (ret) {
+			dev_err(&pdev->dev, "%s: could not find %s entry in dt\n",
+				__func__, "qcom,rx0-datahub-ch0-addr");
+			return ret;
+		}
+
+		/* ioremap for RX0 DATA HUB CH0 physical address from DT */
+		rx_priv->rx0_datahub_ch0 = devm_ioremap(&pdev->dev, rx0_datahub_addr, 0x4);
+		if (!rx_priv->rx0_datahub_ch0) {
+			dev_err(&pdev->dev, "%s: ioremap failed for rx0_datahub_ch0 at 0x%x\n",
+				__func__, rx0_datahub_addr);
+			return -ENOMEM;
+		}
+
+		/* Resume runtime before accessing register */
+		ret = lpass_cdc_runtime_resume(&pdev->dev);
+		if (ret) {
+			dev_err(&pdev->dev, "%s: runtime resume failed: %d\n", __func__, ret);
+			return ret;
+		}
+
+		/* Write 0x82 to the register */
+		iowrite32(reg_val, rx_priv->rx0_datahub_ch0);
+
+		/* Suspend runtime after accessing register */
+		lpass_cdc_runtime_suspend(&pdev->dev);
+			dev_dbg(&pdev->dev, "%s: rx0_datahub_ch0 mapped at physical addr 0x%x\n",
+				__func__, rx0_datahub_addr);
+		}
+#endif
 
 	dev_set_drvdata(&pdev->dev, rx_priv);
 	mutex_init(&rx_priv->mclk_lock);
