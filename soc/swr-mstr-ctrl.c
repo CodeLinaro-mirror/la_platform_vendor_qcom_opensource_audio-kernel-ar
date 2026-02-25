@@ -3322,7 +3322,8 @@ static ssize_t swr_mstr_ctrl_proc_read(struct file *filep, char __user *buf,
 
 	i = ((int) *ppos + SWRM_BASE);
 
-	for (; i <= SWRM_MAX_REGISTER; i += 4) {
+	for (; i <= REGISTER_ADDRESS(swrm->version_index, SWRM_REGISTER_MAX);
+		i += 4) {
 
 		/* No registers between SWRM_REG_GAP_START to SWRM_REG_GAP_END */
 		if (i > SWRM_REG_GAP_START && i < SWRM_REG_GAP_END)
@@ -3330,7 +3331,7 @@ static ssize_t swr_mstr_ctrl_proc_read(struct file *filep, char __user *buf,
 
 		usleep_range(100, 150);
 		reg_val = swr_master_read(swrm, i);
-		len = scnprintf(tmp_buf, 25, "0x%.3x: 0x%.2x\n", i, reg_val);
+		len = scnprintf(tmp_buf, 15, "0x%.3x: 0x%.2x\n", i, reg_val);
 		if (len < 0) {
 			ret = -EFAULT;
 			goto copy_err;
