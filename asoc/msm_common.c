@@ -1168,14 +1168,17 @@ static const char *const qos_text[] = {"Disable", "Enable"};
 static const char *const against_sleep_text[] = {"Disable", "Enable"};
 
 static SOC_ENUM_SINGLE_EXT_DECL(qos_vote, qos_text);
-static SOC_ENUM_SINGLE_EXT_DECL(sleep_against, against_sleep_text);
+
+static const struct soc_enum vote_enum =
+	SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(against_sleep_text),
+			    against_sleep_text);
 
 static const struct snd_kcontrol_new card_mixer_controls[] = {
 	SOC_ENUM_EXT("PM_QOS Vote", qos_vote,
 			msm_qos_ctl_get, msm_qos_ctl_put),
 	SOC_SINGLE_EXT("LPI PCM Logging Enable", 0, 0, 1, 0,
 			msm_lpi_logging_enable_get, msm_lpi_logging_enable_put),
-	SOC_ENUM_EXT("VOTE Against Sleep", sleep_against,
+	SOC_ENUM_EXT("VOTE Against Sleep", vote_enum,
 			msm_vote_against_sleep_ctl_get, msm_vote_against_sleep_ctl_put),
 };
 
