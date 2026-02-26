@@ -7,6 +7,7 @@
 #include <linux/slab.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
+#include <linux/version.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/soc.h>
@@ -55,9 +56,16 @@ static int msm_stub_dev_probe(struct platform_device *pdev)
 	&soc_msm_stub, msm_stub_dais, ARRAY_SIZE(msm_stub_dais));
 }
 
+#if (KERNEL_VERSION(6, 12, 0) <= LINUX_VERSION_CODE)
+#define MSM_STUB_DEV_REMOVE_RETURN_VAL
 static void msm_stub_dev_remove(struct platform_device *pdev)
+#else
+#define MSM_STUB_DEV_REMOVE_RETURN_VAL 0
+static int msm_stub_dev_remove(struct platform_device *pdev)
+#endif
 {
 	snd_soc_unregister_component(&pdev->dev);
+	return MSM_STUB_DEV_REMOVE_RETURN_VAL;
 }
 static const struct of_device_id msm_stub_codec_dt_match[] = {
 	{ .compatible = "qcom,msm-stub-codec", },

@@ -3,15 +3,18 @@ targets = [
     "canoe",
     #"gen3auto",
     "autogvm",
+    "pineapple",
     "lahaina",
     "sun",
     "vienna",
+    "volcano",
     "x1p42100",
 ]
 
 la_variants = [
     # keep sorted
     "consolidate",
+    "gki",
     "perf",
 ]
 
@@ -48,7 +51,7 @@ vm_variants = [
 
 lunch_target_bases = {
     # keep sorted
-    "volcano": "pineapple",
+    #"volcano": "pineapple",
 }
 
 def get_all_la_variants():
