@@ -1,7 +1,7 @@
 load(":audio_modules.bzl", "audio_modules")
 load(":module_mgr.bzl", "define_target_modules")
-load("//msm-kernel:target_variants.bzl", "get_all_lunch_target_base_target_variants")
-load("//msm-kernel:target_variants.bzl", "get_all_la_variants", "get_all_le_variants", "get_all_lxc_variants")
+load(":target_variants.bzl", "get_all_lunch_target_base_target_variants")
+load(":target_variants.bzl", "get_all_la_variants", "get_all_le_variants")
 
 def define_blair(t, v, lt=None):
     print(t)
