@@ -1529,7 +1529,7 @@ static int lpass_cdc_wsa_macro_config_compander(struct snd_soc_component *compon
 		case CONFIG_3S:
 		case EXT_3S:
 			upper_gain = sys_gain_int;
-			lower_gain = 75;
+			lower_gain = 0;
 			break;
 		case EXT_ABOVE_3S:
 			upper_gain = sys_gain_int;
