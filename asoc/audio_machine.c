@@ -2641,6 +2641,29 @@ void msm_common_set_pdata(struct snd_soc_card *card,
 	pdata->common_pdata = common_pdata;
 }
 
+static int msm_asoc_parse_soundcard_name(struct platform_device *pdev,
+				struct snd_soc_card *card)
+{
+	int ret = 0;
+	u32 part_info = 0;
+
+	ret = socinfo_get_subpart_info(PART_SLC, &part_info, 1);
+	if (ret < 0)
+		dev_dbg(&pdev->dev, "%s: socinfo_get_subpart_info failed, err:%d\n",
+			__func__, ret);
+
+	if (!part_info)
+		ret = snd_soc_of_parse_card_name(card, "qcom,model");
+	else
+		ret = snd_soc_of_parse_card_name(card, "qcom,slc-model");
+
+	if (ret)
+		dev_err(&pdev->dev, "%s: parse card name failed, err:%d\n",
+			__func__, ret);
+
+	return ret;
+}
+
 static int msm_asoc_machine_probe(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = NULL;
@@ -2695,10 +2718,10 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	platform_set_drvdata(pdev, card);
 	snd_soc_card_set_drvdata(card, pdata);
 
-	ret = snd_soc_of_parse_card_name(card, "qcom,model");
+	ret = msm_asoc_parse_soundcard_name(pdev, card);
 	if (ret) {
-		dev_err(&pdev->dev, "%s: parse card name failed, err:%d\n",
-			__func__, ret);
+		dev_err(&pdev->dev, "%s: parse soundcard name failed, err:%d\n",
+				__func__, ret);
 		goto err;
 	}
 
