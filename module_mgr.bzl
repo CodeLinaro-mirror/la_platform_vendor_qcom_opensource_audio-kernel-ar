@@ -110,7 +110,7 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
     )
 
     pkg_install(
-        name = "{}_modules_dist".format(rule_prefix),
+        name = "{}_audio_modules_dist".format(rule_prefix),
         srcs = [":{}_dist_files".format(rule_prefix)],
         destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
     )
