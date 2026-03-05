@@ -742,12 +742,20 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	size_t pa_len = 0;
 	struct iosys_map *iosys_vmap = NULL;
 	int ret = 0;
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS);
 	struct qcom_scm_vmperm dst_vmids_map[] = {{VMID_LPASS, PERM_READ | PERM_WRITE},
 		{VMID_ADSP_HEAP, PERM_READ | PERM_WRITE}};
 	u64 src_vmid_unmap_list = BIT(VMID_LPASS) | BIT(VMID_ADSP_HEAP);
 	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
 		PERM_READ | PERM_WRITE | PERM_EXEC}};
+#else
+	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS);
+	struct qcom_scm_vmperm dst_vmids_map[] = {{VMID_MSS_MSA, PERM_READ | PERM_WRITE}};
+	u64 src_vmid_unmap_list = BIT(VMID_MSS_MSA);
+	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
+			PERM_READ | PERM_WRITE | PERM_EXEC}};
+#endif
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	struct msm_audio_ion_private *ion_data =
 			container_of(file->f_inode->i_cdev, struct msm_audio_ion_private, cdev);
