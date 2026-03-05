@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifdef CONFIG_DEBUG_FS
@@ -18,6 +18,8 @@
 #define SWR_SLV_WR_BUF_LEN      32
 #define SWR_SLV_MAX_DEVICES     2
 
+void simple_amp_regdump_register(struct simple_amp_priv *simple_amp,
+                struct swr_device *pdev);
 
 static int codec_debug_open(struct inode *inode, struct file *file)
 {

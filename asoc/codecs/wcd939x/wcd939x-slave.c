@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2019, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -39,6 +39,8 @@ struct wcd939x_slave_priv {
 	int (*rst_notify)(void *);
 	void *slv_handle;
 };
+
+int wcd939x_slave_register_notify(struct swr_device *pdev, int (*rst_notify)(void *), void *handle);
 
 int wcd939x_slave_register_notify(struct swr_device *pdev, int (*rst_notify)(void *), void *handle)
 {
