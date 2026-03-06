@@ -112,6 +112,7 @@ audio_modules.register(
     deps = [":%b_spf_core_dlkm",
             ":%b_q6_notifier_dlkm",
             ":%b_snd_event_dlkm",
+            ":%b_machine_dlkm",
 	   ],
 )
 audio_modules.register(

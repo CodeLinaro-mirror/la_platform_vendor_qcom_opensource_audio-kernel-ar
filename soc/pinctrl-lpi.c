@@ -27,6 +27,7 @@
 
 #include "core.h"
 #include "pinctrl-utils.h"
+#include "../asoc/msm_common.h"
 
 #define LPI_AUTO_SUSPEND_DELAY           100 /* delay in msec */
 #define LPI_AUTO_SUSPEND_DELAY_ERROR     1   /* delay in msec */
@@ -180,6 +181,7 @@ static int lpi_gpio_read(struct lpi_gpio_pad *pad, unsigned int addr)
 		return 0;
 	}
 	pm_runtime_get_sync(lpi_dev);
+	pr_err("%s(): Vishnu state->core_hw_vote_status:%d\n",__func__,state->core_hw_vote_status);
 	mutex_lock(&state->core_hw_vote_lock);
 	if (!state->core_hw_vote_status) {
 		if (__ratelimit(&rtl))
@@ -372,7 +374,7 @@ static int lpi_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		param = pinconf_to_config_param(configs[i]);
 		arg = pinconf_to_config_argument(configs[i]);
 
-		dev_dbg(pctldev->dev, "%s: param: %d arg: %d pin: %d\n",
+		dev_err(pctldev->dev, "%s: param: %d arg: %d pin: %d\n",
 			__func__, param, arg, pin);
 
 		switch (param) {
@@ -401,7 +403,7 @@ static int lpi_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 		case PIN_CONFIG_SLEW_RATE:
 			if (pad->slew_base == NULL ||
 				pad->slew_offset == LPI_SLEW_OFFSET_INVALID) {
-				dev_dbg(pctldev->dev, "%s: invalid slew settings for pin: %d\n",
+				dev_err(pctldev->dev, "%s: invalid slew settings for pin: %d\n",
 					__func__, pin);
 				goto set_gpio;
 			}
@@ -553,7 +555,7 @@ int lpi_pinctrl_suspend(struct device *dev)
 {
 	int ret = 0;
 
-	dev_dbg(dev, "%s: system suspend\n", __func__);
+	dev_err(dev, "%s: system suspend\n", __func__);
 
 	if ((!pm_runtime_enabled(dev) || !pm_runtime_suspended(dev))) {
 		ret = lpi_pinctrl_runtime_suspend(dev);
@@ -978,7 +980,9 @@ int lpi_pinctrl_runtime_resume(struct device *dev)
 	} else {
 		state->core_hw_vote_status = true;
 	}
-
+	dev_err(dev, "%s():: state->core_hw_vote_status: %d\n",__func__,state->core_hw_vote_status);
+	if (state->core_hw_vote_status)
+		msm_common_vote_against_sleep(true);
 	pm_runtime_set_autosuspend_delay(dev, LPI_AUTO_SUSPEND_DELAY);
 
 exit:
@@ -1000,8 +1004,10 @@ int lpi_pinctrl_runtime_suspend(struct device *dev)
 		hw_vote = state->lpass_audio_hw_vote;
 	}
 
+	dev_err(dev, "%s():: state->core_hw_vote_status: %d\n",__func__,state->core_hw_vote_status);
 	mutex_lock(&state->core_hw_vote_lock);
 	if (state->core_hw_vote_status) {
+		msm_common_vote_against_sleep(false);
 		digital_cdc_rsc_mgr_hw_vote_disable(hw_vote, dev);
 		state->core_hw_vote_status = false;
 	}

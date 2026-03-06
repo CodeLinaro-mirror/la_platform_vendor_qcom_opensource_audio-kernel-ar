@@ -205,6 +205,7 @@ static int _audio_prm_set_lpass_cpu_lpr_req(uint8_t enable)
 
 	prm_lpr_request.lpr_state = LPR_CPU_SS_SLEEP_DISABLED;
 
+	pr_err("%s(): vote : %d\n", __func__,enable);
 	memcpy(&pkt->payload, &prm_lpr_request, sizeof(struct prm_cpu_lpr_request_t));
 
 	ret = prm_gpr_send_pkt(pkt, &g_prm.wait);
