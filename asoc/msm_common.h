@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef _MSM_COMMON_H_
 #define _MSM_COMMON_H_
@@ -71,4 +71,5 @@ int msm_common_snd_init(struct platform_device *pdev,
 void msm_common_snd_deinit(struct msm_common_pdata *pdata);
 
 int msm_common_dai_link_init(struct snd_soc_pcm_runtime *rtd);
+extern int msm_common_vote_against_sleep(bool enable);
 #endif
