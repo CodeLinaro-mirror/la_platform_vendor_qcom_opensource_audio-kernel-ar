@@ -44,7 +44,8 @@ endif
 ifeq ($(call is-board-platform-in-list, shikra), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/pm2250_spmi_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/rouleur_dlkm.ko \
-	$(KERNEL_MODULES_OUT)/rouleur_slave_dlkm.ko
+	$(KERNEL_MODULES_OUT)/rouleur_slave_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/qaif_cpu_dlkm.ko
 endif
 ifeq ($(call is-board-platform-in-list,sun canoe alor whale art hamoa shikra), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/lpass_bt_swr_dlkm.ko

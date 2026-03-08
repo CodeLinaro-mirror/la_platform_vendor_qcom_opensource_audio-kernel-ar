@@ -51,7 +51,8 @@ def define_shikra():
             "simple_amp_dlkm",
             "pm2250_spmi_dlkm",
             "rouleur_dlkm",
-            "rouleur_slave_dlkm"
+            "rouleur_slave_dlkm",
+            "qaif_cpu_dlkm"
         ],
         config_options = [
             "CONFIG_ARCH_SHIKRA",
@@ -75,6 +76,7 @@ def define_shikra():
             "CONFIG_AUDIO_GPR_DOMAIN_MODEM",
             "CONFIG_SND_SOC_ROULEUR",
             "CONFIG_SND_SOC_ROULEUR_SLAVE",
-            "CONFIG_PM2250_SPMI"
+            "CONFIG_PM2250_SPMI",
+            "CONFIG_SND_SOC_QAIF_CPU"
         ]
     )
