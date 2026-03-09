@@ -306,6 +306,7 @@ audio_modules.register(
             ":%b_wcd937x_dlkm",
             ":%b_wsa881x_analog_dlkm",
             ":%b_snd_event_dlkm",
+            ":%b_rouleur_dlkm",
            ],
 )
 
@@ -404,4 +405,38 @@ audio_modules.register(
     config_option = "CONFIG_SND_SOC_WCD937X_SLAVE",
     srcs = ["wcd937x_slave.c"],
     deps = [":%b_swr_dlkm"],
+)
+
+# >>>> ROULEUR MODULE <<<<
+audio_modules.register(
+    name = "rouleur_dlkm",
+    path = ASOC_CODECS_PATH + "/rouleur",
+    config_option = "CONFIG_SND_SOC_ROULEUR",
+    srcs = [
+        "rouleur.c",
+        "rouleur-regmap.c",
+        "rouleur-tables.c",
+        "rouleur-mbhc.c",
+    ],
+    deps = [":%b_rouleur_slave_dlkm",
+            ":%b_swr_dlkm",
+            ":%b_bolero_cdc_dlkm",
+            ":%b_pm2250_spmi_dlkm",
+            ":%b_wcd9xxx_dlkm",
+            ":%b_wcd_core_dlkm",
+            ":%b_mbhc_dlkm",
+           ],
+)
+audio_modules.register(
+    name = "rouleur_slave_dlkm",
+    path = ASOC_CODECS_PATH + "/rouleur",
+    config_option = "CONFIG_SND_SOC_ROULEUR_SLAVE",
+    srcs = ["rouleur_slave.c"],
+    deps = [":%b_swr_dlkm"],
+)
+audio_modules.register(
+    name = "pm2250_spmi_dlkm",
+    path = ASOC_CODECS_PATH + "/rouleur",
+    config_option = "CONFIG_PM2250_SPMI",
+    srcs = ["pm2250_spmi.c"],
 )

@@ -26,4 +26,7 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/bolero/rx_macro_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa881x_analog_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd937x/wcd937x_slave_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/rouleur/rouleur_slave_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/rouleur/rouleur_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/rouleur/pm2250_spmi_dlkm.ko
 endif  #bengal
