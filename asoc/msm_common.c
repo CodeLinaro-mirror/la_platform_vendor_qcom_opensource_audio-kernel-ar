@@ -489,6 +489,13 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
+	if (pdata->is_alsa_qaif_supported) {
+		dev_info(rtd->card->dev,
+			"%s: ALSA QAIF Supported, HW Config through PRM not required\n",
+			__func__);
+		return ret;
+	}
+
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
 		if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) == 0) {
@@ -829,6 +836,15 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 	for (count = 0; count < MI2S_TDM_AUXPCM_MAX; count++) {
 		mutex_init(&common_pdata->lock[count]);
 		atomic_set(&common_pdata->mi2s_gpio_ref_cnt[count], 0);
+	}
+
+	if (of_find_property(pdev->dev.of_node, "qaif-cpu-supported", NULL)) {
+		dev_info(&pdev->dev, "%s: ALSA QAIF supported\n",__func__);
+		common_pdata->is_alsa_qaif_supported = true;
+	} else {
+		dev_info(&pdev->dev, "%s: ALSA QAIF not supported\n",
+			__func__);
+		common_pdata->is_alsa_qaif_supported = false;
 	}
 
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,tdm-max-slots",
