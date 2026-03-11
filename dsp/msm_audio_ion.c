@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2013-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2025, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/init.h>
@@ -406,7 +406,7 @@ void msm_audio_fd_list_debug(void)
 	}
 }
 
-void msm_audio_update_fd_list(struct msm_audio_fd_data *msm_audio_fd_data)
+static void msm_audio_update_fd_list(struct msm_audio_fd_data *msm_audio_fd_data)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data1 = NULL;
 
@@ -424,7 +424,7 @@ void msm_audio_update_fd_list(struct msm_audio_fd_data *msm_audio_fd_data)
 	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
 }
 
-void msm_audio_delete_fd_entry(void *handle, int handle_fd)
+static void msm_audio_delete_fd_entry(void *handle, int handle_fd)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	struct list_head *ptr, *next;
@@ -500,7 +500,7 @@ static int msm_audio_set_hyp_assign(int fd, bool assign)
 	return status;
 }
 
-void msm_audio_get_handle(int fd, void **handle)
+static void msm_audio_get_handle(int fd, void **handle)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 
@@ -742,12 +742,20 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	size_t pa_len = 0;
 	struct iosys_map *iosys_vmap = NULL;
 	int ret = 0;
+#ifndef CONFIG_AUDIO_GPR_DOMAIN_MODEM
 	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS);
 	struct qcom_scm_vmperm dst_vmids_map[] = {{VMID_LPASS, PERM_READ | PERM_WRITE},
 		{VMID_ADSP_HEAP, PERM_READ | PERM_WRITE}};
 	u64 src_vmid_unmap_list = BIT(VMID_LPASS) | BIT(VMID_ADSP_HEAP);
 	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
 		PERM_READ | PERM_WRITE | PERM_EXEC}};
+#else
+	u64 src_vmid_map_list = BIT(QCOM_SCM_VMID_HLOS);
+	struct qcom_scm_vmperm dst_vmids_map[] = {{VMID_MSS_MSA, PERM_READ | PERM_WRITE}};
+	u64 src_vmid_unmap_list = BIT(VMID_MSS_MSA);
+	struct qcom_scm_vmperm dst_vmids_unmap[] = {{QCOM_SCM_VMID_HLOS,
+			PERM_READ | PERM_WRITE | PERM_EXEC}};
+#endif
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	struct msm_audio_ion_private *ion_data =
 			container_of(file->f_inode->i_cdev, struct msm_audio_ion_private, cdev);
@@ -1036,13 +1044,13 @@ static struct platform_driver msm_audio_ion_driver = {
 	.remove = msm_audio_ion_remove,
 };
 
-int __init msm_audio_ion_init(void)
+static int __init msm_audio_ion_init(void)
 {
 	pr_debug("%s: msm_audio_ion_init called \n",__func__);
 	return platform_driver_register(&msm_audio_ion_driver);
 }
 
-void msm_audio_ion_exit(void)
+static void msm_audio_ion_exit(void)
 {
 	platform_driver_unregister(&msm_audio_ion_driver);
 }

@@ -70,8 +70,13 @@ do {									      \
 
 #define MODULE_NAME "audio-pkt"
 #define MINOR_NUMBER_COUNT 1
+#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+#define AUDPKT_DRIVER_NAME "aud_pasthru_modem"
+#define CHANNEL_NAME "modem_apps"
+#else
 #define AUDPKT_DRIVER_NAME "aud_pasthru_adsp"
 #define CHANNEL_NAME "adsp_apps"
+#endif
 #define MAX_PACKET_SIZE 4096
 
 enum audio_pkt_state {
@@ -196,7 +201,7 @@ struct audio_pkt_clnt_ch {
  * userspace client do a open() system call. All input arguments are
  * validated by the virtual file system before calling this function.
  */
-int audio_pkt_open(struct inode *inode, struct file *file)
+static int audio_pkt_open(struct inode *inode, struct file *file)
 {
 	struct audio_pkt_device *audpkt_dev = ap_priv->ap_dev;
 	AUDIO_PKT_INFO("%s: for %s \n", __func__,audpkt_dev->ch_name);
@@ -213,7 +218,7 @@ int audio_pkt_open(struct inode *inode, struct file *file)
  * userspace client do a close() system call. All input arguments are
  * validated by the virtual file system before calling this function.
  */
-int audio_pkt_release(struct inode *inode, struct file *file)
+static int audio_pkt_release(struct inode *inode, struct file *file)
 {
 	struct audio_pkt_priv *ap_priv = file->private_data;
 	struct audio_pkt_device *audpkt_dev = ap_priv->ap_dev;
@@ -277,7 +282,7 @@ static int audio_pkt_internal_release(struct platform_device *adev)
  * audpkt_update_handle - Update from physical address to file handler
  * audpkt_hdr:	Pointer to the file structure.
  */
-int audpkt_chk_and_update_handle(struct audio_gpr_pkt *gpr_pkt)
+static int audpkt_chk_and_update_handle(struct audio_gpr_pkt *gpr_pkt)
 {
 	int ret = 0, fd = 0;
 	size_t pa_len = 0;
@@ -309,7 +314,7 @@ int audpkt_chk_and_update_handle(struct audio_gpr_pkt *gpr_pkt)
  * userspace client do a read() system call. All input arguments are
  * validated by the virtual file system before calling this function.
  */
-ssize_t audio_pkt_read(struct file *file, char __user *buf,
+static ssize_t audio_pkt_read(struct file *file, char __user *buf,
 		       size_t count, loff_t *ppos)
 {
 	struct audio_pkt_priv *ap_priv = file->private_data;
@@ -401,7 +406,7 @@ free_kbuf:
  * audpkt_update_physical_addr - Update physical address
  * audpkt_hdr:	Pointer to the file structure.
  */
-int audpkt_chk_and_update_physical_addr(struct gpr_hdr *gpr_pkt)
+static int audpkt_chk_and_update_physical_addr(struct gpr_hdr *gpr_pkt)
 {
 	int ret = 0;
 	size_t pa_len = 0;
@@ -458,7 +463,7 @@ int audpkt_chk_and_update_physical_addr(struct gpr_hdr *gpr_pkt)
  * audpkt_update_satellite_physical_addr - Update physical address for satellite domain
  * audpkt_hdr:	Pointer to the file structure.
  */
-int audpkt_chk_and_update_satellite_physical_addr(struct audio_satellite_gpr_pkt *gpr_pkt)
+static int audpkt_chk_and_update_satellite_physical_addr(struct audio_satellite_gpr_pkt *gpr_pkt)
 {
 	int ret = 0;
 	size_t pa_len = 0;
@@ -493,7 +498,7 @@ int audpkt_chk_and_update_satellite_physical_addr(struct audio_satellite_gpr_pkt
  * userspace client do a write() system call. All input arguments are
  * validated by the virtual file system before calling this function.
  */
-ssize_t audio_pkt_write(struct file *file, const char __user *buf,
+static ssize_t audio_pkt_write(struct file *file, const char __user *buf,
 			size_t count, loff_t *ppos)
 {
 	struct audio_pkt_priv *ap_priv = NULL;

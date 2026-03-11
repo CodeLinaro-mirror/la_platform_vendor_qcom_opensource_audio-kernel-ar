@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -71,6 +71,9 @@ struct audio_ext_clk_priv {
 	uint32_t lpass_core_hwvote_client_handle;
 	uint32_t lpass_audio_hwvote_client_handle;
 };
+
+int audio_ref_clk_platform_init(void);
+void audio_ref_clk_platform_exit(void);
 
 static inline struct audio_ext_clk_priv *to_audio_clk(struct clk_hw *hw)
 {

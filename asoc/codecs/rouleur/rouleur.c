@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -25,7 +25,7 @@
 #include "rouleur-registers.h"
 #include "pm2250-spmi.h"
 #include <asoc/msm-cdc-pinctrl.h>
-#include <dt-bindings/sound/audio-codec-port-types.h>
+#include <bindings/audio-codec-port-types.h>
 #include <asoc/msm-cdc-supply.h>
 #include <linux/power_supply.h>
 #include "asoc/bolero-slave-internal.h"
@@ -42,6 +42,18 @@
 #define LOW_SOC_MBIAS_REG_MIN_VOLTAGE 2850000
 
 #define FOUNDRY_ID_SEC 0x5
+
+#define ROULEUR_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
+						SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
+						SNDRV_PCM_RATE_96000 | SNDRV_PCM_RATE_192000 |\
+						SNDRV_PCM_RATE_384000)
+/* Fractional Rates */
+#define ROULEUR_FRAC_RATES (SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_88200 |\
+						SNDRV_PCM_RATE_176400 | SNDRV_PCM_RATE_352800)
+
+#define ROULEUR_FORMATS (SNDRV_PCM_FMTBIT_S16_LE |\
+						SNDRV_PCM_FMTBIT_S24_LE |\
+						SNDRV_PCM_FMTBIT_S24_3LE | SNDRV_PCM_FMTBIT_S32_LE)
 
 enum {
 	CODEC_TX = 0,
@@ -92,11 +104,35 @@ static struct regmap_irq_chip rouleur_regmap_irq_chip = {
 	.mask_base = ROULEUR_DIG_SWR_INTR_MASK_0,
 	.ack_base = ROULEUR_DIG_SWR_INTR_CLEAR_0,
 	.use_ack = 1,
-	.type_base = ROULEUR_DIG_SWR_INTR_LEVEL_0,
 	.runtime_pm = false,
 	.handle_post_irq = rouleur_handle_post_irq,
 	.irq_drv_data = NULL,
 };
+
+static struct snd_soc_dai_driver rouleur_dai[] = {
+	{
+		.name = "rouleur_cdc",
+		.playback = {
+			.stream_name = "ROULEUR_AIF Playback",
+			.rates = ROULEUR_RATES | ROULEUR_FRAC_RATES,
+			.formats = ROULEUR_FORMATS,
+			.rate_max = 384000,
+			.rate_min = 8000,
+			.channels_min = 1,
+			.channels_max = 4,
+		},
+		.capture = {
+			.stream_name = "ROULEUR_AIF Capture",
+			.rates = ROULEUR_RATES,
+			.formats = ROULEUR_FORMATS,
+			.rate_max = 192000,
+			.rate_min = 8000,
+			.channels_min = 1,
+			.channels_max = 4,
+		},
+	},
+};
+
 
 static int rouleur_handle_post_irq(void *data)
 {
@@ -163,6 +199,11 @@ static int rouleur_set_port_params(struct snd_soc_component *component,
 					__func__, slv_prt_type);
 	return -EINVAL;
 found:
+    if (i > num_ports || j == MAX_CH_PER_PORT) {
+		dev_err(component->dev, "%s Failed to find slave port for type %u\n",
+						__func__, slv_prt_type);
+		return -EINVAL;
+	}
 	*port_id = i;
 	*num_ch = (*map)[i][j].num_ch;
 	*ch_mask = (*map)[i][j].ch_mask;
@@ -170,6 +211,78 @@ found:
 	*port_type = (*map)[i][j].master_port_type;
 
 	return 0;
+}
+
+/* qcom,swr-tx-port-params = <OFFSET1_VAL0 LANE1>, <OFFSET1_VAL5 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>,*UC0*
+			<OFFSET1_VAL0 LANE1>, <OFFSET1_VAL2 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, *UC1*
+			<OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>; *UC2*
+			<OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>, <OFFSET1_VAL1 LANE0>; *UC3 */
+static int rouleur_parse_port_params(struct device *dev,
+			char *prop, u8 path)
+{
+	u32 *dt_array, map_size, max_uc;
+	int ret = 0;
+	u32 cnt = 0;
+	u32 i, j;
+	struct swr_port_params (*map)[SWR_UC_MAX][SWR_NUM_PORTS];
+	struct swr_dev_frame_config (*map_uc)[SWR_UC_MAX];
+	struct rouleur_priv *rouleur = dev_get_drvdata(dev);
+
+	switch (path) {
+	case CODEC_TX:
+		map = &rouleur->tx_port_params;
+		map_uc = &rouleur->swr_tx_port_params;
+		break;
+	default:
+		ret = -EINVAL;
+		goto err_port_map;
+	}
+
+	if (!of_find_property(dev->of_node, prop,
+				&map_size)) {
+		dev_err(dev, "missing port mapping prop %s\n", prop);
+		ret = -EINVAL;
+		goto err_port_map;
+	}
+
+	max_uc = map_size / (SWR_NUM_PORTS * SWR_PORT_PARAMS * sizeof(u32));
+
+	if (max_uc != SWR_UC_MAX) {
+		dev_err(dev, "%s: port params not provided for all usecases\n",
+			__func__);
+		ret = -EINVAL;
+		goto err_port_map;
+	}
+	dt_array = kzalloc(map_size, GFP_KERNEL);
+
+	if (!dt_array) {
+		ret = -ENOMEM;
+		goto err_alloc;
+	}
+	ret = of_property_read_u32_array(dev->of_node, prop, dt_array,
+				SWR_NUM_PORTS * SWR_PORT_PARAMS * max_uc);
+	if (ret) {
+		dev_err(dev, "%s: Failed to read  port mapping from prop %s\n",
+					__func__, prop);
+		goto err_pdata_fail;
+	}
+
+	for (i = 0; i < max_uc; i++) {
+		for (j = 0; j < SWR_NUM_PORTS; j++) {
+			cnt = (i * SWR_NUM_PORTS + j) * SWR_PORT_PARAMS;
+			(*map)[i][j].offset1 = dt_array[cnt];
+			(*map)[i][j].lane_ctrl = dt_array[cnt + 1];
+		}
+		(*map_uc)[i].pp = &(*map)[i][0];
+	}
+	kfree(dt_array);
+	return 0;
+
+err_pdata_fail:
+	kfree(dt_array);
+err_alloc:
+err_port_map:
+	return ret;
 }
 
 static int rouleur_parse_port_mapping(struct device *dev,
@@ -245,6 +358,8 @@ static int rouleur_parse_port_mapping(struct device *dev,
 		old_port_num = port_num;
 	}
 	*num_ports = port_num;
+	kfree(dt_array);
+	return 0;
 
 err_pdata_fail:
 	kfree(dt_array);
@@ -261,6 +376,8 @@ static int rouleur_tx_connect_port(struct snd_soc_component *component,
 	u8 ch_mask;
 	u32 ch_rate;
 	u8 port_type;
+	u8 ch_type = 0;
+	int slave_ch_idx;
 	u8 num_port = 1;
 	int ret = 0;
 
@@ -273,14 +390,20 @@ static int rouleur_tx_connect_port(struct snd_soc_component *component,
 			__func__, ret);
 		return ret;
 	}
+	slave_ch_idx = rouleur_slave_get_slave_ch_val(slv_port_type);
+	if (slave_ch_idx != -EINVAL)
+		ch_type = rouleur->tx_master_ch_map[slave_ch_idx];
+
+	dev_dbg(component->dev, "%s slv_ch_idx: %d, mstr_ch_type: %d\n",
+		__func__, slave_ch_idx, ch_type);
 
 	if (enable)
 		ret = swr_connect_port(rouleur->tx_swr_dev, &port_id,
 					num_port, &ch_mask, &ch_rate,
-					 &num_ch, &port_type);
+					 &num_ch, &ch_type);
 	else
 		ret = swr_disconnect_port(rouleur->tx_swr_dev, &port_id,
-					num_port, &ch_mask, &port_type);
+					num_port, &ch_mask, &ch_type);
 	return ret;
 
 }
@@ -1057,14 +1180,27 @@ static int rouleur_tx_swr_ctrl(struct snd_soc_dapm_widget *w,
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		ret = swr_slvdev_datapath_control(rouleur->tx_swr_dev,
-		    rouleur->tx_swr_dev->dev_num,
-		    true);
+		if (strnstr(w->name, "ADC", sizeof("ADC")))
+		{
+			/* Enable BCS for Headset mic */
+			if (w->shift == 1 && !(snd_soc_component_read(component, ROULEUR_ANA_TX_AMIC2) &  0x10))
+			{
+				if (!rouleur->bcs_dis) {
+					rouleur_tx_connect_port(component, MBHC, true);
+					set_bit(AMIC2_BCS_ENABLE, &rouleur->status_mask);
+				}
+			}
+			rouleur_tx_connect_port(component, ADC1 + (w->shift), true);
+		}
+		else {
+			rouleur_tx_connect_port(component, DMIC0 + (w->shift), true);
+		}
 		break;
+
 	case SND_SOC_DAPM_POST_PMD:
 		ret = swr_slvdev_datapath_control(rouleur->tx_swr_dev,
-		    rouleur->tx_swr_dev->dev_num,
-		    false);
+			rouleur->tx_swr_dev->dev_num,
+			false);
 		break;
 	};
 
@@ -1079,19 +1215,13 @@ static int rouleur_codec_enable_adc(struct snd_soc_dapm_widget *w,
 			snd_soc_dapm_to_component(w->dapm);
 	struct rouleur_priv *rouleur =
 			snd_soc_component_get_drvdata(component);
+	int ret = 0;
 
 	dev_dbg(component->dev, "%s wname: %s event: %d\n", __func__,
 		w->name, event);
 
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
-		/* Enable BCS for Headset mic */
-		if (w->shift == 1 && !(snd_soc_component_read32(component,
-				ROULEUR_ANA_TX_AMIC2) & 0x10)) {
-			rouleur_tx_connect_port(component, MBHC, true);
-			set_bit(AMIC2_BCS_ENABLE, &rouleur->status_mask);
-		}
-		rouleur_tx_connect_port(component, ADC1 + (w->shift), true);
 		rouleur_global_mbias_enable(component);
 		if (w->shift)
 			snd_soc_component_update_bits(component,
@@ -1101,6 +1231,8 @@ static int rouleur_codec_enable_adc(struct snd_soc_dapm_widget *w,
 			snd_soc_component_update_bits(component,
 				ROULEUR_DIG_SWR_CDC_TX_ANA_MODE_0_1,
 				0x03, 0x03);
+		ret = swr_slvdev_datapath_control(rouleur->tx_swr_dev,
+			rouleur->tx_swr_dev->dev_num, true);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
 		rouleur_tx_connect_port(component, ADC1 + (w->shift), false);
@@ -1163,12 +1295,12 @@ int rouleur_mbhc_micb_adjust_voltage(struct snd_soc_component *component,
 	micb_reg = ROULEUR_ANA_MICBIAS_MICB_1_2_EN;
 	switch (micb_num) {
 	case MIC_BIAS_1:
-		micb_val = snd_soc_component_read32(component, micb_reg);
+		micb_val = snd_soc_component_read(component, micb_reg);
 		micb_en = (micb_val & 0x40) >> 6;
 		pullup_mask = 0x20;
 		break;
 	case MIC_BIAS_2:
-		micb_val = snd_soc_component_read32(component, micb_reg);
+		micb_val = snd_soc_component_read(component, micb_reg);
 		micb_en = (micb_val & 0x04) >> 2;
 		pullup_mask = 0x02;
 		break;
@@ -1188,7 +1320,7 @@ int rouleur_mbhc_micb_adjust_voltage(struct snd_soc_component *component,
 	 * momentarily, change the micbias value and then re-enable
 	 * micbias.
 	 */
-	cur_vout_ctl = (snd_soc_component_read32(component,
+	cur_vout_ctl = (snd_soc_component_read(component,
 				ROULEUR_ANA_MICBIAS_LDO_1_SETTING)) & 0xF8;
 	cur_vout_ctl = cur_vout_ctl >> 3;
 	req_vout_ctl = rouleur_get_micb_vout_ctl_val(req_volt);
@@ -1394,7 +1526,7 @@ static int rouleur_get_logical_addr(struct swr_device *swr_dev)
 		ret = swr_get_logical_dev_num(swr_dev, swr_dev->addr, &devnum);
 		if (ret) {
 			dev_err(&swr_dev->dev,
-				"%s get devnum %d for dev addr %lx failed\n",
+				"%s get devnum %d for dev addr %llx failed\n",
 				__func__, devnum, swr_dev->addr);
 			/* retry after 1ms */
 			usleep_range(1000, 1010);
@@ -1408,7 +1540,7 @@ static bool get_usbc_hs_status(struct snd_soc_component *component,
 			       struct wcd_mbhc_config *mbhc_cfg)
 {
 	if (mbhc_cfg->enable_usbc_analog) {
-		if (!(snd_soc_component_read32(component, ROULEUR_ANA_MBHC_MECH)
+		if (!(snd_soc_component_read(component, ROULEUR_ANA_MBHC_MECH)
 			& 0x20))
 			return true;
 	}
@@ -1590,9 +1722,9 @@ static int rouleur_get_compander(struct snd_kcontrol *kcontrol,
 				snd_soc_kcontrol_component(kcontrol);
 	struct rouleur_priv *rouleur = snd_soc_component_get_drvdata(component);
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 
 	ucontrol->value.integer.value[0] = hphr ? rouleur->comp2_enable :
@@ -1608,9 +1740,9 @@ static int rouleur_set_compander(struct snd_kcontrol *kcontrol,
 	struct rouleur_priv *rouleur = snd_soc_component_get_drvdata(component);
 	int value = ucontrol->value.integer.value[0];
 	bool hphr;
-	struct soc_multi_mixer_control *mc;
+	struct soc_mixer_control *mc;
 
-	mc = (struct soc_multi_mixer_control *)(kcontrol->private_value);
+	mc = (struct soc_mixer_control *)(kcontrol->private_value);
 	hphr = mc->shift;
 	if (hphr)
 		rouleur->comp2_enable = value;
@@ -1676,21 +1808,170 @@ static int rouleur_codec_enable_pa_vpos(struct snd_soc_dapm_widget *w,
 	}
 	return 0;
 }
+const char * const tx_master_ch_text[] = {
+	"ZERO", "SWRM_TX1_CH1", "SWRM_TX1_CH2", "SWRM_TX1_CH3", "SWRM_TX1_CH4",
+	"SWRM_TX2_CH1", "SWRM_TX2_CH2", "SWRM_TX2_CH3", "SWRM_TX2_CH4",
+	"SWRM_TX3_CH1", "SWRM_TX3_CH2", "SWRM_TX3_CH3", "SWRM_TX3_CH4",
+	"SWRM_PCM_IN",
+};
+
+const struct soc_enum tx_master_ch_enum = SOC_ENUM_SINGLE_EXT(ARRAY_SIZE(tx_master_ch_text), tx_master_ch_text);
+
+static void rouleur_tx_get_slave_ch_type_idx(const char *wname, int *ch_idx)
+{
+	u8 ch_type = 0;
+
+	if (strnstr(wname, "ADC1", sizeof("ADC1")))
+		ch_type = ADC1;
+	else if (strnstr(wname, "ADC2", sizeof("ADC2")))
+		ch_type = ADC2;
+	else if (strnstr(wname, "ADC3", sizeof("ADC3")))
+	 	ch_type = ADC3;
+	else if (strnstr(wname, "DMIC0", sizeof("DMIC0")))
+		ch_type = DMIC0;
+	else if (strnstr(wname, "DMIC1", sizeof("DMIC1")))
+		ch_type = DMIC1;
+	else if (strnstr(wname, "MBHC", sizeof("MBHC")))
+		ch_type = MBHC;
+	else if (strnstr(wname, "DMIC2", sizeof("DMIC2")))
+		ch_type = DMIC2;
+	else if (strnstr(wname, "DMIC3", sizeof("DMIC3")))
+		ch_type = DMIC3;
+	else if (strnstr(wname, "DMIC4", sizeof("DMIC4")))
+		ch_type = DMIC4;
+	else if (strnstr(wname, "DMIC5", sizeof("DMIC5")))
+		ch_type = DMIC5;
+	else
+		pr_err("%s: ch name: %s is not listed\n", __func__, wname);
+
+	if (ch_type)
+		*ch_idx = rouleur_slave_get_slave_ch_val(ch_type);
+	else
+		*ch_idx = -EINVAL;
+}
+
+static int rouleur_tx_master_ch_get(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	struct rouleur_priv *rouleur = NULL;
+	int slave_ch_idx = -EINVAL;
+
+	if (component == NULL)
+		return -EINVAL;
+
+	rouleur = snd_soc_component_get_drvdata(component);
+	if (rouleur == NULL)
+		return -EINVAL;
+
+	rouleur_tx_get_slave_ch_type_idx(kcontrol->id.name, &slave_ch_idx);
+
+	if (slave_ch_idx < 0 || slave_ch_idx >= ROULEUR_MAX_SLAVE_CH_TYPES)
+		return -EINVAL;
+
+	ucontrol->value.integer.value[0] =
+			rouleur_slave_get_master_ch_val(
+			rouleur->tx_master_ch_map[slave_ch_idx]);
+
+	dev_dbg(component->dev, "%s: ucontrol->value.integer.value[0] = %ld\n",
+			__func__, ucontrol->value.integer.value[0]);
+	return 0;
+}
+
+static int rouleur_tx_master_ch_put(struct snd_kcontrol *kcontrol,
+					struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+				snd_soc_kcontrol_component(kcontrol);
+	struct rouleur_priv *rouleur;
+	int slave_ch_idx = -EINVAL, idx = 0;
+
+	if (component == NULL)
+		return -EINVAL;
+
+	rouleur = snd_soc_component_get_drvdata(component);
+	if (rouleur == NULL)
+		return -EINVAL;
+
+	rouleur_tx_get_slave_ch_type_idx(kcontrol->id.name, &slave_ch_idx);
+
+	if (slave_ch_idx < 0 || slave_ch_idx >= ROULEUR_MAX_SLAVE_CH_TYPES)
+		return -EINVAL;
+
+	dev_dbg(component->dev, "%s: slave_ch_idx: %d", __func__, slave_ch_idx);
+	dev_dbg(component->dev, "%s: ucontrol->value.enumerated.item[0] = %u\n",
+			__func__, ucontrol->value.enumerated.item[0]);
+
+	idx = ucontrol->value.enumerated.item[0];
+	if (idx < 0 || idx >= ARRAY_SIZE(rouleur_swr_master_ch_map))
+		return -EINVAL;
+
+	rouleur->tx_master_ch_map[slave_ch_idx] =
+			rouleur_slave_get_master_ch(idx);
+
+	return 0;
+}
+
+static int rouleur_bcs_get(struct snd_kcontrol *kcontrol,
+                                struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+						snd_soc_kcontrol_component(kcontrol);
+	struct rouleur_priv *rouleur = snd_soc_component_get_drvdata(component);
+
+	ucontrol->value.integer.value[0] = rouleur->bcs_dis;
+	dev_err(component->dev, "%s: BCS Disable %d\n", __func__, rouleur->bcs_dis);
+	return 0;
+}
+
+static int rouleur_bcs_put(struct snd_kcontrol *kcontrol,
+								struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct rouleur_priv *rouleur = snd_soc_component_get_drvdata(component);
+
+	rouleur->bcs_dis = ucontrol->value.integer.value[0];
+	dev_err(component->dev, "%s: BCS Disable %d\n", __func__, rouleur->bcs_dis);
+	return 0;
+}
 
 static const struct snd_kcontrol_new rouleur_snd_controls[] = {
 	SOC_SINGLE_EXT("HPHL_COMP Switch", SND_SOC_NOPM, 0, 1, 0,
 		rouleur_get_compander, rouleur_set_compander),
 	SOC_SINGLE_EXT("HPHR_COMP Switch", SND_SOC_NOPM, 1, 1, 0,
 		rouleur_get_compander, rouleur_set_compander),
+	SOC_SINGLE_EXT("ADC2_BCS Disable", SND_SOC_NOPM, 0, 1, 0,
+                rouleur_bcs_get, rouleur_bcs_put),
 
 	SOC_SINGLE_TLV("HPHL Volume", ROULEUR_ANA_HPHPA_L_GAIN, 0, 20, 1,
 					line_gain),
 	SOC_SINGLE_TLV("HPHR Volume", ROULEUR_ANA_HPHPA_R_GAIN, 0, 20, 1,
 					line_gain),
-	SOC_SINGLE_TLV("ADC1 Volume", ROULEUR_ANA_TX_AMIC1, 0, 8, 0,
+	SOC_SINGLE_TLV("ADC1 Volume", ROULEUR_ANA_TX_AMIC1, 0, 12, 0,
 			analog_gain),
-	SOC_SINGLE_TLV("ADC2 Volume", ROULEUR_ANA_TX_AMIC2, 0, 8, 0,
+	SOC_SINGLE_TLV("ADC2 Volume", ROULEUR_ANA_TX_AMIC2, 0, 12, 0,
 			analog_gain),
+	SOC_ENUM_EXT("ADC1 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("ADC2 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("ADC3 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("DMIC0 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("DMIC1 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("MBHC ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("DMIC2 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("DMIC3 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("DMIC4 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
+	SOC_ENUM_EXT("DMIC5 ChMap", tx_master_ch_enum,
+			rouleur_tx_master_ch_get, rouleur_tx_master_ch_put),
 };
 
 static const struct snd_kcontrol_new adc1_switch[] = {
@@ -1746,6 +2027,15 @@ static const struct snd_soc_dapm_widget rouleur_dapm_widgets[] = {
 	SND_SOC_DAPM_INPUT("AMIC3"),
 	SND_SOC_DAPM_INPUT("IN1_HPHL"),
 	SND_SOC_DAPM_INPUT("IN2_HPHR"),
+	SND_SOC_DAPM_INPUT("IN3_AUX"),
+
+	/*
+	* These dummy widgets are null connected to WCD937x dapm input and
+	* output widgets which are not actual path endpoints. This ensures
+	* dapm doesnt set these dapm input and output widgets as endpoints.
+	*/
+	SND_SOC_DAPM_INPUT("WCD_TX_DUMMY"),
+	SND_SOC_DAPM_OUTPUT("WCD_RX_DUMMY"),
 
 	/*tx widgets*/
 	SND_SOC_DAPM_ADC_E("ADC1", NULL, SND_SOC_NOPM, 0, 0,
@@ -1763,24 +2053,28 @@ static const struct snd_soc_dapm_widget rouleur_dapm_widgets[] = {
 				adc1_switch, ARRAY_SIZE(adc1_switch),
 				rouleur_tx_swr_ctrl, SND_SOC_DAPM_PRE_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_MIXER_E("ADC2_MIXER", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_MIXER_E("ADC2_MIXER", SND_SOC_NOPM, 1, 0,
 				adc2_switch, ARRAY_SIZE(adc2_switch),
 				rouleur_tx_swr_ctrl, SND_SOC_DAPM_PRE_PMU |
 				SND_SOC_DAPM_POST_PMD),
 
 	/* micbias widgets*/
-	SND_SOC_DAPM_MICBIAS_E("MIC BIAS1", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY("MIC BIAS1", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_MICBIAS_E("MIC BIAS2", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY("MIC BIAS2", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_MICBIAS_E("MIC BIAS3", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY("MIC BIAS3", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
+
+	/*SND_SOC_DAPM_SUPPLY("VDD_BUCK", SND_SOC_NOPM, 0, 0,
+		wcd937x_codec_enable_vdd_buck,
+		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMD),*/
 
 	SND_SOC_DAPM_SUPPLY("PA_VPOS", SND_SOC_NOPM, 0, 0,
 			     rouleur_codec_enable_pa_vpos,
@@ -1791,6 +2085,11 @@ static const struct snd_soc_dapm_widget rouleur_dapm_widgets[] = {
 				rouleur_codec_enable_ear_pa,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),
+	/*SND_SOC_DAPM_PGA_E("AUX PGA", WCD937X_AUX_AUXPA, 7, 0, NULL, 0,
+		rouleur_codec_enable_aux_pa,
+		SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
+		SND_SOC_DAPM_PRE_PMD | SND_SOC_DAPM_POST_PMD),*/
+
 	SND_SOC_DAPM_PGA_E("LO PGA", ROULEUR_ANA_COMBOPA_CTL, 7, 0, NULL, 0,
 				rouleur_codec_enable_lo_pa,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
@@ -1839,23 +2138,25 @@ static const struct snd_soc_dapm_widget rouleur_dapm_widgets[] = {
 
 	SND_SOC_DAPM_OUTPUT("ADC1_OUTPUT"),
 	SND_SOC_DAPM_OUTPUT("ADC2_OUTPUT"),
+	SND_SOC_DAPM_OUTPUT("WCD_TX_OUTPUT"),
 
 	/*output widgets rx*/
 	SND_SOC_DAPM_OUTPUT("EAR"),
 	SND_SOC_DAPM_OUTPUT("LO"),
+	SND_SOC_DAPM_OUTPUT("AUX"),
 	SND_SOC_DAPM_OUTPUT("HPHL"),
 	SND_SOC_DAPM_OUTPUT("HPHR"),
 
 	/* micbias pull up widgets*/
-	SND_SOC_DAPM_MICBIAS_E("VA MIC BIAS1", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY("VA MIC BIAS1", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias_pullup,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_MICBIAS_E("VA MIC BIAS2", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY("VA MIC BIAS2", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias_pullup,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
-	SND_SOC_DAPM_MICBIAS_E("VA MIC BIAS3", SND_SOC_NOPM, 0, 0,
+	SND_SOC_DAPM_SUPPLY("VA MIC BIAS3", SND_SOC_NOPM, 0, 0,
 				rouleur_codec_enable_micbias_pullup,
 				SND_SOC_DAPM_PRE_PMU | SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
@@ -1883,16 +2184,21 @@ static const struct snd_soc_dapm_widget rouleur_dapm_widgets[] = {
 };
 
 static const struct snd_soc_dapm_route rouleur_audio_map[] = {
+	{"WCD_TX_DUMMY", NULL, "WCD_TX_OUTPUT"},
+	{"WCD_TX_OUTPUT", NULL, "ADC1_MIXER"},
 	{"ADC1_OUTPUT", NULL, "ADC1_MIXER"},
 	{"ADC1_MIXER", "Switch", "ADC1"},
 	{"ADC1", NULL, "AMIC1"},
 
+	{"WCD_TX_OUTPUT", NULL, "ADC2_MIXER"},
 	{"ADC2_OUTPUT", NULL, "ADC2_MIXER"},
 	{"ADC2_MIXER", "Switch", "ADC2"},
 	{"ADC2", NULL, "ADC2 MUX"},
 	{"ADC2 MUX", "INP3", "AMIC3"},
 	{"ADC2 MUX", "INP2", "AMIC2"},
 
+	{"IN1_HPHL", NULL, "WCD_RX_DUMMY"},
+	//{"IN1_HPHL", NULL, "VDD_BUCK"},
 	{"IN1_HPHL", NULL, "PA_VPOS"},
 	{"RX1", NULL, "IN1_HPHL"},
 	{"RDAC1", NULL, "RX1"},
@@ -1900,6 +2206,8 @@ static const struct snd_soc_dapm_route rouleur_audio_map[] = {
 	{"HPHL PGA", NULL, "HPHL_RDAC"},
 	{"HPHL", NULL, "HPHL PGA"},
 
+	{"IN2_HPHR", NULL, "WCD_RX_DUMMY"},
+	//{"IN2_HPHR", NULL, "VDD_BUCK"},
 	{"IN2_HPHR", NULL, "PA_VPOS"},
 	{"RX2", NULL, "IN2_HPHR"},
 	{"RDAC2", NULL, "RX2"},
@@ -1907,10 +2215,16 @@ static const struct snd_soc_dapm_route rouleur_audio_map[] = {
 	{"HPHR PGA", NULL, "HPHR_RDAC"},
 	{"HPHR", NULL, "HPHR PGA"},
 
+	{"IN3_AUX", NULL, "WCD_RX_DUMMY"},
+        //{"IN3_AUX", NULL, "VDD_BUCK"},
+        //{"IN3_AUX", NULL, "CLS_H_PORT"},
+	//{"RX3", NULL, "IN3_AUX"},
 	{"RDAC3", NULL, "RX1"},
 	{"EAR_RDAC", "Switch", "RDAC3"},
 	{"EAR PGA", NULL, "EAR_RDAC"},
 	{"EAR", NULL, "EAR PGA"},
+	//{"AUX PGA", NULL, "AUX_RDAC"},
+	//{"AUX", NULL, "AUX PGA"},
 
 	{"RDAC3", NULL, "RX1"},
 	{"LO_RDAC", "Switch", "RDAC3"},
@@ -1982,13 +2296,20 @@ int rouleur_info_create_codec_entry(struct snd_info_entry *codec_root,
 		return 0;
 	}
 	card = component->card;
-	priv->entry = snd_info_create_subdir(codec_root->module,
-					     "rouleur", codec_root);
+	priv->entry = snd_info_create_module_entry(codec_root->module, "rouleur", codec_root);
+
 	if (!priv->entry) {
 		dev_dbg(component->dev, "%s: failed to create rouleur entry\n",
 			__func__);
 		return -ENOMEM;
 	}
+	priv->entry->mode = S_IFDIR | 0555;
+	if (snd_info_register(priv->entry) < 0) {
+		snd_info_free_entry(priv->entry);
+		pr_err("%s snd_info_register priv->entry faild \n",__func__);
+		return -ENOMEM;
+	}
+
 	version_entry = snd_info_create_card_entry(card->snd_card,
 						   "version",
 						   priv->entry);
@@ -2149,8 +2470,8 @@ static void rouleur_get_foundry_id(struct rouleur_priv *rouleur)
 	ret = pm2250_spmi_read(rouleur->spmi_dev,
 				rouleur->foundry_id_reg, &rouleur->foundry_id);
 	if (ret == 0)
-		pr_debug("%s: rouleur foundry id = %x\n", rouleur->foundry_id,
-			 __func__);
+		pr_debug("%s: rouleur foundry id = %x\n", __func__,
+			 rouleur->foundry_id);
 	else
 		pr_debug("%s: rouleur error in spmi read ret = %d\n",
 			 __func__, ret);
@@ -2200,12 +2521,17 @@ static int rouleur_soc_codec_probe(struct snd_soc_component *component)
 	snd_soc_dapm_ignore_suspend(dapm, "AMIC3");
 	snd_soc_dapm_ignore_suspend(dapm, "IN1_HPHL");
 	snd_soc_dapm_ignore_suspend(dapm, "IN2_HPHR");
+	snd_soc_dapm_ignore_suspend(dapm, "IN3_AUX");
 	snd_soc_dapm_ignore_suspend(dapm, "ADC1_OUTPUT");
 	snd_soc_dapm_ignore_suspend(dapm, "ADC2_OUTPUT");
+	snd_soc_dapm_ignore_suspend(dapm, "WCD_TX_OUTPUT");
 	snd_soc_dapm_ignore_suspend(dapm, "EAR");
 	snd_soc_dapm_ignore_suspend(dapm, "LO");
+	snd_soc_dapm_ignore_suspend(dapm, "AUX");
 	snd_soc_dapm_ignore_suspend(dapm, "HPHL");
 	snd_soc_dapm_ignore_suspend(dapm, "HPHR");
+	snd_soc_dapm_ignore_suspend(dapm, "WCD_TX_DUMMY");
+	snd_soc_dapm_ignore_suspend(dapm, "WCD_RX_DUMMY");
 	snd_soc_dapm_ignore_suspend(dapm, "DMIC1_OUTPUT");
 	snd_soc_dapm_ignore_suspend(dapm, "DMIC2_OUTPUT");
 	snd_soc_dapm_sync(dapm);
@@ -2624,6 +2950,13 @@ static int rouleur_bind(struct device *dev)
 		goto err;
 	}
 
+	ret = rouleur_parse_port_params(dev, "qcom,swr-tx-port-params",
+							CODEC_TX);
+	if (ret) {
+		dev_err(dev, "Failed to read port params\n");
+		goto err;
+	}
+
 	rouleur->rx_swr_dev = get_matching_swr_slave_device(pdata->rx_slave);
 	if (!rouleur->rx_swr_dev) {
 		dev_err(dev, "%s: Could not find RX swr slave device\n",
@@ -2639,6 +2972,8 @@ static int rouleur_bind(struct device *dev)
 		ret = -ENODEV;
 		goto err;
 	}
+	swr_init_port_params(rouleur->tx_swr_dev, SWR_NUM_PORTS,
+			     rouleur->swr_tx_port_params);
 
 	rouleur->regmap = devm_regmap_init_swr(rouleur->tx_swr_dev,
 					       &rouleur_regmap_config);
@@ -2686,8 +3021,7 @@ static int rouleur_bind(struct device *dev)
 	wcd_disable_irq(&rouleur->irq_info, ROULEUR_IRQ_HPHR_PDM_WD_INT);
 	wcd_disable_irq(&rouleur->irq_info, ROULEUR_IRQ_HPHL_PDM_WD_INT);
 
-	ret = snd_soc_register_component(dev, &soc_codec_dev_rouleur,
-				     NULL, 0);
+	ret = snd_soc_register_component(dev, &soc_codec_dev_rouleur, rouleur_dai, ARRAY_SIZE(rouleur_dai));
 	if (ret) {
 		dev_err(dev, "%s: Codec registration failed\n",
 				__func__);
@@ -2789,12 +3123,10 @@ static int rouleur_probe(struct platform_device *pdev)
 					&rouleur_comp_ops, match);
 }
 
-static int rouleur_remove(struct platform_device *pdev)
+static void rouleur_remove(struct platform_device *pdev)
 {
 	component_master_del(&pdev->dev, &rouleur_comp_ops);
 	dev_set_drvdata(&pdev->dev, NULL);
-
-	return 0;
 }
 
 #ifdef CONFIG_PM_SLEEP
@@ -2821,4 +3153,3 @@ static struct platform_driver rouleur_codec_driver = {
 module_platform_driver(rouleur_codec_driver);
 MODULE_DESCRIPTION("Rouleur Codec driver");
 MODULE_LICENSE("GPL v2");
-

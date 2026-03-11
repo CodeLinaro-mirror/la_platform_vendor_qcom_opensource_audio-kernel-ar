@@ -215,7 +215,7 @@ static int _audio_prm_set_lpass_cpu_lpr_req(uint8_t enable)
 
 /**
  */
-int _audio_prm_set_lpass_hw_core_req(uint32_t hw_core_id, uint8_t enable)
+static int _audio_prm_set_lpass_hw_core_req(uint32_t hw_core_id, uint8_t enable)
 {
 	struct gpr_pkt *pkt;
         prm_cmd_request_hw_core_t prm_rsc_request;
@@ -551,8 +551,13 @@ static int audio_prm_probe(struct gpr_device *adev)
 	if (ret < 0)
 		pr_debug("%s: sleep API not supported\n", __func__);
 
+#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+	ret = audio_notifier_register("audio_prm", AUDIO_NOTIFIER_MODEM_DOMAIN,
+					&service_nb);
+#else
 	ret = audio_notifier_register("audio_prm", AUDIO_NOTIFIER_ADSP_DOMAIN,
 				      &service_nb);
+#endif
 	if (ret < 0) {
 		if (ret != -EPROBE_DEFER)
 			pr_err("%s: Audio notifier register failed ret = %d\n",
