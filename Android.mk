@@ -40,13 +40,17 @@ ifeq ($(call is-board-platform-in-list,hamoa),true)
 AUDIO_SELECT  := CONFIG_SND_SOC_HAMOA=m
 endif
 
+ifeq ($(call is-board-platform-in-list, shikra),true)
+AUDIO_SELECT  := CONFIG_SND_SOC_SHIKRA=m
+endif
+
 ifeq ($(ENABLE_AUDIO_LEGACY_TECHPACK),true)
 include $(call all-subdir-makefiles)
 LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro parrot kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale art hamoa), true)
+ifeq ($(call is-board-platform-in-list,taro parrot kalama bengal pineapple sun holi blair gen4 msmnile canoe alor whale art hamoa shikra), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -360,9 +364,38 @@ LOCAL_MODULE_TAGS         := optional
 LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
-
-ifneq ($(call is-board-platform-in-list, parrot),true)
+########################### ROULEUR CODEC###########################
+ifeq ($(call is-board-platform-in-list, shikra),true)
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := rouleur_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/rouleur_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := pm2250_spmi_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/pm2250_spmi_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := rouleur_slave_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/rouleur/rouleur_slave_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+###########################################################
+endif
+###########################################################
+ifneq ($(call is-board-platform-in-list,parrot),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := lpass_bt_swr_dlkm.ko
@@ -428,7 +461,7 @@ LOCAL_MODULE_DEBUG_ENABLE := true
 LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 ###########################################################
-ifeq ($(call is-board-platform-in-list, sun canoe alor whale art hamoa parrot),true)
+ifeq ($(call is-board-platform-in-list, sun canoe alor whale art hamoa parrot shikra),true)
 ###########################################################
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
@@ -536,7 +569,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 ########################### WCD937x CODEC  ################################
-ifeq ($(call is-board-platform-in-list,holi blair parrot canoe art hamoa alor sun),true)
+ifeq ($(call is-board-platform-in-list,holi blair parrot canoe art hamoa alor sun shikra),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := wcd937x_dlkm.ko
