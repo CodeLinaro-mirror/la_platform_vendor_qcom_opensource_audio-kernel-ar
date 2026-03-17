@@ -88,6 +88,7 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa885x_i2c_dlkm.ko
 endif
 
 ifeq ($(call is-board-platform-in-list, shikra),true)
+LOCAL_MODULE_KO_DIRS += asoc/qaif_cpu_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/rouleur/pm2250_spmi_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/rouleur/rouleur_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/rouleur/rouleur_slave_dlkm.ko

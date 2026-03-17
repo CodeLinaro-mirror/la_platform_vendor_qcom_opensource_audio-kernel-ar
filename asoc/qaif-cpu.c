@@ -1,0 +1,1460 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Copyright (c) 2010-2011,2013-2015 The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ *
+ * qaif-cpu.c -- ALSA SoC CPU-Platform DAI driver for QTi QAIF
+ */
+
+#include <linux/clk.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/of.h>
+#include <linux/of_device.h>
+#include <linux/platform_device.h>
+#include <sound/pcm.h>
+#include <sound/pcm_params.h>
+#include <linux/regmap.h>
+#include <sound/soc.h>
+#include <sound/soc-dai.h>
+#include <dt-bindings/sound/qcom,lpass.h>
+#include "qaif-reg.h"
+#include "qaif.h"
+
+#define QAIF_AIF_REG_READ 1
+#define QAIF_AIF_REG_WRITE 0
+
+static int qaif_cif_cpu_init_bitfields(struct device *dev,
+			struct regmap *map)
+{
+	struct qaif_drv_data *drvdata = dev_get_drvdata(dev);
+	struct qaif_variant *v = drvdata->variant;
+	struct qaif_dmactl *rd_dmactl;
+	struct qaif_dmactl *wr_dmactl;
+	struct qaif_cdc_intfctl *rd_intfctl;
+	struct qaif_cdc_intfctl *wr_intfctl;
+
+	/* Allocate RDDMA control structure */
+	rd_dmactl = devm_kzalloc(dev, sizeof(struct qaif_dmactl), GFP_KERNEL);
+	if (!rd_dmactl)
+		return -ENOMEM;
+
+	/* Allocate WRDMA control structure */
+	wr_dmactl = devm_kzalloc(dev, sizeof(struct qaif_dmactl), GFP_KERNEL);
+	if (!wr_dmactl)
+		return -ENOMEM;
+
+	/* Allocate RDDMA INTF control structure */
+	rd_intfctl = devm_kzalloc(dev, sizeof(struct qaif_cdc_intfctl), GFP_KERNEL);
+	if (!rd_intfctl)
+		return -ENOMEM;
+
+	/* Allocate WRDMA INTF control structure */
+	wr_intfctl = devm_kzalloc(dev, sizeof(struct qaif_cdc_intfctl), GFP_KERNEL);
+	if (!wr_intfctl)
+		return -ENOMEM;
+
+	/* ===================================================================
+	 * Allocate RDDMA (RX/Playback) regmap fields for all 4 channels
+	 * ===================================================================*/
+
+	/* CTL register fields */
+	rd_dmactl->enable = devm_regmap_field_alloc(dev, map, v->cif_rddma_enable);
+	rd_dmactl->reset = devm_regmap_field_alloc(dev, map, v->cif_rddma_reset);
+
+	/* CFG register fields */
+	rd_dmactl->shram_wm = devm_regmap_field_alloc(dev, map, v->cif_rddma_shram_wm);
+	rd_dmactl->burst1 = devm_regmap_field_alloc(dev, map, v->cif_rddma_burst1);
+	rd_dmactl->burst2 = devm_regmap_field_alloc(dev, map, v->cif_rddma_burst2);
+	rd_dmactl->burst4 = devm_regmap_field_alloc(dev, map, v->cif_rddma_burst4);
+	rd_dmactl->burst8 = devm_regmap_field_alloc(dev, map, v->cif_rddma_burst8);
+	rd_dmactl->burst16 = devm_regmap_field_alloc(dev, map, v->cif_rddma_burst16);
+	rd_dmactl->dma_dyncclk = devm_regmap_field_alloc(dev, map, v->cif_rddma_dma_dyncclk);
+	rd_dmactl->num_ot = devm_regmap_field_alloc(dev, map, v->cif_rddma_num_ot);
+
+	/* INTF_CFG register fields */
+	rd_intfctl->en_16bit_unpack = devm_regmap_field_alloc(dev, map, v->cif_rddma_en_16bit_unpack);
+	rd_intfctl->intf_dyncclk = devm_regmap_field_alloc(dev, map, v->cif_rddma_intf_dyncclk);
+	rd_intfctl->fs_out_gate = devm_regmap_field_alloc(dev, map, v->cif_rddma_fs_out_gate);
+	rd_intfctl->fs_sel = devm_regmap_field_alloc(dev, map, v->cif_rddma_fs_sel);
+	rd_intfctl->fs_delay = devm_regmap_field_alloc(dev, map, v->cif_rddma_fs_delay);
+	rd_intfctl->active_ch_en = devm_regmap_field_alloc(dev, map, v->cif_rddma_active_ch_en);
+
+	/* ===================================================================
+	 * Allocate WRDMA (TX/Capture) regmap fields for all 4 channels
+	 * ===================================================================*/
+
+	/* CTL register fields */
+	wr_dmactl->enable = devm_regmap_field_alloc(dev, map, v->cif_wrdma_enable);
+	wr_dmactl->reset = devm_regmap_field_alloc(dev, map, v->cif_wrdma_reset);
+
+	/* CFG register fields */
+	wr_dmactl->shram_wm = devm_regmap_field_alloc(dev, map, v->cif_wrdma_shram_wm);
+	wr_dmactl->burst1 = devm_regmap_field_alloc(dev, map, v->cif_wrdma_burst1);
+	wr_dmactl->burst2 = devm_regmap_field_alloc(dev, map, v->cif_wrdma_burst2);
+	wr_dmactl->burst4 = devm_regmap_field_alloc(dev, map, v->cif_wrdma_burst4);
+	wr_dmactl->burst8 = devm_regmap_field_alloc(dev, map, v->cif_wrdma_burst8);
+	wr_dmactl->burst16 = devm_regmap_field_alloc(dev, map, v->cif_wrdma_burst16);
+	wr_dmactl->dma_dyncclk = devm_regmap_field_alloc(dev, map, v->cif_wrdma_dma_dyncclk);
+	wr_dmactl->num_ot = devm_regmap_field_alloc(dev, map, v->cif_wrdma_num_ot);
+
+	/* INTF_CFG register fields */
+	wr_intfctl->en_16bit_unpack = devm_regmap_field_alloc(dev, map, v->cif_wrdma_en_16bit_unpack);
+	wr_intfctl->intf_dyncclk = devm_regmap_field_alloc(dev, map, v->cif_wrdma_intf_dyncclk);
+	wr_intfctl->fs_out_gate = devm_regmap_field_alloc(dev, map, v->cif_wrdma_fs_out_gate);
+	wr_intfctl->fs_sel = devm_regmap_field_alloc(dev, map, v->cif_wrdma_fs_sel);
+	wr_intfctl->fs_delay = devm_regmap_field_alloc(dev, map, v->cif_wrdma_fs_delay);
+	wr_intfctl->active_ch_en = devm_regmap_field_alloc(dev, map, v->cif_wrdma_active_ch_en);
+
+	/* ===================================================================
+	 * Check for allocation errors
+	 * ===================================================================*/
+	if (IS_ERR(rd_dmactl->enable) || IS_ERR(wr_dmactl->enable) ||
+	    IS_ERR(rd_dmactl->reset) || IS_ERR(wr_dmactl->reset) ||
+	    IS_ERR(rd_dmactl->num_ot) || IS_ERR(wr_dmactl->num_ot) ||
+	    IS_ERR(rd_dmactl->dma_dyncclk) || IS_ERR(wr_dmactl->dma_dyncclk) ||
+	    IS_ERR(rd_dmactl->burst16) || IS_ERR(wr_dmactl->burst16) ||
+	    IS_ERR(rd_dmactl->burst8) || IS_ERR(wr_dmactl->burst8) ||
+	    IS_ERR(rd_dmactl->burst4) || IS_ERR(wr_dmactl->burst4) ||
+	    IS_ERR(rd_dmactl->burst2) || IS_ERR(wr_dmactl->burst2) ||
+	    IS_ERR(rd_dmactl->burst1) || IS_ERR(wr_dmactl->burst1) ||
+	    IS_ERR(rd_dmactl->shram_wm) || IS_ERR(wr_dmactl->shram_wm) ||
+	    IS_ERR(rd_intfctl->active_ch_en) || IS_ERR(wr_intfctl->active_ch_en) ||
+	    IS_ERR(rd_intfctl->fs_sel) || IS_ERR(wr_intfctl->fs_sel) || 
+	    IS_ERR(rd_intfctl->fs_delay) || IS_ERR(wr_intfctl->fs_delay) || 
+	    IS_ERR(rd_intfctl->fs_out_gate) || IS_ERR(wr_intfctl->fs_out_gate) ||
+	    IS_ERR(rd_intfctl->intf_dyncclk) || IS_ERR(wr_intfctl->intf_dyncclk) ||
+	    IS_ERR(rd_intfctl->en_16bit_unpack) || IS_ERR(wr_intfctl->en_16bit_unpack)) {
+		dev_err(dev, "error allocating codec dma regmap fields\n");
+		return -EINVAL;
+	}
+
+	/* Store in variant data */
+	v->cif_rd_dmactl = rd_dmactl;
+	v->cif_wr_dmactl = wr_dmactl;
+	v->cif_rddma_intfctl = rd_intfctl;
+	v->cif_wrdma_intfctl = wr_intfctl;
+
+	return 0;
+}
+
+static struct qaif_cdc_intfctl *qaif_get_cif_intfctl_handle(struct snd_pcm_substream *substream,
+					struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *soc_runtime = snd_soc_substream_to_rtd(substream);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(soc_runtime, 0);
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	struct qaif_variant *v = drvdata->variant;
+	unsigned int dai_id = cpu_dai->driver->id;
+	struct qaif_cdc_intfctl *intfctl = NULL;
+
+	if (!v) {
+		dev_err(soc_runtime->dev, "No variant data\n");
+		return intfctl;
+	}
+
+	switch (dai_id) {
+	case LPASS_CDC_DMA_RX0 ... LPASS_CDC_DMA_RX9:
+		intfctl = v->cif_rddma_intfctl;
+		break;
+	case LPASS_CDC_DMA_TX0 ... LPASS_CDC_DMA_TX8:
+	case LPASS_CDC_DMA_VA_TX0 ... LPASS_CDC_DMA_VA_TX8:
+		intfctl = v->cif_wrdma_intfctl;
+		break;
+	default:
+		dev_err(soc_runtime->dev, "invalid dai id for dma ctl: %d\n", dai_id);
+		break;
+	}
+	return intfctl;
+}
+
+static int qaif_cif_daiops_hw_params(struct snd_pcm_substream *substream,
+				      struct snd_pcm_hw_params *params,
+				      struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *soc_runtime = snd_soc_substream_to_rtd(substream);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(soc_runtime, 0);
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	struct qaif_variant *v = drvdata->variant;
+	struct qaif_cdc_intfctl *intfctl = NULL;
+	unsigned int dai_id = cpu_dai->driver->id;
+	unsigned int ret, regval;
+	unsigned int channels = params_channels(params);
+	int idx;
+
+	switch (channels) {
+	case 1:
+		regval = QAIF_CIF_DMA_INTF_ONE_CHANNEL;
+		break;
+	case 2:
+		regval = QAIF_CIF_DMA_INTF_TWO_CHANNEL;
+		break;
+	case 4:
+		regval = QAIF_CIF_DMA_INTF_FOUR_CHANNEL;
+		break;
+	case 6:
+		regval = QAIF_CIF_DMA_INTF_SIX_CHANNEL;
+		break;
+	case 8:
+		regval = QAIF_CIF_DMA_INTF_EIGHT_CHANNEL;
+		break;
+	default:
+		dev_err(soc_runtime->dev, "invalid PCM config\n");
+		return -EINVAL;
+	}
+
+	intfctl = qaif_get_cif_intfctl_handle(substream, dai);
+	if (!intfctl) {
+		dev_err(soc_runtime->dev, "Invalid intfctl: %d\n", dai_id);
+		return -EINVAL;
+	}
+	idx = v->get_dma_idx(dai_id);
+	if (idx < 0) {
+		dev_err(soc_runtime->dev, "Invalid DMA index: %d\n", idx);
+		return -EINVAL;
+	}
+	//active channel mask
+	ret = regmap_fields_write(intfctl->active_ch_en, idx, regval);
+	if (ret) {
+		dev_err(soc_runtime->dev,
+			"error writing to intfctl active_ch_en reg field: %d\n", ret);
+		return ret;
+	}
+	return 0;
+}
+
+static int qaif_cif_daiops_trigger(struct snd_pcm_substream *substream,
+				    int cmd, struct snd_soc_dai *dai)
+{
+	struct snd_soc_pcm_runtime *soc_runtime = snd_soc_substream_to_rtd(substream);
+	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(soc_runtime, 0);
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	struct qaif_variant *v = drvdata->variant;
+	unsigned int dai_id = cpu_dai->driver->id;
+	struct qaif_cdc_intfctl *intfctl = NULL;
+	int ret = 0, idx;
+
+	intfctl = qaif_get_cif_intfctl_handle(substream, dai);
+	if (!intfctl) {
+		dev_err(soc_runtime->dev, "Invalid intfctl: %d\n", dai_id);
+		return -EINVAL;
+	}
+	idx = v->get_dma_idx(dai_id);
+	if (idx < 0) {
+		dev_err(soc_runtime->dev, "Invalid DMA index: %d\n", idx);
+		return -EINVAL;
+	}
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		ret = regmap_fields_write(intfctl->intf_dyncclk, idx, 1);
+		if (ret) {
+			dev_err(soc_runtime->dev, "error writing to dmactl intf_dyncclk reg field: %d\n", ret);
+			return ret;
+		}
+		// ToDo: Hardcoded for now, Later to modify dynamically
+		ret = regmap_fields_write(intfctl->fs_sel, idx, 0x0);
+		if (ret) {
+			dev_err(soc_runtime->dev, "error writing to dmactl codec_fs_sel reg field: %d\n", ret);
+			return ret;
+		}
+
+		ret = regmap_fields_write(intfctl->en_16bit_unpack, idx, 0x1); //ToDo: based on bw and packing enable flag
+		if (ret) {
+			dev_err(soc_runtime->dev, "error writing to dmactl en_16bit_unpack reg field: %d\n", ret);
+			return ret;
+		}
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		ret = regmap_fields_write(intfctl->intf_dyncclk, idx, 0);
+		if (ret) {
+			dev_err(soc_runtime->dev, "error writing to dmactl intf_dyncclk reg field: %d\n", ret);
+			return ret;
+		}
+		ret = regmap_fields_write(intfctl->en_16bit_unpack, idx, 0);
+		if (ret) {
+			dev_err(soc_runtime->dev, "error writing to dmactl en_16bit_unpack reg field: %d\n", ret);
+			return ret;
+		}
+		break;
+	default:
+		ret = -EINVAL;
+		dev_err(soc_runtime->dev, "%s: invalid %d interface\n", __func__, cmd);
+		break;
+	}
+	return ret;
+}
+
+const struct snd_soc_dai_ops asoc_qcom_qaif_cif_dai_ops = {
+	.hw_params	= qaif_cif_daiops_hw_params,
+	.trigger	= qaif_cif_daiops_trigger,
+};
+EXPORT_SYMBOL_GPL(asoc_qcom_qaif_cif_dai_ops);
+
+static int qaif_aif_cfg_cpu_init_bitfields(struct device *dev,
+					    struct regmap *map)
+{
+	struct qaif_drv_data *drvdata = dev_get_drvdata(dev);
+	struct qaif_variant *v = drvdata->variant;
+	struct qaif_aud_intfctl *aif_intfctl;
+
+	/* Allocate AIF interface control structure */
+	aif_intfctl = devm_kzalloc(dev, sizeof(struct qaif_aud_intfctl), GFP_KERNEL);
+	if (!aif_intfctl)
+		return -ENOMEM;
+
+	/* ===================================================================
+	 * Allocate regmap fields for AUD_INTF SYNC_CFG register
+	 * ===================================================================*/
+	aif_intfctl->inv_sync = devm_regmap_field_alloc(dev, map, v->aif_inv_sync);
+	aif_intfctl->sync_delay = devm_regmap_field_alloc(dev, map, v->aif_sync_delay);
+	aif_intfctl->sync_mode = devm_regmap_field_alloc(dev, map, v->aif_sync_mode);
+	aif_intfctl->sync_src = devm_regmap_field_alloc(dev, map, v->aif_sync_src);
+
+	/* ===================================================================
+	 * Allocate regmap fields for AUD_INTF BIT_WIDTH_CFG register
+	 * ===================================================================*/
+	aif_intfctl->slot_width_rx = devm_regmap_field_alloc(dev, map, v->aif_slot_width_rx);
+	aif_intfctl->slot_width_tx = devm_regmap_field_alloc(dev, map, v->aif_slot_width_tx);
+	aif_intfctl->sample_width_rx = devm_regmap_field_alloc(dev, map, v->aif_sample_width_rx);
+	aif_intfctl->sample_width_tx = devm_regmap_field_alloc(dev, map, v->aif_sample_width_tx);
+
+	/* ===================================================================
+	 * Allocate regmap fields for AUD_INTF MI2S_CFG register
+	 * ===================================================================*/
+	aif_intfctl->mono_mode_rx = devm_regmap_field_alloc(dev, map, v->aif_mono_mode_rx);
+	aif_intfctl->mono_mode_tx = devm_regmap_field_alloc(dev, map, v->aif_mono_mode_tx);
+
+	/* ===================================================================
+	 * Allocate regmap fields for AUD_INTF LANE_CFG register
+	 * ===================================================================*/
+	aif_intfctl->lane_en = devm_regmap_field_alloc(dev, map, v->aif_lane_en);
+	aif_intfctl->lane_dir = devm_regmap_field_alloc(dev, map, v->aif_lane_dir);
+	aif_intfctl->loopback_en = devm_regmap_field_alloc(dev, map, v->aif_loopback_en);
+	aif_intfctl->ctrl_data_oe = devm_regmap_field_alloc(dev, map, v->aif_ctrl_data_oe);
+
+	/* ===================================================================
+	 * Allocate regmap fields for AUD_INTF SLOT_EN registers
+	 * ===================================================================*/
+	aif_intfctl->slot_en_rx_mask = devm_regmap_field_alloc(dev, map, v->aif_slot_en_rx_mask);
+	aif_intfctl->slot_en_tx_mask = devm_regmap_field_alloc(dev, map, v->aif_slot_en_tx_mask);
+
+	/* ===================================================================
+	 * Allocate regmap fields for AUD_INTF FRAME_CFG register
+	 * ===================================================================*/
+	aif_intfctl->bits_per_lane = devm_regmap_field_alloc(dev, map, v->aif_bits_per_lane);
+
+	/* ===================================================================
+	 * Allocate regmap fields for AUD_INTF CFG register
+	 * ===================================================================*/
+	aif_intfctl->full_cycle_en = devm_regmap_field_alloc(dev, map, v->aif_full_cycle_en);
+
+	/* ===================================================================
+	 * Check for allocation errors
+	 * ===================================================================*/
+	if (IS_ERR(aif_intfctl->inv_sync) || IS_ERR(aif_intfctl->sync_delay) ||
+	    IS_ERR(aif_intfctl->sync_mode) || IS_ERR(aif_intfctl->sync_src) ||
+	    IS_ERR(aif_intfctl->slot_width_rx) || IS_ERR(aif_intfctl->slot_width_tx) ||
+	    IS_ERR(aif_intfctl->sample_width_rx) || IS_ERR(aif_intfctl->sample_width_tx) ||
+	    IS_ERR(aif_intfctl->mono_mode_rx) || IS_ERR(aif_intfctl->mono_mode_tx) ||
+	    IS_ERR(aif_intfctl->lane_en) || IS_ERR(aif_intfctl->lane_dir) ||
+	    IS_ERR(aif_intfctl->loopback_en) || IS_ERR(aif_intfctl->ctrl_data_oe) ||
+	    IS_ERR(aif_intfctl->slot_en_rx_mask) || IS_ERR(aif_intfctl->slot_en_tx_mask) ||
+	    IS_ERR(aif_intfctl->bits_per_lane) || IS_ERR(aif_intfctl->full_cycle_en)) {
+		dev_err(dev, "error allocating AIF interface regmap fields\n");
+		return -EINVAL;
+	}
+
+	/* Store in variant data */
+	v->aif_intfctl = aif_intfctl;
+
+	dev_info(dev, "Successfully initialized AIF interface control bitfields\n");
+	return 0;
+}
+
+
+
+static int qaif_aif_cpu_init_bitfields(struct device *dev,
+			struct regmap *map)
+{
+	struct qaif_drv_data *drvdata = dev_get_drvdata(dev);
+	struct qaif_variant *v = drvdata->variant;
+	struct qaif_dmactl *rd_dmactl;
+	struct qaif_dmactl *wr_dmactl;
+
+	/* Allocate RDDMA control structure */
+	rd_dmactl = devm_kzalloc(dev, sizeof(struct qaif_dmactl), GFP_KERNEL);
+	if (!rd_dmactl)
+		return -ENOMEM;
+
+	/* Allocate WRDMA control structure */
+	wr_dmactl = devm_kzalloc(dev, sizeof(struct qaif_dmactl), GFP_KERNEL);
+	if (!wr_dmactl)
+		return -ENOMEM;
+
+	/* ===================================================================
+	 * Allocate RDDMA (RX/Playback) regmap fields for all 4 channels
+	 * ===================================================================*/
+
+	/* CTL register fields */
+	rd_dmactl->enable = devm_regmap_field_alloc(dev, map, v->rddma_enable);
+	rd_dmactl->reset = devm_regmap_field_alloc(dev, map, v->rddma_reset);
+
+	/* CFG register fields */
+	rd_dmactl->shram_wm = devm_regmap_field_alloc(dev, map, v->rddma_shram_wm);
+	rd_dmactl->burst1 = devm_regmap_field_alloc(dev, map, v->rddma_burst1);
+	rd_dmactl->burst2 = devm_regmap_field_alloc(dev, map, v->rddma_burst2);
+	rd_dmactl->burst4 = devm_regmap_field_alloc(dev, map, v->rddma_burst4);
+	rd_dmactl->burst8 = devm_regmap_field_alloc(dev, map, v->rddma_burst8);
+	rd_dmactl->burst16 = devm_regmap_field_alloc(dev, map, v->rddma_burst16);
+	rd_dmactl->dma_dyncclk = devm_regmap_field_alloc(dev, map, v->rddma_dma_dyncclk);
+	rd_dmactl->num_ot = devm_regmap_field_alloc(dev, map, v->rddma_num_ot);
+
+	/* ===================================================================
+	 * Allocate WRDMA (TX/Capture) regmap fields for all 4 channels
+	 * ===================================================================*/
+
+	/* CTL register fields */
+	wr_dmactl->enable = devm_regmap_field_alloc(dev, map, v->wrdma_enable);
+	wr_dmactl->reset = devm_regmap_field_alloc(dev, map, v->wrdma_reset);
+
+	/* CFG register fields */
+	wr_dmactl->shram_wm = devm_regmap_field_alloc(dev, map, v->wrdma_shram_wm);
+	wr_dmactl->burst1 = devm_regmap_field_alloc(dev, map, v->wrdma_burst1);
+	wr_dmactl->burst2 = devm_regmap_field_alloc(dev, map, v->wrdma_burst2);
+	wr_dmactl->burst4 = devm_regmap_field_alloc(dev, map, v->wrdma_burst4);
+	wr_dmactl->burst8 = devm_regmap_field_alloc(dev, map, v->wrdma_burst8);
+	wr_dmactl->burst16 = devm_regmap_field_alloc(dev, map, v->wrdma_burst16);
+	wr_dmactl->dma_dyncclk = devm_regmap_field_alloc(dev, map, v->wrdma_dma_dyncclk);
+	wr_dmactl->num_ot = devm_regmap_field_alloc(dev, map, v->wrdma_num_ot);
+
+	/* ===================================================================
+	 * Check for allocation errors
+	 * ===================================================================*/
+	if (IS_ERR(rd_dmactl->enable) || IS_ERR(wr_dmactl->enable) ||
+	    IS_ERR(rd_dmactl->reset) || IS_ERR(wr_dmactl->reset) ||
+	    IS_ERR(rd_dmactl->num_ot) || IS_ERR(wr_dmactl->num_ot) ||
+	    IS_ERR(rd_dmactl->dma_dyncclk) || IS_ERR(wr_dmactl->dma_dyncclk) ||
+	    IS_ERR(rd_dmactl->burst16) || IS_ERR(wr_dmactl->burst16) ||
+	    IS_ERR(rd_dmactl->burst8) || IS_ERR(wr_dmactl->burst8) || 
+	    IS_ERR(rd_dmactl->burst4) || IS_ERR(wr_dmactl->burst4) || 
+	    IS_ERR(rd_dmactl->burst2) || IS_ERR(wr_dmactl->burst2) ||
+	    IS_ERR(rd_dmactl->burst1) || IS_ERR(wr_dmactl->burst1) ||
+	    IS_ERR(rd_dmactl->shram_wm) || IS_ERR(wr_dmactl->shram_wm)) {
+		dev_err(dev, "error allocating AIF dma regmap fields\n");
+		return -EINVAL;
+	}
+
+	/* Store in variant data */
+	v->aif_rd_dmactl = rd_dmactl;
+	v->aif_wr_dmactl = wr_dmactl;
+
+	return 0;
+}
+
+static int qaif_aif_cpu_daiops_set_sysclk(struct snd_soc_dai *dai, int clk_id,
+		unsigned int freq, int dir)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	const struct qaif_variant *v = drvdata->variant;
+	int idx = v->get_dma_idx(dai->driver->id);
+	int ret;
+
+	ret = clk_set_rate(drvdata->mi2s_osr_clk[idx], freq);
+	if (ret)
+		dev_err(dai->dev, "error setting mi2s osrclk to %u: %d\n",
+			freq, ret);
+
+	return ret;
+}
+
+static int qaif_aif_cpu_daiops_startup(struct snd_pcm_substream *substream,
+		struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	const struct qaif_variant *v = drvdata->variant;
+	int idx = v->get_dma_idx(dai->driver->id);
+	int ret;
+
+	ret = clk_prepare_enable(drvdata->mi2s_osr_clk[idx]);
+	if (ret) {
+		dev_err(dai->dev, "error in enabling mi2s osr clk: %d\n", ret);
+		return ret;
+	}
+	ret = clk_prepare(drvdata->mi2s_bit_clk[idx]);
+	if (ret) {
+		dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
+		clk_disable_unprepare(drvdata->mi2s_osr_clk[idx]);
+		return ret;
+	}
+	return 0;
+}
+
+static void qaif_aif_cpu_daiops_shutdown(struct snd_pcm_substream *substream,
+		struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	const struct qaif_variant *v = drvdata->variant;
+	int idx = v->get_dma_idx(dai->driver->id);
+
+	clk_disable_unprepare(drvdata->mi2s_osr_clk[idx]);
+	/*
+	 * Ensure LRCLK is disabled even in device node validation.
+	 * Will not impact if disabled in qaif_aif_cpu_daiops_trigger()
+	 * suspend.
+	 */
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		regmap_write(drvdata->audio_qaif_map,
+			QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_TX);
+	else
+		regmap_write(drvdata->audio_qaif_map,
+			QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_RX);
+
+	/*
+	 * BCLK may not be enabled if qaif_aif_cpu_daiops_prepare is called before
+	 * qaif_aif_cpu_daiops_shutdown. It's paired with the clk_enable in
+	 * qaif_aif_cpu_daiops_prepare.
+	 */
+	if (drvdata->mi2s_was_prepared[idx]) {
+		drvdata->mi2s_was_prepared[idx] = false;
+		clk_disable(drvdata->mi2s_bit_clk[idx]);
+	}
+
+	clk_unprepare(drvdata->mi2s_bit_clk[idx]);
+}
+
+static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
+		struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	struct qaif_variant *v = drvdata->variant;
+	struct qaif_aud_intfctl *aif_intfctl = v->aif_intfctl;
+	unsigned int idx;
+	struct qaif_aif_config *aif_intf_cfg = NULL;
+	snd_pcm_format_t format = params_format(params);
+	unsigned int channels = params_channels(params);
+	unsigned int rate = params_rate(params);
+	int bitwidth, ret;
+
+	if (!aif_intfctl) {
+		dev_err(dai->dev, "AIF interface control not initialized\n");
+		return -EINVAL;
+	}
+
+	idx = v->get_dma_idx(dai->driver->id);
+	aif_intf_cfg = &v->aif_intf_cfg[idx];
+
+	if (!aif_intf_cfg) {
+		dev_err(dai->dev, "AIF interface config not found\n");
+		return -EINVAL;
+	}
+	bitwidth = snd_pcm_format_width(format);
+	if (bitwidth < 0) {
+		dev_err(dai->dev, "invalid bit width given: %d\n", bitwidth);
+		return bitwidth;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->sync_mode, idx, aif_intf_cfg->sync_mode);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write sync_mode: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->sync_src, idx, aif_intf_cfg->sync_src);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write sync_src: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->inv_sync, idx, aif_intf_cfg->invert_sync);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write invert_sync: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->sync_delay, idx, aif_intf_cfg->sync_delay);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write sync_delay: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->ctrl_data_oe, idx, aif_intf_cfg->ctrl_data_oe);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write ctrl_data_oe: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->loopback_en, idx, aif_intf_cfg->loopback_en);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write loopback_en: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->lane_en, idx, aif_intf_cfg->lane_en_mask);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write lane_en (mask=0x%02X): %d\n", 
+			aif_intf_cfg->lane_en_mask, ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->lane_dir, idx, aif_intf_cfg->lane_dir_mask);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write lane_dir (mask=0x%02X): %d\n", 
+			aif_intf_cfg->lane_dir_mask, ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->bits_per_lane, idx, aif_intf_cfg->bits_per_lane);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write bits_per_lane: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_fields_write(aif_intfctl->full_cycle_en, idx, aif_intf_cfg->full_cycle_en);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write full_cycle_en: %d\n", ret);
+		return ret;
+	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+
+		ret = regmap_fields_write(aif_intfctl->slot_width_tx, idx, QAIF_AIF_SLOT_WIDTH(aif_intf_cfg->slot_width_tx));
+		if (ret) {
+			dev_err(dai->dev, "Failed to write slot_width_tx: %d\n", ret);
+			return ret;
+		}
+
+		ret = regmap_fields_write(aif_intfctl->sample_width_tx, idx, QAIF_AIF_SAMPLE_WIDTH(bitwidth));
+		if (ret) {
+			dev_err(dai->dev, "Failed to write sample_width_tx: %d\n", ret);
+			return ret;
+		}
+		ret = regmap_fields_write(aif_intfctl->slot_en_tx_mask, idx, aif_intf_cfg->slot_en_tx_mask);
+		if (ret) {
+			dev_err(dai->dev, "Failed to write slot_en_tx_mask (0x%08X): %d\n", 
+				aif_intf_cfg->slot_en_tx_mask, ret);
+			return ret;
+		}
+		if (channels >= 2) {
+			ret = regmap_fields_write(aif_intfctl->mono_mode_tx, idx, QAIF_AUD_INTF_CTL_STEREO);
+			if (ret) {
+				dev_err(dai->dev, "Failed to write mono_mode_tx: %d\n", ret);
+				return ret;
+			}
+		} else {
+			ret = regmap_fields_write(aif_intfctl->mono_mode_tx, idx, QAIF_AUD_INTF_CTL_MONO);
+			if (ret) {
+				dev_err(dai->dev, "Failed to write mono_mode_tx: %d\n", ret);
+				return ret;
+			}
+		}
+	} else {
+
+		ret = regmap_fields_write(aif_intfctl->slot_width_rx, idx, QAIF_AIF_SLOT_WIDTH(aif_intf_cfg->slot_width_rx));
+		if (ret) {
+			dev_err(dai->dev, "Failed to write slot_width_rx: %d\n", ret);
+			return ret;
+		}
+
+		ret = regmap_fields_write(aif_intfctl->sample_width_rx, idx, QAIF_AIF_SAMPLE_WIDTH(bitwidth));
+		if (ret) {
+			dev_err(dai->dev, "Failed to write sample_width_rx: %d\n", ret);
+			return ret;
+		}
+		ret = regmap_fields_write(aif_intfctl->slot_en_rx_mask, idx, aif_intf_cfg->slot_en_rx_mask);
+		if (ret) {
+			dev_err(dai->dev, "Failed to write slot_en_rx_mask (0x%08X): %d\n", 
+				aif_intf_cfg->slot_en_rx_mask, ret);
+			return ret;
+		}
+		if (channels >= 2) {
+			ret = regmap_fields_write(aif_intfctl->mono_mode_rx, idx, QAIF_AUD_INTF_CTL_STEREO);
+			if (ret) {
+				dev_err(dai->dev, "Failed to write mono_mode_rx: %d\n", ret);
+				return ret;
+			}
+		} else {
+			ret = regmap_fields_write(aif_intfctl->mono_mode_rx, idx, QAIF_AUD_INTF_CTL_MONO);
+			if (ret) {
+				dev_err(dai->dev, "Failed to write mono_mode_rx: %d\n", ret);
+				return ret;
+			}
+		}
+	}
+
+	if (ret) {
+		dev_err(dai->dev, "error writing to aif_intfctl channels mode: %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(drvdata->mi2s_bit_clk[idx],
+			   rate * bitwidth * channels);
+	if (ret) {
+		dev_err(dai->dev, "error setting mi2s bitclk to %u: %d\n",
+			rate * bitwidth * channels, ret);
+		return ret;
+	}
+	dev_dbg(dai->dev, "setting mi2s bitclk to %u\n",
+		rate * bitwidth * channels);
+
+	return 0;
+}
+
+static int qaif_aif_cpu_daiops_trigger(struct snd_pcm_substream *substream,
+		int cmd, struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	const struct qaif_variant *v = drvdata->variant;
+	int idx = v->get_dma_idx(dai->driver->id);
+	int ret = -EINVAL;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+	case SNDRV_PCM_TRIGGER_RESUME:
+	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
+		/*
+		 * Ensure qaif_aif BCLK/LRCLK is enabled during
+		 * device resume as qaif_aif_cpu_daiops_prepare() is not called
+		 * after the device resumes. We don't check mi2s_was_prepared before
+		 * enable/disable BCLK in trigger events because:
+		 *  1. These trigger events are paired, so the BCLK
+		 *     enable_count is balanced.
+		 *  2. the BCLK can be shared (ex: headset and headset mic),
+		 *     we need to increase the enable_count so that we don't
+		 *     turn off the shared BCLK while other devices are using
+		 *     it.
+		 */
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			ret = regmap_write(drvdata->audio_qaif_map,
+					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_TX);
+		} else  {
+			ret = regmap_write(drvdata->audio_qaif_map,
+					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_RX);
+		}
+		if (ret)
+			dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
+
+		ret = clk_enable(drvdata->mi2s_bit_clk[idx]);
+		if (ret) {
+			dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
+			clk_disable(drvdata->mi2s_osr_clk[idx]);
+			return ret;
+		}
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+	case SNDRV_PCM_TRIGGER_SUSPEND:
+	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
+		/*
+		 * To ensure qaif_aif BCLK/LRCLK is disabled during
+		 * device suspend.
+		 */
+		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			ret = regmap_write(drvdata->audio_qaif_map,
+					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_TX);
+		} else  {
+			ret = regmap_write(drvdata->audio_qaif_map,
+					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_RX);
+		}
+		if (ret)
+			dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
+
+		clk_disable(drvdata->mi2s_bit_clk[idx]);
+
+		break;
+	}
+
+	return ret;
+}
+
+static int qaif_aif_cpu_daiops_prepare(struct snd_pcm_substream *substream,
+		struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	const struct qaif_variant *v = drvdata->variant;
+	int idx = v->get_dma_idx(dai->driver->id);
+	int ret;
+
+	/*
+	 * Check mi2s_was_prepared before enabling BCLK as qaif_aif_cpu_daiops_prepare can
+	 * be called multiple times. It's paired with the clk_disable in
+	 * qaif_aif_cpu_daiops_shutdown.
+	 */
+	if (!drvdata->mi2s_was_prepared[idx]) {
+		ret = clk_enable(drvdata->mi2s_bit_clk[idx]);
+		if (ret) {
+			dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
+			return ret;
+		}
+		drvdata->mi2s_was_prepared[idx] = true;
+	}
+	return 0;
+}
+
+static int qaif_aif_cpu_daiops_probe(struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	const struct qaif_variant *v = drvdata->variant;
+	int idx = v->get_dma_idx(dai->driver->id);
+	int ret;
+
+	/* ensure audio ctrl is disabled */
+	ret = regmap_write(drvdata->audio_qaif_map,
+			QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET);
+	if (ret)
+		dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
+
+	return ret;
+}
+
+const struct snd_soc_dai_ops asoc_qcom_qaif_aif_cpu_dai_ops = {
+	.probe		= qaif_aif_cpu_daiops_probe,
+	.set_sysclk	= qaif_aif_cpu_daiops_set_sysclk,
+	.startup	= qaif_aif_cpu_daiops_startup,
+	.shutdown	= qaif_aif_cpu_daiops_shutdown,
+	.hw_params	= qaif_aif_cpu_daiops_hw_params,
+	.trigger	= qaif_aif_cpu_daiops_trigger,
+	.prepare	= qaif_aif_cpu_daiops_prepare,
+};
+EXPORT_SYMBOL_GPL(asoc_qcom_qaif_aif_cpu_dai_ops);
+
+static int asoc_qcom_of_xlate_dai_name(struct snd_soc_component *component,
+				   const struct of_phandle_args *args,
+				   const char **dai_name)
+{
+	struct qaif_drv_data *drvdata = snd_soc_component_get_drvdata(component);
+	struct qaif_variant *v = drvdata->variant;
+	int id = args->args[0];
+	int ret = -EINVAL;
+	int i;
+
+	for (i = 0; i  < v->num_dai; i++) {
+		if (v->dai_driver[i].id == id) {
+			*dai_name = v->dai_driver[i].name;
+			ret = 0;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static const struct snd_soc_component_driver qaif_cpu_comp_driver = {
+	.name = "qaif-cpu",
+	.of_xlate_dai_name = asoc_qcom_of_xlate_dai_name,
+	.legacy_dai_naming = 1,
+};
+
+static bool __audio_qaif_regmap_accessible(struct device *dev, unsigned int reg, bool rw)
+{
+	struct qaif_drv_data *drvdata = dev_get_drvdata(dev);
+	struct qaif_variant *v = drvdata->variant;
+	int i;
+
+	if (reg == QAIF_EE_OVERLAP_IRQ_EN_REG)
+		return true;
+	if (reg == QAIF_EE_OVERLAP_IRQ_RAW_STATUS_REG)
+		return true;
+	if (reg == QAIF_EE_OVERLAP_IRQ_CLEAR_REG)
+		return true;
+	if (reg == QAIF_EE_OVERLAP_IRQ_FORCE_REG)
+		return true;
+
+	for (i = 0; i < DMA_TYPE_MAX; i++) {
+		//RDDMA IRQ
+		if (reg == QAIF_EE_RDDMA_PERIOD_IRQ_EN_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_PERIOD_IRQ_FORCE_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_UNDERFLOW_IRQ_EN_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_UNDERFLOW_IRQ_FORCE_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_ERR_RSP_IRQ_EN_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_ERR_RSP_IRQ_FORCE_REG(v, i))
+			return true;
+
+		//WRDMA IRQ
+		if (reg == QAIF_EE_WRDMA_PERIOD_IRQ_EN_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_PERIOD_IRQ_FORCE_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_OVERFLOW_IRQ_EN_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_OVERFLOW_IRQ_FORCE_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_ERR_RSP_IRQ_EN_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_ERR_RSP_IRQ_FORCE_REG(v, i))
+			return true;
+	}
+
+	for (i = 0; i < v->num_rddma; i++) {
+		if (reg == QAIF_RDDMA_CTL_REG(v, i))
+			return true;
+		if (reg == QAIF_RDDMA_CFG_REG(v, i))
+			return true;
+		if (reg == QAIF_RDDMA_BASE_ADDR_REG(v, i))
+			return true;
+		if (reg == QAIF_RDDMA_BUFF_LEN_REG(v, i))
+			return true;
+		if (reg == QAIF_RDDMA_PERIOD_LEN_REG(v, i))
+			return true;
+		if (rw == QAIF_AIF_REG_READ) {
+			if (reg == QAIF_RDDMA_CURR_ADDR_REG(v, i))
+				return true;
+			if (reg == QAIF_RDDMA_PERIOD_CNT_REG(v, i))
+				return true;
+		}
+	}
+
+	for (i = 0; i < v->num_wrdma; i++) {
+		if (reg == QAIF_WRDMA_CTL_REG(v, i))
+			return true;
+		if (reg == QAIF_WRDMA_CFG_REG(v, i))
+			return true;
+		if (reg == QAIF_WRDMA_BASE_ADDR_REG(v, i))
+			return true;
+		if (reg == QAIF_WRDMA_BUFF_LEN_REG(v, i))
+			return true;
+		if (reg == QAIF_WRDMA_PERIOD_LEN_REG(v, i))
+			return true;
+		if (rw == QAIF_AIF_REG_READ) {
+			if (reg == QAIF_WRDMA_CURR_ADDR_REG(v, i))
+				return true;
+			if (reg == QAIF_WRDMA_PERIOD_CNT_REG(v, i))
+				return true;
+		}
+	}
+
+	for (i = 0; i < v->num_codec_rddma; i++) {
+		if (reg == QAIF_CODEC_RDDMA_CTL_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_RDDMA_CFG_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_RDDMA_BASE_ADDR_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_RDDMA_BUFF_LEN_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_RDDMA_PERIOD_LEN_REG(v, i))
+			return true;
+		if (rw == QAIF_AIF_REG_READ) {
+			if (reg == QAIF_CODEC_RDDMA_CURR_ADDR_REG(v, i))
+				return true;
+			if (reg == QAIF_CODEC_RDDMA_PERIOD_CNT_REG(v, i))
+				return true;
+		}
+	}
+
+	for (i = 0; i < v->num_codec_wrdma; i++) {
+		if (reg == QAIF_CODEC_WRDMA_CTL_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_WRDMA_CFG_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_WRDMA_BASE_ADDR_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_WRDMA_BUFF_LEN_REG(v, i))
+			return true;
+		if (reg == QAIF_CODEC_WRDMA_PERIOD_LEN_REG(v, i))
+			return true;
+		if (rw == QAIF_AIF_REG_READ) {
+			if (reg == QAIF_CODEC_WRDMA_CURR_ADDR_REG(v, i))
+				return true;
+			if (reg == QAIF_CODEC_WRDMA_PERIOD_CNT_REG(v, i))
+				return true;
+		}
+	}
+	return false;
+}
+
+static bool audio_qaif_regmap_writeable(struct device *dev, unsigned int reg)
+{
+	return __audio_qaif_regmap_accessible(dev, reg, QAIF_AIF_REG_WRITE);
+}
+
+static bool audio_qaif_regmap_readable(struct device *dev, unsigned int reg)
+{
+	return __audio_qaif_regmap_accessible(dev, reg, QAIF_AIF_REG_READ);
+}
+
+static bool audio_qaif_regmap_volatile(struct device *dev, unsigned int reg)
+{
+	struct qaif_drv_data *drvdata = dev_get_drvdata(dev);
+	struct qaif_variant *v = drvdata->variant;
+	int i;
+
+	for (i = 0; i < DMA_TYPE_MAX; i++) {
+		//RDDMA IRQ
+		if (reg == QAIF_EE_RDDMA_PERIOD_IRQ_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_PERIOD_IRQ_RAW_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_PERIOD_IRQ_CLR_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_UNDERFLOW_IRQ_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_UNDERFLOW_IRQ_RAW_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_UNDERFLOW_IRQ_CLR_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_ERR_RSP_IRQ_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_ERR_RSP_IRQ_RAW_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_RDDMA_ERR_RSP_IRQ_CLR_REG(v, i))
+			return true;
+
+		//WRDMA IRQ
+		if (reg == QAIF_EE_WRDMA_PERIOD_IRQ_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_PERIOD_IRQ_RAW_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_PERIOD_IRQ_CLR_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_OVERFLOW_IRQ_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_OVERFLOW_IRQ_RAW_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_OVERFLOW_IRQ_CLR_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_ERR_RSP_IRQ_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_ERR_RSP_IRQ_RAW_STAT_REG(v, i))
+			return true;
+		if (reg == QAIF_EE_WRDMA_ERR_RSP_IRQ_CLR_REG(v, i))
+			return true;
+	}
+
+	for (i = 0; i < v->num_rddma; i++)
+		if (reg == QAIF_RDDMA_CURR_ADDR_REG(v, i))
+			return true;
+
+	for (i = 0; i < v->num_wrdma; i++)
+		if (reg == QAIF_WRDMA_CURR_ADDR_REG(v, i))
+			return true;
+
+	for (i = 0; i < v->num_codec_rddma; i++)
+		if (reg == QAIF_CODEC_RDDMA_CURR_ADDR_REG(v, i))
+			return true;
+
+	for (i = 0; i < v->num_codec_wrdma; i++)
+		if (reg == QAIF_CODEC_WRDMA_CURR_ADDR_REG(v, i))
+			return true;
+
+	return false;
+}
+
+static struct regmap_config audio_qaif_regmap_config = {
+	.name = "audio_qaif_cpu",
+	.reg_bits = 32,
+	.reg_stride = 4,
+	.val_bits = 32,
+	.writeable_reg = audio_qaif_regmap_writeable,
+	.readable_reg = audio_qaif_regmap_readable,
+	.volatile_reg = audio_qaif_regmap_volatile,
+	.cache_type = REGCACHE_FLAT,
+};
+
+static int of_qaif_parse_aif_intf_cfg(struct device *dev,
+					struct qaif_drv_data *data)
+{
+	struct qaif_variant *v = data->variant;
+	struct device_node *np = dev->of_node;
+	struct device_node *intf_np;
+	struct qaif_aif_config *cfg;
+	const __be32 *lane_cfg_prop;
+	int num_interfaces, ret, i, j;
+	int lane_cfg_len;
+	int dai_id, intf_idx;
+
+	if (!v) {
+		dev_err(dev, "No variant data\n");
+		return -EINVAL;
+	}
+	/* Get count of interface phandles from aif-interface property */
+	num_interfaces = of_count_phandle_with_args(np, "aif-interface", NULL);
+	if (num_interfaces <= 0) {
+		dev_err(dev, "No aif-interface property found or invalid: %d\n", num_interfaces);
+		return -EINVAL;
+	}
+
+	if (num_interfaces > QAIF_MAX_AIF_CFG_CNT) {
+		dev_warn(dev, "Too many interfaces (%d), limiting to %d\n",
+			 num_interfaces, QAIF_MAX_AIF_CFG_CNT);
+		num_interfaces = QAIF_MAX_AIF_CFG_CNT;
+	}
+
+	dev_info(dev, "Found %d AIF interfaces to parse\n", num_interfaces);
+
+	/* Parse each interface node */
+	for (i = 0; i < num_interfaces; i++) {
+		intf_np = of_parse_phandle(np, "aif-interface", i);
+		if (!intf_np) {
+			dev_err(dev, "Failed to get interface node %d\n", i);
+			continue;
+		}
+
+		dev_info(dev, "=== Parsing Interface %d: %s ===\n", i, intf_np->name);
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-intf-dai-id", &dai_id);
+		if (ret) {
+			dev_err(dev, "Missing dai-id for interface %d: %s ===\n", i, intf_np->name);
+			return -EINVAL;
+		}
+
+		if (v->get_dma_idx) {
+			intf_idx = v->get_dma_idx(dai_id);
+			if (intf_idx < 0) {
+				dev_err(dev, "invalid intf idx for : %d: %s ===\n", i, intf_np->name);
+				return -EINVAL;
+			}
+		} else {
+			dev_err(dev, "can not get intf idx for : %d: %s ===\n", i, intf_np->name);
+			return -EINVAL;
+		}
+		cfg = &v->aif_intf_cfg[intf_idx];
+
+		/* Parse sync configuration */
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-sync-mode", &cfg->sync_mode);
+		if (ret) {
+			dev_warn(dev, "Missing sync-mode for interface %d\n", i);
+			cfg->sync_mode = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-sync-src", &cfg->sync_src);
+		if (ret) {
+			dev_warn(dev, "Missing sync-src for interface %d\n", i);
+			cfg->sync_src = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-invert-sync", &cfg->invert_sync);
+		if (ret) {
+			dev_warn(dev, "Missing invert-sync for interface %d\n", i);
+			cfg->invert_sync = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-sync-delay", &cfg->sync_delay);
+		if (ret) {
+			dev_warn(dev, "Missing sync-delay for interface %d\n", i);
+			cfg->sync_delay = 0;
+		}
+
+		/* Parse slot and sample width configuration */
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-slot-width-rx", &cfg->slot_width_rx);
+		if (ret) {
+			dev_warn(dev, "Missing slot-width-rx for interface %d\n", i);
+			cfg->slot_width_rx = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-slot-width-tx", &cfg->slot_width_tx);
+		if (ret) {
+			dev_warn(dev, "Missing slot-width-tx for interface %d\n", i);
+			cfg->slot_width_tx = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-sample-width-rx", &cfg->sample_width_rx);
+		if (ret) {
+			dev_warn(dev, "Missing sample-width-rx for interface %d\n", i);
+			cfg->sample_width_rx = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-sample-width-tx", &cfg->sample_width_tx);
+		if (ret) {
+			dev_warn(dev, "Missing sample-width-tx for interface %d\n", i);
+			cfg->sample_width_tx = 0;
+		}
+
+		/* Parse slot enable masks */
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-slot-en-rx-mask", &cfg->slot_en_rx_mask);
+		if (ret) {
+			dev_warn(dev, "Missing slot-en-rx-mask for interface %d\n", i);
+			cfg->slot_en_rx_mask = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-slot-en-tx-mask", &cfg->slot_en_tx_mask);
+		if (ret) {
+			dev_warn(dev, "Missing slot-en-tx-mask for interface %d\n", i);
+			cfg->slot_en_tx_mask = 0;
+		}
+
+		/* Parse control configuration */
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-loopback-en", &cfg->loopback_en);
+		if (ret) {
+			dev_warn(dev, "Missing loopback-en for interface %d\n", i);
+			cfg->loopback_en = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-ctrl-data-oe", &cfg->ctrl_data_oe);
+		if (ret) {
+			dev_warn(dev, "Missing ctrl-data-oe for interface %d\n", i);
+			cfg->ctrl_data_oe = 0;
+		}
+
+		/* Parse lane configuration */
+		lane_cfg_prop = of_get_property(intf_np, "qcom,qaif-aif-lane-config", &lane_cfg_len);
+		if (lane_cfg_prop) {
+			/* Each lane config has 2 u32 values: enable and direction */
+			cfg->num_lanes = lane_cfg_len / (2 * sizeof(u32));
+			if (cfg->num_lanes > QAIF_MAX_LANES) {
+				dev_warn(dev, "Too many lanes (%d), limiting to %d\n",
+					 cfg->num_lanes, QAIF_MAX_LANES);
+				cfg->num_lanes = QAIF_MAX_LANES;
+			}
+
+			for (j = 0; j < cfg->num_lanes; j++) {
+				if ((cfg->lane_cfg[j].enable = be32_to_cpup(lane_cfg_prop + (j * 2))))
+					cfg->lane_en_mask |= BIT(j);  /* Set bit j for lane enable */
+
+				if ((cfg->lane_cfg[j].direction = be32_to_cpup(lane_cfg_prop + (j * 2 + 1))))
+					cfg->lane_dir_mask |= BIT(j); /* Set bit j for RX direction */
+			}
+
+		} else {
+			dev_warn(dev, "Missing lane-config for interface %d\n", i);
+			cfg->num_lanes = 0;
+		}
+
+		/* Parse mono/stereo mode */
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-mono-mode-tx", &cfg->mono_mode_tx);
+		if (ret) {
+			dev_warn(dev, "Missing mono-mode-tx for interface %d\n", i);
+			cfg->mono_mode_tx = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-mono-mode-rx", &cfg->mono_mode_rx);
+		if (ret) {
+			dev_warn(dev, "Missing mono-mode-rx for interface %d\n", i);
+			cfg->mono_mode_rx = 0;
+		}
+
+		/* Parse frame configuration */
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-full-cycle-en", &cfg->full_cycle_en);
+		if (ret) {
+			dev_warn(dev, "Missing full-cycle-en for interface %d\n", i);
+			cfg->full_cycle_en = 0;
+		}
+
+		ret = of_property_read_u32(intf_np, "qcom,qaif-aif-bits-per-lane", &cfg->bits_per_lane);
+		if (ret) {
+			dev_warn(dev, "Missing bits-per-lane for interface %d\n", i);
+			cfg->bits_per_lane = 0;
+		}
+
+#if 1  /* Set to 0 to disable debug printing */
+		/* ===================================================================
+		 * DEBUG: Print all parsed properties
+		 * Comment out this section or set #if 0 to disable debug output
+		 * ===================================================================*/
+		dev_info(dev, "--- Interface %d Configuration ---\n", i);
+		dev_info(dev, "  Node name: %s\n", intf_np->name);
+
+		/* Sync configuration */
+		dev_info(dev, "  Sync Configuration:\n");
+		dev_info(dev, "    sync_mode      = %u\n", cfg->sync_mode);
+		dev_info(dev, "    sync_src       = %u\n", cfg->sync_src);
+		dev_info(dev, "    invert_sync    = %u\n", cfg->invert_sync);
+		dev_info(dev, "    sync_delay     = %u\n", cfg->sync_delay);
+
+		/* Slot and sample width */
+		dev_info(dev, "  Width Configuration:\n");
+		dev_info(dev, "    slot_width_rx  = %u\n", cfg->slot_width_rx);
+		dev_info(dev, "    slot_width_tx  = %u\n", cfg->slot_width_tx);
+		dev_info(dev, "    sample_width_rx= %u\n", cfg->sample_width_rx);
+		dev_info(dev, "    sample_width_tx= %u\n", cfg->sample_width_tx);
+
+		/* Slot enable masks */
+		dev_info(dev, "  Slot Enable Masks:\n");
+		dev_info(dev, "    slot_en_rx_mask= 0x%08X\n", cfg->slot_en_rx_mask);
+		dev_info(dev, "    slot_en_tx_mask= 0x%08X\n", cfg->slot_en_tx_mask);
+
+		/* Control configuration */
+		dev_info(dev, "  Control Configuration:\n");
+		dev_info(dev, "    loopback_en    = %u\n", cfg->loopback_en);
+		dev_info(dev, "    ctrl_data_oe   = %u\n", cfg->ctrl_data_oe);
+
+		/* Lane configuration */
+		dev_info(dev, "  Lane Configuration (num_lanes=%u):\n", cfg->num_lanes);
+		for (j = 0; j < cfg->num_lanes; j++) {
+			dev_info(dev, "    Lane %d: enable=%u, direction=%u (%s)\n",
+				 j, cfg->lane_cfg[j].enable, cfg->lane_cfg[j].direction,
+				 cfg->lane_cfg[j].direction ? "RX_MIC" : "TX_SPKR");
+		}
+		dev_info(dev, "  Lane Configuration (lane_en_mask=0x%x):\n", cfg->lane_en_mask);
+		dev_info(dev, "  Lane Configuration (lane_dir_mask=0x%x):\n", cfg->lane_dir_mask);
+
+		/* Mono/Stereo mode */
+		dev_info(dev, "  Mono/Stereo Mode:\n");
+		dev_info(dev, "    mono_mode_tx   = %u (%s)\n",
+			 cfg->mono_mode_tx, cfg->mono_mode_tx ? "MONO" : "STEREO");
+		dev_info(dev, "    mono_mode_rx   = %u (%s)\n",
+			 cfg->mono_mode_rx, cfg->mono_mode_rx ? "MONO" : "STEREO");
+
+		/* Frame configuration */
+		dev_info(dev, "  Frame Configuration:\n");
+		dev_info(dev, "    full_cycle_en  = %u\n", cfg->full_cycle_en);
+		dev_info(dev, "    bits_per_lane  = %u\n", cfg->bits_per_lane);
+
+		dev_info(dev, "--- End Interface %d ---\n", i);
+#endif
+
+		of_node_put(intf_np);
+	}
+
+	dev_info(dev, "Successfully parsed %d AIF interfaces\n", num_interfaces);
+	return 0;
+}
+
+static int of_qaif_cdc_dma_clks_parse(struct device *dev,
+					struct qaif_drv_data *data)
+{
+	data->aud_dma_clk = devm_clk_get(dev, "audio_core_cc_aud_dma_clk");
+	if (IS_ERR(data->aud_dma_clk))
+		return PTR_ERR(data->aud_dma_clk);
+
+	return 0;
+}
+
+int asoc_qcom_qaif_cpu_platform_probe(struct platform_device *pdev)
+{
+	struct qaif_drv_data *drvdata;
+	struct resource *res;
+	struct qaif_variant *variant;
+	struct device *dev = &pdev->dev;
+	const struct of_device_id *match;
+	int ret, i, dai_id, idx;
+
+	drvdata = devm_kzalloc(dev, sizeof(struct qaif_drv_data), GFP_KERNEL);
+	if (!drvdata)
+		return -ENOMEM;
+	platform_set_drvdata(pdev, drvdata);
+
+	match = of_match_device(dev->driver->of_match_table, dev);
+	if (!match || !match->data)
+		return -EINVAL;
+
+	drvdata->variant = (struct qaif_variant *)match->data;
+	variant = drvdata->variant;
+	if (!variant) {
+		dev_err(dev, "No variant data\n");
+		return -EINVAL;
+	}
+
+	ret = of_qaif_parse_aif_intf_cfg(dev, drvdata);
+	if (ret) {
+		dev_err(dev, "Failed to parse aif interfaces: %d\n", ret);
+		return -EINVAL;
+	}
+
+	drvdata->audio_qaif =
+			devm_platform_ioremap_resource_byname(pdev, "audio-qaif-core");
+	if (IS_ERR(drvdata->audio_qaif))
+		return PTR_ERR(drvdata->audio_qaif);
+
+	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "audio-qaif-core");
+
+	if (!res)
+		return -EINVAL;
+
+	audio_qaif_regmap_config.max_register = resource_size(res);
+
+	drvdata->audio_qaif_map = devm_regmap_init_mmio(dev, drvdata->audio_qaif,
+				&audio_qaif_regmap_config);
+	if (IS_ERR(drvdata->audio_qaif_map))
+		return PTR_ERR(drvdata->audio_qaif_map);
+
+	ret = of_qaif_cdc_dma_clks_parse(dev, drvdata);
+	if (ret) {
+		dev_err(dev, "failed to get cdc dma clocks %d\n", ret);
+		return ret;
+	}
+
+	if (variant->init) {
+		ret = variant->init(pdev);
+		if (ret) {
+			dev_err(dev, "error initializing variant: %d\n", ret);
+			return ret;
+		}
+	}
+
+	for (i = 0; i < variant->num_dai; i++) {
+		dai_id = variant->dai_driver[i].id;
+		if (is_cif_dma_port(dai_id))
+			continue;
+		idx = variant->get_dma_idx(dai_id);
+		drvdata->mi2s_osr_clk[idx] = devm_clk_get_optional(dev,
+					     variant->dai_osr_clk_names[idx]);
+		drvdata->mi2s_bit_clk[idx] = devm_clk_get(dev,
+						variant->dai_bit_clk_names[idx]);
+		if (IS_ERR(drvdata->mi2s_bit_clk[idx])) {
+			dev_err(dev,
+				"error getting %s: %ld\n",
+				variant->dai_bit_clk_names[idx],
+				PTR_ERR(drvdata->mi2s_bit_clk[idx]));
+			return PTR_ERR(drvdata->mi2s_bit_clk[idx]);
+		}
+	}
+
+	ret = qaif_aif_cpu_init_bitfields(dev, drvdata->audio_qaif_map);
+	if (ret) {
+		dev_err(dev, "error init cif bitfield: %d\n", ret);
+		return ret;
+	}
+
+	/* Initialize bitfields for dai AIF CFG register */
+	ret = qaif_aif_cfg_cpu_init_bitfields(dev, drvdata->audio_qaif_map);
+	if (ret) {
+		dev_err(dev, "error init aif_intfctl field: %d\n", ret);
+		return ret;
+	}
+
+	ret = qaif_cif_cpu_init_bitfields(dev, drvdata->audio_qaif_map);
+	if (ret) {
+		dev_err(dev, "error init cif bitfield: %d\n", ret);
+		return ret;
+	}
+
+	ret = devm_snd_soc_register_component(dev, &qaif_cpu_comp_driver,
+								variant->dai_driver,
+								variant->num_dai);
+	if (ret) {
+		dev_err(dev, "error registering cpu driver: %d\n", ret);
+		goto err;
+	}
+
+	ret = asoc_qcom_qaif_platform_register(pdev);
+	if (ret) {
+		dev_err(dev, "error registering platform driver: %d\n", ret);
+		goto err;
+	}
+
+err:
+	return ret;
+}
+EXPORT_SYMBOL_GPL(asoc_qcom_qaif_cpu_platform_probe);
+
+void asoc_qcom_qaif_cpu_platform_remove(struct platform_device *pdev)
+{
+	struct qaif_drv_data *drvdata = platform_get_drvdata(pdev);
+
+	if (drvdata->variant->exit)
+		drvdata->variant->exit(pdev);
+}
+EXPORT_SYMBOL_GPL(asoc_qcom_qaif_cpu_platform_remove);
+
+void asoc_qcom_qaif_cpu_platform_shutdown(struct platform_device *pdev)
+{
+	struct qaif_drv_data *drvdata = platform_get_drvdata(pdev);
+
+	if (drvdata->variant->exit)
+		drvdata->variant->exit(pdev);
+
+}
+EXPORT_SYMBOL_GPL(asoc_qcom_qaif_cpu_platform_shutdown);
+
+MODULE_DESCRIPTION("QTi QAIF CPU Driver");
+MODULE_LICENSE("GPL");

@@ -148,6 +148,16 @@ audio_modules.register(
 )
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
+    name = "qaif_cpu_dlkm",
+    path = ASOC_PATH,
+    config_option = "CONFIG_SND_SOC_QAIF_CPU",
+    srcs = [
+        "qaif-shikra.c",
+        "qaif-cpu.c",
+        "qaif-platform.c"
+    ]
+)
+audio_modules.register(
     name = "machine_dlkm",
     path = ASOC_PATH,
     srcs = [
