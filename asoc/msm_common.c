@@ -525,7 +525,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 						goto done;
 					}
 				}
-				pr_debug("%s: clk_id :%d clk freq %d\n", __func__,
+				pr_debug("%s: clk_id : 0x%x clk freq %d\n", __func__,
 					intf_clk_cfg.clk_id, intf_clk_cfg.clk_freq_in_hz);
 				ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 1);
 				if (ret < 0) {
@@ -545,7 +545,24 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 					slots = 0x04;
 
 				intf_clk_cfg.clk_id = ret;
-				intf_clk_cfg.clk_freq_in_hz = rate * slot_width * slots;
+				if (pdata->mi2s_audio_intf) {
+					switch (params_format(params)) {
+					case SNDRV_PCM_FORMAT_S24_LE:
+					case SNDRV_PCM_FORMAT_S24_3LE:
+					case SNDRV_PCM_FORMAT_S32_LE:
+						slot_width = 32;
+						break;
+					case SNDRV_PCM_FORMAT_S16_LE:
+					default:
+						slot_width = 16;
+					pr_debug("%s: bitwidth set to default : %d\n",
+							__func__, slot_width);
+					}
+
+					intf_clk_cfg.clk_freq_in_hz = rate * slot_width * MI2S_NUM_CHANNELS;
+				}
+				else
+					intf_clk_cfg.clk_freq_in_hz = rate * slot_width * slots;
 				intf_clk_cfg.clk_attri = pdata->tdm_clk_attribute[index];
 				intf_clk_cfg.clk_root = 0;
 
@@ -559,7 +576,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 						goto done;
 					}
 				}
-				pr_debug("%s: qaif clk_id :%d clk freq %d\n", __func__,
+				pr_debug("%s: qaif clk_id: 0x%x clk freq: %d\n", __func__,
 					intf_clk_cfg.clk_id, intf_clk_cfg.clk_freq_in_hz);
 				ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 1);
 				if (ret < 0) {
@@ -603,7 +620,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 						goto done;
 					}
 				}
-				pr_debug("%s: mi2s clk_id :%d clk freq %d\n", __func__,
+				pr_debug("%s: mi2s clk_id: 0x%x clk freq: %d\n", __func__,
 					intf_clk_cfg.clk_id, intf_clk_cfg.clk_freq_in_hz);
 				ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 1);
 				if (ret < 0) {
@@ -930,6 +947,13 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 			"qcom,sen-mi2s-gpios", 0);
 	common_pdata->mi2s_gpio_p[SEP_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
 			"qcom,sep-mi2s-gpios", 0);
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,mi2s-audio-intf",
+			&common_pdata->mi2s_audio_intf);
+	if (ret) {
+		dev_dbg(&pdev->dev, "%s: No DT match for mi2s audio intf\n",
+			__func__);
+		ret = 0;
+	}
 	common_pdata->aud_dev_state = devm_kcalloc(&pdev->dev, card->num_links,
 						sizeof(uint8_t), GFP_KERNEL);
 	dev_info(&pdev->dev, "num_links %d \n", card->num_links);
