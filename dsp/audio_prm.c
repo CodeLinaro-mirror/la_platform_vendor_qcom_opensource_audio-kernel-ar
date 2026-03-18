@@ -20,8 +20,8 @@
 #include <dsp/audio_notifier.h>
 
 #define TIMEOUT_MS 200
-#define MAX_RETRY_COUNT 3
-#define APM_READY_WAIT_DURATION 2
+#define MAX_RETRY_COUNT 4
+#define APM_READY_WAIT_DURATION 20
 #define GPR_SEND_PKT_APM_TIMEOUT_MS 0
 
 #define DEBUG_TOKEN_MASK 0xFFFFF000
