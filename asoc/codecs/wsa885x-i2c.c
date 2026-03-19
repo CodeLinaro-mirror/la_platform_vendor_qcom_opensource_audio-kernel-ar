@@ -1554,7 +1554,7 @@ static void wsa885x_regulator_disable(void *data)
 static int wsa885x_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 						  struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
 
@@ -1566,7 +1566,7 @@ static int wsa885x_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 static int wsa885x_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
 						  struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
 	long val = ucontrol->value.integer.value[0];
@@ -1594,7 +1594,7 @@ static int wsa885x_i2c_usage_modes_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1620,7 +1620,7 @@ static int wsa885x_i2c_usage_modes_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1649,7 +1649,7 @@ static int wsa885x_i2c_rx_slot_mask_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1672,7 +1672,7 @@ static int wsa885x_i2c_rx_slot_mask_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1855,7 +1855,7 @@ static void wsa885x_temperature_work(struct work_struct *work)
 static int wsa885x_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 				snd_soc_component_get_drvdata(component);
 
@@ -1873,7 +1873,7 @@ static int wsa885x_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
 static int wsa885x_trigger_die_temp_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 				snd_soc_component_get_drvdata(component);
 
@@ -1899,7 +1899,7 @@ static int wsa885x_get_temp(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 				snd_soc_component_get_drvdata(component);
 	int ret = 0;

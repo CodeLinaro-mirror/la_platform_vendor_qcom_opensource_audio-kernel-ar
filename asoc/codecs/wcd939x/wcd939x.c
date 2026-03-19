@@ -225,7 +225,7 @@ static int wcd939x_hph_compander_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	int compander = ((struct soc_mixer_control *)
@@ -240,7 +240,7 @@ static int wcd939x_hph_compander_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	int compander = ((struct soc_mixer_control *)
@@ -264,7 +264,7 @@ static int wcd939x_hph_xtalk_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	int xtalk = ((struct soc_mixer_control *)
@@ -291,7 +291,7 @@ static int wcd939x_hph_xtalk_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	int xtalk = ((struct soc_mixer_control *)
@@ -311,7 +311,7 @@ static int wcd939x_hph_pcm_enable_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	wcd939x->hph_pcm_enabled = ucontrol->value.integer.value[0];
@@ -325,7 +325,7 @@ static int wcd939x_hph_pcm_enable_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	ucontrol->value.integer.value[0] = wcd939x->hph_pcm_enabled;
@@ -3212,7 +3212,7 @@ static int wcd939x_tx_mode_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = NULL;
 	int ret = 0;
 	unsigned int path = 0;
@@ -3238,7 +3238,7 @@ static int wcd939x_tx_mode_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = NULL;
 	u32 mode_val;
 	unsigned int path = 0;
@@ -3273,7 +3273,7 @@ static int wcd939x_tx_mode_put(struct snd_kcontrol *kcontrol,
 static int wcd939x_rx_hph_mode_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	ucontrol->value.integer.value[0] = wcd939x->hph_mode;
@@ -3283,7 +3283,7 @@ static int wcd939x_rx_hph_mode_get(struct snd_kcontrol *kcontrol,
 static int wcd939x_rx_hph_mode_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 	u32 mode_val;
 
@@ -3315,7 +3315,7 @@ static int wcd939x_ear_pa_gain_get(struct snd_kcontrol *kcontrol,
 {
 	u8 ear_pa_gain = 0;
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 
 	ear_pa_gain = snd_soc_component_read(component,
 				WCD939X_EAR_COMPANDER_CTL);
@@ -3335,7 +3335,7 @@ static int wcd939x_ear_pa_gain_put(struct snd_kcontrol *kcontrol,
 {
 	u8 ear_pa_gain = 0;
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 
 	dev_dbg(component->dev, "%s: ucontrol->value.integer.value[0]  = %ld\n",
 			__func__, ucontrol->value.integer.value[0]);
@@ -3377,7 +3377,7 @@ static int wcd939x_get_compander(struct snd_kcontrol *kcontrol,
 {
 
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 	bool hphr;
 	struct soc_mixer_control *mc;
@@ -3394,7 +3394,7 @@ static int wcd939x_set_compander(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 	int value = ucontrol->value.integer.value[0];
 	bool hphr;
@@ -3475,7 +3475,7 @@ static int wcd939x_ldoh_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	ucontrol->value.integer.value[0] = wcd939x->ldoh;
@@ -3487,7 +3487,7 @@ static int wcd939x_ldoh_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	wcd939x->ldoh = ucontrol->value.integer.value[0];
@@ -3549,7 +3549,7 @@ static int wcd939x_tx_master_ch_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = NULL;
 	int slave_ch_idx = -EINVAL;
 
@@ -3574,7 +3574,7 @@ static int wcd939x_tx_master_ch_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = NULL;
 	int slave_ch_idx = -EINVAL, idx = 0;
 
@@ -3606,7 +3606,7 @@ static int wcd939x_bcs_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	ucontrol->value.integer.value[0] = wcd939x->bcs_dis;
@@ -3618,7 +3618,7 @@ static int wcd939x_bcs_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd939x_priv *wcd939x = snd_soc_component_get_drvdata(component);
 
 	wcd939x->bcs_dis = ucontrol->value.integer.value[0];

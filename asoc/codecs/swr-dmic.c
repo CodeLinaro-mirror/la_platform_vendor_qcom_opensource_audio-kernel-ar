@@ -137,7 +137,7 @@ static int swr_dmic_tx_master_port_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct swr_dmic_priv *swr_dmic = NULL;
 	int ret = 0;
 	unsigned int slave_port_idx = SWR_DMIC_MAX_PORTS;
@@ -179,7 +179,7 @@ static int swr_dmic_tx_master_port_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct swr_dmic_priv *swr_dmic = NULL;
 	int ret = 0;
 	unsigned int slave_port_idx = SWR_DMIC_MAX_PORTS;
