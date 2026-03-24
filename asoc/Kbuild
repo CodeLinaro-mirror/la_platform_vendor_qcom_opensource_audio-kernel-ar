@@ -65,10 +65,6 @@ ifeq ($(KERNEL_BUILD), 0)
 		include $(AUDIO_ROOT)/config/waipioauto.conf
 		INCS    +=  -include $(AUDIO_ROOT)/config/waipioautoconf.h
 	endif
-	ifeq ($(CONFIG_ARCH_RAVELIN), y)
-		include $(AUDIO_ROOT)/config/ravelinauto.conf
-		INCS    +=  -include $(AUDIO_ROOT)/config/ravelinautoconf.h
-	endif
 	ifeq ($(CONFIG_ARCH_LITO), y)
 		include $(AUDIO_ROOT)/config/litoauto.conf
 		export
@@ -173,11 +169,6 @@ ifdef CONFIG_SND_SOC_WAIPIO
 	MACHINE_OBJS += waipio.o
 endif
 
-# for RAVELIN sound card driver
-ifdef CONFIG_SND_SOC_RAVELIN
-	MACHINE_OBJS += waipio.o
-endif
-
 # for HOLI sound card driver
 ifdef CONFIG_SND_SOC_HOLI
 	MACHINE_OBJS += holi.o
@@ -263,9 +254,6 @@ obj-$(CONFIG_SND_SOC_LAHAINA) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_WAIPIO) += machine_dlkm.o
-machine_dlkm-y := $(MACHINE_OBJS)
-
-obj-$(CONFIG_SND_SOC_RAVELIN) += machine_dlkm.o
 machine_dlkm-y := $(MACHINE_OBJS)
 
 obj-$(CONFIG_SND_SOC_HOLI) += machine_dlkm.o
