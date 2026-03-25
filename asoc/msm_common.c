@@ -1161,9 +1161,21 @@ static int msm_register_pm_qos_latency_controls(struct snd_soc_pcm_runtime *rtd)
 
 	lpass_cdc_component = snd_soc_rtdcom_lookup(rtd, "lpass-cdc");
 	if (!lpass_cdc_component) {
-		pr_err("%s: could not find component for lpass-cdc\n",
-				__func__);
-		return -EINVAL;
+		pr_err("%s could not find component for lpass-cdc\n",
+                                __func__);
+		 /*IDP uses bolero cdc node, check and attach controls*/
+                lpass_cdc_component = snd_soc_rtdcom_lookup(rtd, "bolero_codec");
+		if (!lpass_cdc_component) {
+                	pr_err("%s could not find component for bolero-cdc\n",
+                                __func__);
+			/*TurboX C610 uses external codec, check and attach controls*/
+			lpass_cdc_component = snd_soc_rtdcom_lookup(rtd, "tavil_codec");
+			if (!lpass_cdc_component) {
+				pr_err("%s could not find component for tavil_codec\n",
+					__func__);
+				return -EINVAL;
+			}
+		}
 	}
 
 	ret = snd_soc_add_component_controls(lpass_cdc_component,
@@ -1173,6 +1185,9 @@ static int msm_register_pm_qos_latency_controls(struct snd_soc_pcm_runtime *rtd)
 				__func__, ret);
 		return -EINVAL;
 	}
+	pr_err("%s pm_qos mixer controls added\n",
+                                __func__);
+
 	return 0;
 }
 
