@@ -71,6 +71,10 @@ ifeq ($(call is-board-platform-in-list, holi blair hamoa), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif
+ifeq ($(call is-board-platform-in-list, parrot canoe art hamoa alor sun), true)
+AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd937x_dlkm.ko \
+	$(KERNEL_MODULES_OUT)/wcd937x_slave_dlkm.ko
+endif
 endif
 else
 ifeq ($(call is-board-platform-in-list, gen4 msmnile), true)

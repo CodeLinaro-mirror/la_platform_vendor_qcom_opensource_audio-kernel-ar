@@ -791,13 +791,15 @@ static int swrm_get_port_config(struct swr_mstr_ctrl *swrm)
 
 	if (swrm->master_id == MASTER_ID_TX || swrm->master_id == MASTER_ID_BT)
 		return 0;
-	/* TODO - Send usecase information to avoid checking for master_id */
-	if (swrm->mport_cfg[SWRM_DSD_PARAMS_PORT].port_en &&
-				(swrm->master_id == MASTER_ID_RX))
-		usecase = 1;
-	else if ((swrm->master_id == MASTER_ID_RX) &&
+
+	if ((swrm->master_id == MASTER_ID_RX) &&
 		(swrm->bus_clk == SWR_CLK_RATE_11P2896MHZ))
 		usecase = 2;
+	/* TODO - Send usecase information to avoid checking for master_id
+	   As DSD is no more in use, so making to pick default rx port params */
+	else if (swrm->mport_cfg[SWRM_DSD_PARAMS_PORT].port_en &&
+				(swrm->master_id == MASTER_ID_RX))
+		usecase = 0;
 
 	if ((swrm->master_id == MASTER_ID_WSA) &&
 	    swrm->mport_cfg[SWRM_SPK_DAC_PORT_RECEIVER].port_en &&
@@ -1347,7 +1349,7 @@ end:
 	return is_removed;
 }
 
-int swrm_get_clk_div_rate(int mclk_freq, int bus_clk_freq)
+static int swrm_get_clk_div_rate(int mclk_freq, int bus_clk_freq)
 {
 	if (!bus_clk_freq)
 		return mclk_freq;
@@ -4121,7 +4123,7 @@ static int swrm_device_down(struct device *dev)
 	return 0;
 }
 
-int swrm_register_wake_irq(struct swr_mstr_ctrl *swrm)
+static int swrm_register_wake_irq(struct swr_mstr_ctrl *swrm)
 {
 	int ret = 0;
 	int irq;

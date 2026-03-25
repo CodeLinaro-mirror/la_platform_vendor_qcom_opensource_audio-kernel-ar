@@ -2215,7 +2215,7 @@ static const char *simple_amp_interrupts[] = {
 	"mono_left_protection_Mode_Changed",
 };
 
-void simple_amp_read_print_registers(struct regmap *regmap, unsigned int *regs, size_t count)
+static void simple_amp_read_print_registers(struct regmap *regmap, unsigned int *regs, size_t count)
 {
 	int ret;
 	unsigned int val;

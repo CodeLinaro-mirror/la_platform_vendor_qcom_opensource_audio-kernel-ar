@@ -167,6 +167,7 @@ struct lpass_cdc_tx_macro_priv {
 	bool swr_dmic_enable;
 	bool swr_dmic_gain_disable;
 	int wlock_holders;
+	bool hpf_adapt_bypass_en;
 	int adapt_tuning_registers;
 	u32 tuning_reg_values[MAX_TUNING_REG_VALUE_PAIRS];
 };
@@ -920,6 +921,39 @@ static int lpass_cdc_tx_macro_set_bcs(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+static int lpass_cdc_tx_macro_get_hpf_adapt_bypass(struct snd_kcontrol *kcontrol,
+                            struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+			snd_soc_kcontrol_component(kcontrol);
+	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+	struct device *tx_dev = NULL;
+
+	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
+	return -EINVAL;
+
+	ucontrol->value.integer.value[0] = tx_priv->hpf_adapt_bypass_en;
+
+	return 0;
+}
+
+static int lpass_cdc_tx_macro_set_hpf_adapt_bypass(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_value *ucontrol)
+{
+	struct snd_soc_component *component =
+			snd_soc_kcontrol_component(kcontrol);
+	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+	struct device *tx_dev = NULL;
+	int value = ucontrol->value.integer.value[0];
+
+	if (!lpass_cdc_tx_macro_get_data(component, &tx_dev, &tx_priv, __func__))
+		return -EINVAL;
+
+	tx_priv->hpf_adapt_bypass_en = value;
+
+	return 0;
+}
+
 static const char * const bcs_ch_sel_mux_text[] = {
 	"SWR_MIC0", "SWR_MIC1", "SWR_MIC2", "SWR_MIC3",
 	"SWR_MIC4", "SWR_MIC5", "SWR_MIC6", "SWR_MIC7",
@@ -1095,14 +1129,14 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		}
 		usleep_range(5000, 5050);
 #ifdef CONFIG_BOLERO_VER_2P85
-		if (tx_priv->adapt_tuning_registers > 0) {
+		if (tx_priv->adapt_tuning_registers > 0 && !tx_priv->hpf_adapt_bypass_en) {
 			snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
 			snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
 			snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
 			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
 			/* enable active detection for amic case */
 			if (is_amic_enabled(component, decimator))
-				snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x1);
+				snd_soc_component_update_bits(component, adc_bypass_reg, 0xFF, 0x3);
 			if (tx_priv->adapt_tuning_registers <= MAX_TUNING_REG_VALUE_PAIRS) {
 				if (!tx_priv->bcs_enable) {
 					for (i = 0; i < tx_priv->adapt_tuning_registers; i += 3) {
@@ -1154,6 +1188,10 @@ static int lpass_cdc_tx_macro_enable_dec(struct snd_soc_dapm_widget *w,
 			else
 				unmute_delay = LPASS_CDC_TX_MACRO_AMIC_UNMUTE_DELAY_MS;
 		}
+
+		if (tx_priv->hpf_adapt_bypass_en)
+			snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+
 		if (tx_priv->tx_hpf_work[decimator].hpf_cut_off_freq !=
 							CF_MIN_3DB_150HZ) {
 			lpass_cdc_tx_macro_wake_enable(tx_priv, 1);
@@ -2511,6 +2549,10 @@ static const struct snd_kcontrol_new lpass_cdc_tx_macro_snd_controls[] = {
 	SOC_SINGLE_EXT("DEC0_BCS Switch", SND_SOC_NOPM, 0, 1, 0,
 		       lpass_cdc_tx_macro_get_bcs, lpass_cdc_tx_macro_set_bcs),
 
+	SOC_SINGLE_EXT("DEC_HPF_ADAPT_BYPASS Enable", SND_SOC_NOPM, 0, 1, 0,
+		       lpass_cdc_tx_macro_get_hpf_adapt_bypass,
+		       lpass_cdc_tx_macro_set_hpf_adapt_bypass),
+
 	SOC_SINGLE_EXT("TX_SWR_DMIC Enable", SND_SOC_NOPM, 0, 1, 0,
 			lpass_cdc_tx_macro_swr_dmic_get, lpass_cdc_tx_macro_swr_dmic_put),
 
@@ -2582,11 +2624,23 @@ static const struct lpass_cdc_tx_macro_reg_mask_val
 
 static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 {
-	struct snd_soc_dapm_context *dapm =
-			snd_soc_component_get_dapm(component);
+	struct snd_soc_dapm_context *dapm = NULL;
 	int ret = 0, i = 0, dai_idx;
 	struct device *tx_dev = NULL;
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
+
+	/* Add NULL check for component parameter */
+	if (!component) {
+		pr_err("%s: component is NULL\n", __func__);
+		return -EINVAL;
+	}
+
+	dapm = snd_soc_component_get_dapm(component);
+	if (!dapm) {
+		dev_err(component->dev,
+			"%s: dapm context is NULL\n", __func__);
+		return -EINVAL;
+	}
 
 	tx_dev = lpass_cdc_get_device_ptr(component->dev, TX_MACRO);
 	if (!tx_dev) {
@@ -2594,32 +2648,41 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 			"%s: null device for macro!\n", __func__);
 		return -EINVAL;
 	}
+
 	tx_priv = dev_get_drvdata(tx_dev);
 	if (!tx_priv) {
 		dev_err(component->dev,
 			"%s: priv is null for macro!\n", __func__);
 		return -EINVAL;
 	}
+
+	/* Add NULL check for dapm->card */
+	if (!dapm->card) {
+		dev_err(tx_dev,
+			"%s: dapm->card is NULL\n", __func__);
+		return -EINVAL;
+	}
 	tx_priv->version = lpass_cdc_get_version(tx_dev);
 	ret = snd_soc_dapm_new_controls(dapm, lpass_cdc_tx_macro_dapm_widgets,
 				ARRAY_SIZE(lpass_cdc_tx_macro_dapm_widgets));
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add controls\n",
-			__func__);
+		dev_err(tx_dev, "%s: Failed to add controls, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
 	ret = snd_soc_dapm_add_routes(dapm, tx_audio_map,
 				ARRAY_SIZE(tx_audio_map));
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add routes\n",
-			__func__);
+		dev_err(tx_dev, "%s: Failed to add routes, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
 	ret = snd_soc_dapm_new_widgets(dapm->card);
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add widgets\n", __func__);
+		dev_err(tx_dev, "%s: Failed to add widgets, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
@@ -2627,8 +2690,8 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 			lpass_cdc_tx_macro_snd_controls,
 			ARRAY_SIZE(lpass_cdc_tx_macro_snd_controls));
 	if (ret < 0) {
-		dev_err(tx_dev, "%s: Failed to add snd_ctls\n",
-			__func__);
+		dev_err(tx_dev, "%s: Failed to add snd_ctls, ret=%d\n",
+			__func__, ret);
 		return ret;
 	}
 
@@ -2657,6 +2720,7 @@ static int lpass_cdc_tx_macro_init(struct snd_soc_component *component)
 		INIT_DELAYED_WORK(&tx_priv->tx_dec_unmute_work[dai_idx].dwork,
 				mute_stream_dec_unmute);
 	}
+
 	tx_priv->component = component;
 
 	for (i = 0; i < ARRAY_SIZE(lpass_cdc_tx_macro_reg_init); i++)

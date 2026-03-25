@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/of.h>
@@ -107,10 +108,9 @@ static int pm2250_spmi_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int pm2250_spmi_remove(struct platform_device *pdev)
+static void pm2250_spmi_remove(struct platform_device *pdev)
 {
 	of_platform_depopulate(&pdev->dev);
-	return 0;
 }
 
 static struct platform_driver pm2250_spmi_driver = {

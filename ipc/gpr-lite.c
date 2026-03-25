@@ -59,7 +59,7 @@ enum gpr_subsys_state gpr_get_modem_state(void)
 EXPORT_SYMBOL(gpr_get_modem_state);
 
 
-void gpr_subsys_notif_register(char *client_name, int domain,
+static void gpr_subsys_notif_register(char *client_name, int domain,
 			   struct notifier_block *nb)
 {
 	int ret;
@@ -70,7 +70,7 @@ void gpr_subsys_notif_register(char *client_name, int domain,
 			__func__, domain, ret);
 }
 
-void gpr_subsys_notif_deregister(char *client_name)
+static void gpr_subsys_notif_deregister(char *client_name)
 {
 	int ret;
 
@@ -159,22 +159,6 @@ void gpr_set_modem_state(enum gpr_subsys_state state)
 }
 EXPORT_SYMBOL(gpr_set_modem_state);
 
-
-static void gpr_modem_down(unsigned long opcode)
-{
-	gpr_set_modem_state(GPR_SUBSYS_DOWN);
-	//dispatch_event(opcode, APR_DEST_MODEM);
-}
-
-static void gpr_modem_up(void)
-{
-	//if (apr_cmpxchg_modem_state(APR_SUBSYS_DOWN, APR_SUBSYS_UP) ==
-	//						APR_SUBSYS_DOWN)
-	//	wake_up(&modem_wait);
-	//is_modem_up = 1;
-}
-
-
 int gpr_set_q6_state(enum gpr_subsys_state state)
 {
 	dev_dbg(gpr_priv->dev,"%s: setting adsp state %d\n", __func__, state);
@@ -193,6 +177,20 @@ static void gpr_ssr_disable(struct device *dev, void *data)
 static const struct snd_event_ops gpr_ssr_ops = {
 	.disable = gpr_ssr_disable,
 };
+
+static void gpr_modem_down(unsigned long opcode)
+{
+	dev_info_ratelimited(gpr_priv->dev, "%s: Q6 is Down\n", __func__);
+	gpr_set_q6_state(GPR_SUBSYS_DOWN);
+	snd_event_notify(gpr_priv->dev, SND_EVENT_DOWN);
+}
+
+static void gpr_modem_up(void)
+{
+	dev_info_ratelimited(gpr_priv->dev, "%s: Q6 is Up\n", __func__);
+	gpr_set_q6_state(GPR_SUBSYS_LOADED);
+	snd_event_notify(gpr_priv->dev, SND_EVENT_UP);
+}
 
 static void gpr_adsp_down(unsigned long opcode)
 {

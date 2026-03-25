@@ -1,9 +1,9 @@
 load(":audio_modules.bzl", "audio_modules")
 load(":module_mgr.bzl", "define_target_modules")
 
-def define_art():
+def define_art(target):
     define_target_modules(
-        target = "art",
+        target = target,
         variants = ["consolidate", "perf"],
         registry = audio_modules,
         modules = [
@@ -39,6 +39,8 @@ def define_art():
             "wsa884x_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
+            "wcd937x_dlkm",
+            "wcd937x_slave_dlkm",
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
             "wcd9378_dlkm",

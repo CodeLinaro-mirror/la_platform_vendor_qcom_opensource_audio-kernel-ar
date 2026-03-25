@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+/*
+ * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
+
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/module.h>
@@ -15,6 +17,7 @@
 #include <msm_ext_display.h>
 
 #define DRV_NAME "HDMI_codec"
+#define HDMI_CODEC_PAGE_SIZE 4096
 
 #define MSM_EXT_DISP_PCM_RATES	SNDRV_PCM_RATE_48000
 #define AUD_EXT_DISP_ACK_DISCONNECT (AUDIO_ACK_CONNECT ^ AUDIO_ACK_CONNECT)
@@ -66,8 +69,8 @@ static const struct snd_pcm_hardware dummy_dma_hardware = {
 	.info               = SNDRV_PCM_INFO_INTERLEAVED |
 					SNDRV_PCM_INFO_BLOCK_TRANSFER,
 	.buffer_bytes_max   = 128*1024,
-	.period_bytes_min   = PAGE_SIZE,
-	.period_bytes_max   = PAGE_SIZE*2,
+	.period_bytes_min   = HDMI_CODEC_PAGE_SIZE,
+	.period_bytes_max   = HDMI_CODEC_PAGE_SIZE*2,
 	.periods_min        = 2,
 	.periods_max        = 128,
 };
