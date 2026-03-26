@@ -112,43 +112,43 @@ SND_SOC_DAILINK_DEFS(rx_dma_rx1,
 SND_SOC_DAILINK_DEFS(rx_dma_rx2,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("bolero_codec", "rx_macro_rx3"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc")),
-			   COMP_CODEC("rouleur-codec", "rouleur_cdc"),
+			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			   COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx3,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("bolero_codec", "rx_macro_rx4"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc")),
-			   COMP_CODEC("rouleur-codec", "rouleur_cdc"),
+			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			   COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx5,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("bolero_codec", "rx_macro_rx5"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc")),
-			   COMP_CODEC("rouleur-codec", "rouleur_cdc"),
+			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			   COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(rx_dma_rx6,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("bolero_codec", "rx_macro_rx6"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc")),
-			   COMP_CODEC("rouleur-codec", "rouleur_cdc"),
+			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			   COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(tx_dma_tx3,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("bolero_codec", "tx_macro_tx1"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc")),
-			   COMP_CODEC("rouleur-codec", "rouleur_cdc"),
+			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			   COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(tx_dma_tx4,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("bolero_codec", "tx_macro_tx2"),
-			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc")),
-			   COMP_CODEC("rouleur-codec", "rouleur_cdc"),
+			   COMP_CODEC("wcd937x_codec", "wcd937x_cdc"),
+			   COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(va_dma_tx0,
