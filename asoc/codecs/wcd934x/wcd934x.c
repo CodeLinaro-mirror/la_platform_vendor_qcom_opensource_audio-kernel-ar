@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/*
- * Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
@@ -154,6 +153,7 @@ static const struct snd_kcontrol_new name##_mux = \
 #define WCD934X_DIG_CORE_COLLAPSE_TIMER_MS  (5 * 1000)
 
 #define ENABLE_FIFO_OVERRUN_AUTO_RECOVERY_BIT	0x1
+
 #define TAVIL_SIDETONE_IIR_COEFF_MAX 5
 #define TAVIL_IIR_FILTER_SIZE (sizeof(u32) * BAND_MAX)
 struct tavil_iir_filter_ctl {
@@ -173,6 +173,9 @@ struct tavil_iir_filter_ctl {
 		.bytes_ext = {.max = TAVIL_IIR_FILTER_SIZE, }, \
 	} \
 }
+
+
+
 enum {
 	POWER_COLLAPSE,
 	POWER_RESUME,
