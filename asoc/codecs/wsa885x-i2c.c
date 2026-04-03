@@ -939,6 +939,42 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 	return 0;
 }
 
+static void reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
+{
+	int ret = 0;
+	int ps = 0;
+
+	dev_dbg(wsa885x->component->dev,"%s()\n", __func__);
+
+	wsa885x_handle_ssr_reset(wsa885x);
+
+	regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
+	/* Configure usage mode for thermal/speaker protection */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_OT23_USAGE,
+			 wsa885x->usage_mode);
+	/* Set cluster index for audio processing */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_IT21_CLUSERINDEX, 0x01);
+	/* Set posture number for speaker configuration */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER, 0x01);
+
+	/* Apply requested volume */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+	/* Commit SDCA (Smart Device Class Audio) changes */
+	regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
+
+	/* Request power state 0 (active mode) */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS, 0x00);
+
+	ret = wait_for_pde_state(wsa885x, ps, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+	if (!ret) {
+		dev_dbg(wsa885x->component->dev,
+			"Successfully transitioned to power state %d\n", ps);
+	}
+}
+
 /**
  * codec_mute_stream() - Mute/unmute audio stream and manage power states
  * @dai: Digital Audio Interface
@@ -1012,7 +1048,7 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 					"Successfully transitioned to power state %d\n", ps0);
 		} else {
 			dev_err(wsa885x->component->dev, "PS0 request failed\n");
-			goto exit;
+			reinit_wsa885x_powerup(wsa885x);
 		}
 
 		/* Configure power amplifier based on channel configuration */
@@ -1035,7 +1071,6 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 		/* Commit all changes */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
 	}
-exit:
 	return ret;
 }
 
