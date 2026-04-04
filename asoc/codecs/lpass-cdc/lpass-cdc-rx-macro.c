@@ -4792,8 +4792,7 @@ static int lpass_cdc_rx_macro_probe(struct platform_device *pdev)
 				   &muxsel);
 	if (ret) {
 		dev_err(&pdev->dev, "%s: could not find %s entry in dt\n",
-			__func__, "reg");
-		return ret;
+			__func__, "rx_mclk_mode_muxsel");
 	}
 	ret = of_property_read_u32(pdev->dev.of_node, "qcom,default-clk-id",
 				   &default_clk_id);
