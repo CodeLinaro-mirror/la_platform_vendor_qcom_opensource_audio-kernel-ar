@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2024. Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -334,7 +334,7 @@ static int rouleur_slave_bind(struct device *dev,
 	ret = swr_get_logical_dev_num(pdev, pdev->addr, &devnum);
 	if (ret) {
 		dev_dbg(&pdev->dev,
-				"%s get devnum %d for dev addr %lx failed\n",
+				"%s get devnum %d for dev addr %llx failed\n",
 				__func__, devnum, pdev->addr);
 		swr_remove_device(pdev);
 		return ret;
