@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -212,7 +212,7 @@ static int lpass_cdc_wsa2_macro_enable_vi_decimator(struct snd_soc_component *co
 	.put = lpass_cdc_wsa2_macro_set_digital_volume, \
 	.private_value = (unsigned long)&(struct soc_mixer_control) \
 	{.reg = xreg, .rreg = xreg,  \
-	.min = xmin, .max = xmax, .platform_max = xmax, \
+	.min = xmin, .max = xmax, \
 	.sign_bit = 7,} }
 
 struct lpass_cdc_wsa2_macro_swr_ctrl_platform_data {
