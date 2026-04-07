@@ -168,7 +168,7 @@ static int sdx_mi2s_startup(struct snd_pcm_substream *substream)
 {
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	struct snd_soc_card *card = rtd->card;
-	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
 	struct msm_asoc_mach_data *pdata = snd_soc_card_get_drvdata(card);
 	int ret = 0;
 
@@ -227,7 +227,7 @@ static int sdx_mi2s_startup(struct snd_pcm_substream *substream)
 				goto done;
 			}
 			ret = snd_soc_dai_set_fmt(codec_dai,
-						SND_SOC_DAIFMT_CBS_CFS |
+						SND_SOC_DAIFMT_CBC_CFC |
 						SND_SOC_DAIFMT_I2S);
 			if (ret < 0) {
 				dev_err(card->dev,
@@ -1503,7 +1503,7 @@ static int msm_int_audrx_init(struct snd_soc_pcm_runtime *rtd)
 	struct msm_asoc_mach_data *pdata =
 				snd_soc_card_get_drvdata(rtd->card);
 	int ret = 0;
-	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
 	struct snd_soc_component *component = NULL;
 
 	card = rtd->card->snd_card;
@@ -1731,7 +1731,7 @@ err:
 	return ret;
 }
 
-static int msm_asoc_machine_remove(struct platform_device *pdev)
+static void  msm_asoc_machine_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct msm_asoc_mach_data *pdata = NULL;
@@ -1747,7 +1747,6 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	snd_event_master_deregister(&pdev->dev);
 	snd_soc_unregister_card(card);
 
-	return 0;
 }
 
 static struct platform_driver sdx_asoc_machine_driver = {

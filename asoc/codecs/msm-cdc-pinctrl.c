@@ -393,14 +393,6 @@ static struct platform_driver msm_cdc_pinctrl_driver = {
 	.remove = msm_cdc_pinctrl_remove,
 };
 
-int msm_cdc_pinctrl_drv_init(void)
-{
-	return platform_driver_register(&msm_cdc_pinctrl_driver);
-}
-
-void msm_cdc_pinctrl_drv_exit(void)
-{
-	platform_driver_unregister(&msm_cdc_pinctrl_driver);
-}
+module_platform_driver(msm_cdc_pinctrl_driver);
 MODULE_DESCRIPTION("MSM CODEC pin control platform driver");
 MODULE_LICENSE("GPL v2");
