@@ -148,6 +148,16 @@ audio_modules.register(
 )
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
+    name = "qaif_cpu_dlkm",
+    path = ASOC_PATH,
+    config_option = "CONFIG_SND_SOC_QAIF_CPU",
+    srcs = [
+        "qaif-shikra.c",
+        "qaif-cpu.c",
+        "qaif-platform.c"
+    ]
+)
+audio_modules.register(
     name = "machine_dlkm",
     path = ASOC_PATH,
     srcs = [
@@ -211,6 +221,9 @@ audio_modules.register(
             "audio_machine.c"
         ],
 	"CONFIG_SND_SOC_ALOR": [
+            "audio_machine.c"
+        ],
+        "CONFIG_SND_SOC_SHIKRA": [
             "audio_machine.c"
         ]
     },
@@ -619,4 +632,38 @@ audio_modules.register(
         "wsa885x-i2c.c",
     ],
     deps = [":%b_gpr_dlkm"],
+)
+# >>>> ROULEUR MODULES <<<<
+audio_modules.register(
+    name = "pm2250_spmi_dlkm",
+    path = ASOC_CODECS_PATH + "/rouleur",
+    config_option = "CONFIG_PM2250_SPMI",
+    srcs = ["pm2250_spmi.c"],
+)
+
+audio_modules.register(
+    name = "rouleur_dlkm",
+    path = ASOC_CODECS_PATH + "/rouleur",
+    config_option = "CONFIG_SND_SOC_ROULEUR",
+    srcs = [
+        "rouleur.c",
+        "rouleur-regmap.c",
+        "rouleur-tables.c",
+        "rouleur-mbhc.c",
+    ],
+    deps = [
+        ":%b_swr_dlkm",
+        ":%b_wcd_core_dlkm",
+        ":%b_pm2250_spmi_dlkm",
+        ":%b_mbhc_dlkm",
+        ":%b_wcd9xxx_dlkm",
+    ],
+)
+audio_modules.register(
+    name = "rouleur_slave_dlkm",
+    path = ASOC_CODECS_PATH + "/rouleur",
+    config_option = "CONFIG_SND_SOC_ROULEUR_SLAVE",
+    srcs = ["rouleur_slave.c"],
+    deps = [":%b_swr_dlkm",
+    ],
 )

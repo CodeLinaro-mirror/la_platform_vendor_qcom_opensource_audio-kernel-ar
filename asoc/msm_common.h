@@ -47,6 +47,8 @@ struct msm_common_pdata {
 	uint32_t is_audio_hw_vote_required[MI2S_TDM_AUXPCM_MAX];
 	uint32_t tdm_clk_attribute[MI2S_TDM_AUXPCM_MAX];
 	uint32_t mi2s_clk_attribute[MI2S_TDM_AUXPCM_MAX];
+	bool is_alsa_qaif_supported;
+	u32 mi2s_audio_intf;
 };
 
 int snd_card_notify_user(snd_card_status_t card_status);

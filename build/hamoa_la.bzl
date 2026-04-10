@@ -1,9 +1,9 @@
-
 load(":audio_modules.bzl", "audio_modules")
 load(":module_mgr.bzl", "define_target_modules")
-def define_hamoa():
+
+def define_hamoa_la():
     define_target_modules(
-        target = "hamoa",
+        target = "hamoa_la",
         variants = ["consolidate", "perf"],
         registry = audio_modules,
         modules = [
@@ -26,7 +26,7 @@ def define_hamoa():
             "swr_dmic_dlkm",
             "wcd9xxx_dlkm",
             "swr_haptics_dlkm",
-	    "sdca_registers_dlkm",
+	        "sdca_registers_dlkm",
             "stub_dlkm",
             "hdmi_dlkm",
             "lpass_cdc_dlkm",
@@ -39,10 +39,10 @@ def define_hamoa():
             "wsa884x_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
-            "wcd937x_dlkm",
-            "wcd937x_slave_dlkm",
             "wcd939x_dlkm",
             "wcd939x_slave_dlkm",
+            "wcd937x_dlkm",
+            "wcd937x_slave_dlkm",
             "wcd9378_dlkm",
             "wcd9378_slave_dlkm",
             "lpass_bt_swr_dlkm",
@@ -57,13 +57,14 @@ def define_hamoa():
             "CONFIG_DIGITAL_CDC_RSC_MGR",
             "CONFIG_SOUNDWIRE_MSTR_CTRL",
             "CONFIG_SWRM_VER_2P0",
-	    "CONFIG_BOLERO_VER_2P85",
+	        "CONFIG_BOLERO_VER_2P85",
             "CONFIG_WCD9XXX_CODEC_CORE_V2",
             "CONFIG_MSM_CDC_PINCTRL",
             "CONFIG_SND_SOC_WCD_IRQ",
             "CONFIG_SND_SOC_WCD9XXX_V2",
             "CONFIG_SND_SOC_WCD_MBHC_ADC",
             "CONFIG_LPASS_BT_SWR",
+            "CONFIG_AUDIO_BTFM_PROXY",
             "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
             "CONFIG_SND_SOC_WSA885X_I2C",
