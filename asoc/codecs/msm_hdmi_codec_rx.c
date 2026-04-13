@@ -113,7 +113,7 @@ static int msm_ext_disp_edid_ctl_info(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_info *uinfo)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct msm_ext_disp_audio_codec_rx_data *codec_data;
 	struct msm_ext_disp_audio_edid_blk edid_blk;
 	int rc = 0;
@@ -164,7 +164,7 @@ static int msm_ext_disp_edid_ctl_info(struct snd_kcontrol *kcontrol,
 static int msm_ext_disp_edid_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol) {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct msm_ext_disp_audio_codec_rx_data *codec_data;
 	struct msm_ext_disp_audio_edid_blk edid_blk;
 	struct msm_ext_disp_codec_id codec_info;
@@ -230,7 +230,7 @@ static int msm_ext_disp_audio_type_get(struct snd_kcontrol *kcontrol,
 				       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct msm_ext_disp_audio_codec_rx_data *codec_data;
 	enum msm_ext_disp_cable_state cable_state;
 	enum msm_ext_disp_type disp_type;
@@ -322,7 +322,7 @@ static int msm_ext_disp_audio_ack_set(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct msm_ext_disp_audio_codec_rx_data *codec_data;
 	u32 ack_state = 0;
 	struct msm_ext_disp_codec_id codec_info;
@@ -405,7 +405,7 @@ static int msm_ext_disp_audio_device_get(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct msm_ext_disp_device_mxr_ctl *ctl =
 		(struct msm_ext_disp_device_mxr_ctl *)kcontrol->private_value;
 	struct msm_ext_disp_audio_codec_rx_data *codec_data;
@@ -438,7 +438,7 @@ static int msm_ext_disp_audio_device_set(struct snd_kcontrol *kcontrol,
 				      struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct msm_ext_disp_audio_codec_rx_data *codec_data;
 	int rc = 0;
 	struct msm_ext_disp_device_mxr_ctl *ctl =

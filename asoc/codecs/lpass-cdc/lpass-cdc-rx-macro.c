@@ -2144,7 +2144,7 @@ static int lpass_cdc_rx_macro_hph_idle_detect_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 	struct device *rx_dev = NULL;
 
@@ -2161,7 +2161,7 @@ static int lpass_cdc_rx_macro_hph_idle_detect_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 	struct device *rx_dev = NULL;
 
@@ -2178,7 +2178,7 @@ static int lpass_cdc_rx_macro_get_pcm_path(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2193,7 +2193,7 @@ static int lpass_cdc_rx_macro_put_pcm_path(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2208,7 +2208,7 @@ static int lpass_cdc_rx_macro_get_compander(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	struct device *rx_dev = NULL;
@@ -2225,7 +2225,7 @@ static int lpass_cdc_rx_macro_set_compander(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int comp = ((struct soc_mixer_control *)
 		    kcontrol->private_value)->shift;
 	int value = ucontrol->value.integer.value[0];
@@ -2327,7 +2327,7 @@ static int lpass_cdc_rx_macro_get_ear_mode(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2342,7 +2342,7 @@ static int lpass_cdc_rx_macro_put_ear_mode(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2358,7 +2358,7 @@ static int lpass_cdc_rx_macro_get_hph_hd2_mode(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2373,7 +2373,7 @@ static int lpass_cdc_rx_macro_put_hph_hd2_mode(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2388,7 +2388,7 @@ static int lpass_cdc_rx_macro_get_hph_pwr_mode(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2403,7 +2403,7 @@ static int lpass_cdc_rx_macro_put_hph_pwr_mode(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2418,7 +2418,7 @@ static int lpass_cdc_rx_macro_vbat_bcl_gsm_mode_func_get(struct snd_kcontrol *kc
 	struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 
 	ucontrol->value.integer.value[0] =
 		((snd_soc_component_read(
@@ -2435,7 +2435,7 @@ static int lpass_cdc_rx_macro_vbat_bcl_gsm_mode_func_put(struct snd_kcontrol *kc
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 
 	dev_dbg(component->dev, "%s: value: %lu\n", __func__,
 		ucontrol->value.integer.value[0]);
@@ -2457,7 +2457,7 @@ static int lpass_cdc_rx_macro_soft_clip_enable_get(struct snd_kcontrol *kcontrol
 					  struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2476,7 +2476,7 @@ static int lpass_cdc_rx_macro_soft_clip_enable_put(struct snd_kcontrol *kcontrol
 					  struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2495,7 +2495,7 @@ static int lpass_cdc_rx_macro_aux_hpf_mode_get(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2514,7 +2514,7 @@ static int lpass_cdc_rx_macro_aux_hpf_mode_put(struct snd_kcontrol *kcontrol,
 					  struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -2970,7 +2970,7 @@ static int lpass_cdc_rx_macro_iir_enable_audio_mixer_get(struct snd_kcontrol *kc
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
 	int band_idx = ((struct soc_mixer_control *)
@@ -2992,7 +2992,7 @@ static int lpass_cdc_rx_macro_iir_enable_audio_mixer_put(struct snd_kcontrol *kc
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int iir_idx = ((struct soc_mixer_control *)
 					kcontrol->private_value)->reg;
 	int band_idx = ((struct soc_mixer_control *)
@@ -3081,7 +3081,7 @@ static int lpass_cdc_rx_macro_iir_band_audio_mixer_get(struct snd_kcontrol *kcon
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_rx_macro_iir_filter_ctl *ctl =
 		(struct lpass_cdc_rx_macro_iir_filter_ctl *)kcontrol->private_value;
 	struct soc_bytes_ext *params = &ctl->bytes_ext;
@@ -3137,7 +3137,7 @@ static int lpass_cdc_rx_macro_iir_band_audio_mixer_put(struct snd_kcontrol *kcon
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_rx_macro_iir_filter_ctl *ctl =
 			(struct lpass_cdc_rx_macro_iir_filter_ctl *)kcontrol->private_value;
 	struct soc_bytes_ext *params = &ctl->bytes_ext;
@@ -3252,7 +3252,7 @@ static int lpass_cdc_rx_macro_fir_filter_enable_get(struct snd_kcontrol *kcontro
 			struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 
@@ -3272,7 +3272,7 @@ static int lpass_cdc_rx_macro_fir_filter_enable_put(struct snd_kcontrol *kcontro
 			struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct device *rx_dev = NULL;
 	struct lpass_cdc_rx_macro_priv *rx_priv = NULL;
 	int ret = 0;
@@ -3364,7 +3364,7 @@ static int lpass_cdc_rx_macro_fir_audio_mixer_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_rx_macro_fir_filter_ctl *ctl =
 		(struct lpass_cdc_rx_macro_fir_filter_ctl *)kcontrol->private_value;
 	unsigned int path_idx = ctl->path_idx;
@@ -3588,7 +3588,7 @@ static int lpass_cdc_rx_macro_fir_audio_mixer_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_rx_macro_fir_filter_ctl *ctl =
 		(struct lpass_cdc_rx_macro_fir_filter_ctl *)kcontrol->private_value;
 	unsigned int path_idx = ctl->path_idx;
@@ -3677,7 +3677,7 @@ static int lpass_cdc_rx_macro_fir_coeff_num_get(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	unsigned int path_idx = ((struct soc_mixer_control *)
 				kcontrol->private_value)->shift;
 	struct device *rx_dev = NULL;
@@ -3706,7 +3706,7 @@ static int lpass_cdc_rx_macro_fir_coeff_num_put(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	unsigned int path_idx = ((struct soc_mixer_control *)
 				kcontrol->private_value)->shift;
 	u8 fir_total_coeff_num = ucontrol->value.bytes.data[0];
