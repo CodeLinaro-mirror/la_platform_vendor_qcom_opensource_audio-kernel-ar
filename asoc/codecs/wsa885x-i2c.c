@@ -231,6 +231,11 @@ static const DECLARE_TLV_DB_SCALE(fu21_digital_gain, -8400, 100, 0);
 #define WSA885X_DIG_TRIM_OTP_REG_3       0x8883
 #define WSA885X_DIG_TRIM_OTP_REG_4       0x8884
 
+/*TDM Slots*/
+#define WSA885X_TDM8 0X08
+#define WSA885X_TDM4 0X04
+#define WSA885X_TDM2 0X02
+
 struct wsa885x_temp_register {
 	int d1_msb;
 	int d1_lsb;
@@ -542,18 +547,26 @@ static int wsa885x_handle_ssr_reset(struct wsa885x_i2c_priv *wsa885x)
 /**
  * reg_update_sequence() - Configure TDM control registers sequence
  * @regmap: Regmap instance for register access
- *
+ * @slots: Number of slots to configure TDM CTL
  * This function configures the TDM control registers in a specific sequence
  * required for proper TDM operation. The sequence enables TDM mode and
  * configures the transmit channels.
  */
-static void reg_update_sequence(struct regmap *regmap)
+static void reg_update_sequence(struct regmap *regmap, int slots)
 {
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL1, 0x15);
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL1, 0x11);
 
 	/* Configure TDM control register 0 */
-	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x04);
+	if (slots == WSA885X_TDM2)
+		regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x0);
+	else if (slots == WSA885X_TDM4)
+		regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x04);
+	else if (slots == WSA885X_TDM8)
+		regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0xC);
+	else
+		pr_warn("Invalid TDM slot count: %d, expected 2, 4, or 8\n", slots);
+
 	regmap_update_bits(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x01, 0x01);
 
 	/* Configure TDM transmit channel settings */
@@ -817,7 +830,7 @@ static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG1_TDM_TX,
 						   0x60, 0x60);
 		/* Apply TDM control sequence */
-		reg_update_sequence(wsa885x->regmap);
+		reg_update_sequence(wsa885x->regmap, slots);
 		/* Enable transmit channels */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_TX,
 						   0x04, 0x04);
@@ -831,7 +844,7 @@ static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 		/* Configure slot1 for current protection sense 0 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
 						   0x50, 0x50);
-		reg_update_sequence(wsa885x->regmap);
+		reg_update_sequence(wsa885x->regmap, slots);
 	} else if (wsa885x->rx_slot_mask == WSA885X_CHANNEL_MONO_RIGHT) {
 		/* Mono right channel configuration */
 		/* Configure slot0 for I-sense channel 1 */
@@ -840,7 +853,7 @@ static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 		/* Configure slot1 for current protection sense 1 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
 						   0x60, 0x60);
-		reg_update_sequence(wsa885x->regmap);
+		reg_update_sequence(wsa885x->regmap, slots);
 	}
 
 	/* Enable I2S control */
@@ -939,14 +952,18 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 	return 0;
 }
 
-static void reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
+static int reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
 {
 	int ret = 0;
 	int ps = 0;
 
 	dev_dbg(wsa885x->component->dev,"%s()\n", __func__);
 
-	wsa885x_handle_ssr_reset(wsa885x);
+	ret = wsa885x_handle_ssr_reset(wsa885x);
+	if (ret) {
+		dev_err(wsa885x->component->dev, "SSR reset failed: %d\n", ret);
+		return ret;
+	}
 
 	regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
 	/* Configure usage mode for thermal/speaker protection */
@@ -972,7 +989,11 @@ static void reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
 	if (!ret) {
 		dev_dbg(wsa885x->component->dev,
 			"Successfully transitioned to power state %d\n", ps);
-	}
+	} else
+		dev_err(wsa885x->component->dev,
+			"Failed transitioned to power state %d\n", ps);
+
+	return ret;
 }
 
 /**
@@ -1048,7 +1069,9 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 					"Successfully transitioned to power state %d\n", ps0);
 		} else {
 			dev_err(wsa885x->component->dev, "PS0 request failed\n");
-			reinit_wsa885x_powerup(wsa885x);
+			ret = reinit_wsa885x_powerup(wsa885x);
+			if (ret)
+				return ret;
 		}
 
 		/* Configure power amplifier based on channel configuration */
