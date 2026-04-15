@@ -3729,6 +3729,7 @@ err_irq_fail:
 	cpu_latency_qos_remove_request(&swrm->pm_qos_req);
 
 err_pdata_fail:
+	platform_set_drvdata(pdev, NULL);
 err_memory_fail:
 	return ret;
 }
@@ -3779,6 +3780,7 @@ static int swrm_remove(struct platform_device *pdev)
 	mutex_destroy(&swrm->pm_lock);
 	mutex_destroy(&swrm->runtime_lock);
 	cpu_latency_qos_remove_request(&swrm->pm_qos_req);
+	platform_set_drvdata(pdev, NULL);
 	devm_kfree(&pdev->dev, swrm);
 exit:
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 10, 0)
@@ -4184,6 +4186,7 @@ static int swrm_alloc_port_mem(struct device *dev, struct swr_mstr_ctrl *swrm,
 	} else {
 		dev_err_ratelimited(swrm->dev, "%s: called more than once\n",
 				    __func__);
+		return -EINVAL;
 	}
 
 	return 0;
