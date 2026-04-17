@@ -1603,6 +1603,8 @@ static const struct of_device_id pineapple_asoc_machine_of_match[]  = {
 	  .data = "codec"},
 	{ .compatible = "qcom,pineapple-asoc-snd-stub",
 	  .data = "stub_codec"},
+	{ .compatible = "qcom,pineapple-asoc-snd-tdm",
+	  .data = "tdm"},
 	{},
 };
 
@@ -1834,6 +1836,26 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev,
 
 		dailink = msm_stub_dai_links;
 		total_links = ARRAY_SIZE(msm_stub_be_dai_links);
+	} else if(!strcmp(match->data, "tdm")) {
+		card = &snd_soc_card_pineapple_msm;
+		rc = of_property_read_u32(dev->of_node,
+				"qcom,mi2s-audio-intf", &val);
+		if (!rc && val) {
+			memcpy(msm_pineapple_dai_links + total_links,
+					msm_mi2s_dai_links,
+					sizeof(msm_mi2s_dai_links));
+			total_links += ARRAY_SIZE(msm_mi2s_dai_links);
+		}
+
+		rc = of_property_read_u32(dev->of_node,
+				"qcom,tdm-audio-intf", &val);
+		if (!rc && val) {
+			memcpy(msm_pineapple_dai_links + total_links,
+					msm_tdm_dai_links,
+					sizeof(msm_tdm_dai_links));
+			total_links += ARRAY_SIZE(msm_tdm_dai_links);
+		}
+		dailink = msm_pineapple_dai_links;
 	}
 
 	if (card) {
