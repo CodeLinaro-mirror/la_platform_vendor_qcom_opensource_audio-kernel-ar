@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2015, 2018-2019, The Linux Foundation. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/regmap.h>
@@ -399,7 +400,7 @@ EXPORT_SYMBOL(wsa881x_update_reg_defaults_2_0);
  */
 void wsa881x_update_regmap_2_0(struct regmap *regmap, int flag)
 {
-	u16 ret = 0;
+	int ret = 0;
 
 	switch (flag) {
 	case WSA881X_DIGITAL_SLAVE:

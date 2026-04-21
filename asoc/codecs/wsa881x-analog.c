@@ -26,6 +26,7 @@
 #include <linux/i2c.h>
 #include <linux/kernel.h>
 #include <linux/gpio.h>
+#include <linux/version.h>
 #include <soc/internal.h>
 #include <linux/regmap.h>
 #include <asoc/msm-cdc-pinctrl.h>
@@ -1149,7 +1150,9 @@ static int wsa881x_probe(struct snd_soc_component *component)
 	int wsa881x_index = 0;
 	struct snd_soc_dapm_context *dapm =
 					snd_soc_component_get_dapm(component);
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 0, 0)
 	char *widget_name = NULL;
+#endif
 
 	client = dev_get_drvdata(component->dev);
 	ret = wsa881x_i2c_get_client_index(client, &wsa881x_index);
@@ -1183,6 +1186,10 @@ static int wsa881x_probe(struct snd_soc_component *component)
 	INIT_DELAYED_WORK(&wsa_pdata[wsa881x_index].ocp_ctl_work,
 				wsa881x_ocp_ctl_work);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+	snd_soc_dapm_ignore_suspend(dapm, "WSA_SPKR");
+	snd_soc_dapm_ignore_suspend(dapm, "WSA_IN");
+#else
 	if (component->name_prefix) {
 		widget_name = kcalloc(WIDGET_NAME_MAX_SIZE, sizeof(char),
 					GFP_KERNEL);
@@ -1200,6 +1207,7 @@ static int wsa881x_probe(struct snd_soc_component *component)
 		snd_soc_dapm_ignore_suspend(dapm, "WSA_SPKR");
 		snd_soc_dapm_ignore_suspend(dapm, "WSA_IN");
 	}
+#endif
 
 	snd_soc_dapm_sync(dapm);
 
@@ -1606,7 +1614,6 @@ static int wsa881x_i2c_remove(struct i2c_client *client)
 		kfree(wsa881x->driver);
 	}
 	i2c_set_clientdata(client, NULL);
-	kfree(wsa881x);
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
