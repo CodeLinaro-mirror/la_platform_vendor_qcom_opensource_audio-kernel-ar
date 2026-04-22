@@ -299,6 +299,7 @@ CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-D__linux__
 
 KBUILD_CPPFLAGS += $(CDEFINES)
+KBUILD_CFLAGS += $(INCS)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
 # is disabling the maybe-uninitialized warning.  Re-enable it for the
@@ -332,6 +333,9 @@ wcd_core_dlkm-y := $(CORE_OBJS)
 
 obj-$(CONFIG_SND_SOC_WCD9XXX_V2) += wcd9xxx_dlkm.o
 wcd9xxx_dlkm-y := $(WCD9XXX_OBJS)
+
+obj-$(CONFIG_MSM_CDC_PINCTRL) += msm_cdc_pinctrl_dlkm.o
+msm_cdc_pinctrl_dlkm-y := $(CORE_OBJS)
 
 obj-$(CONFIG_SND_SOC_WCD9335) += wcd9335_dlkm.o
 wcd9335_dlkm-y := $(WCD9335_OBJS)
