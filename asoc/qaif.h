@@ -329,6 +329,9 @@ struct qaif_drv_data {
 	/* interrupts from the Qualcomm audio interface (QAIF) */
 	int audio_qaif_irq;
 
+	/* QAIF init config refcount*/
+	unsigned int qaif_init_ref_cnt;
+
 	/* SOC specific variations in the QAIF IP integration */
 	struct qaif_variant *variant;
 
