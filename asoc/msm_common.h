@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef _MSM_COMMON_H_
 #define _MSM_COMMON_H_
@@ -27,6 +27,16 @@ enum {
 	MI2S_TDM_AUXPCM_MAX,
 };
 
+/* LPAIF interface indices for DT clock ID overrides */
+enum lpaif_intf {
+	LPAIF_RXTX = 0,
+	LPAIF_AUD_PRI,
+	LPAIF_AUD_SEC,
+	LPAIF_VA,
+	LPAIF_WSA,
+	LPAIF_INTF_MAX,
+};
+
 typedef enum snd_card_status_t {
 	SND_CARD_STATUS_OFFLINE = 0,
 	SND_CARD_STATUS_ONLINE  = 1,
@@ -47,6 +57,7 @@ struct msm_common_pdata {
 	uint32_t is_audio_hw_vote_required[MI2S_TDM_AUXPCM_MAX];
 	uint32_t tdm_clk_attribute[MI2S_TDM_AUXPCM_MAX];
 	uint32_t mi2s_clk_attribute[MI2S_TDM_AUXPCM_MAX];
+	uint32_t clk_id[LPAIF_INTF_MAX];
 };
 
 int snd_card_notify_user(snd_card_status_t card_status);
