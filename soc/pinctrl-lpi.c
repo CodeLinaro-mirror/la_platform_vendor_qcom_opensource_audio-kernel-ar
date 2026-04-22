@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -27,6 +28,7 @@
 
 #include "core.h"
 #include "pinctrl-utils.h"
+#include "../asoc/msm_common.h"
 
 #define LPI_AUTO_SUSPEND_DELAY           100 /* delay in msec */
 #define LPI_AUTO_SUSPEND_DELAY_ERROR     1   /* delay in msec */
@@ -978,7 +980,8 @@ int lpi_pinctrl_runtime_resume(struct device *dev)
 	} else {
 		state->core_hw_vote_status = true;
 	}
-
+	if (state->core_hw_vote_status)
+		msm_common_vote_against_sleep(true);
 	pm_runtime_set_autosuspend_delay(dev, LPI_AUTO_SUSPEND_DELAY);
 
 exit:
@@ -1002,6 +1005,7 @@ int lpi_pinctrl_runtime_suspend(struct device *dev)
 
 	mutex_lock(&state->core_hw_vote_lock);
 	if (state->core_hw_vote_status) {
+		msm_common_vote_against_sleep(false);
 		digital_cdc_rsc_mgr_hw_vote_disable(hw_vote, dev);
 		state->core_hw_vote_status = false;
 	}

@@ -1195,17 +1195,15 @@ static int msm_lpi_logging_enable_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
-static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
-		struct snd_ctl_elem_value *ucontrol)
+int msm_common_vote_against_sleep(bool enable)
 {
 	int ret = 0;
 
 	mutex_lock(&vote_against_sleep_lock);
-	vote_against_sleep_enable = ucontrol->value.integer.value[0];
 	pr_debug("%s: vote against sleep enable: %d sleep cnt: %d", __func__,
-			vote_against_sleep_enable, vote_against_sleep_cnt);
+			enable, vote_against_sleep_cnt);
 
-	if (vote_against_sleep_enable) {
+	if (enable) {
 		vote_against_sleep_cnt++;
 		if (vote_against_sleep_cnt ==  1) {
 			ret = audio_prm_set_vote_against_sleep(1);
@@ -1225,6 +1223,14 @@ static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
 	pr_debug("%s: vote against sleep vote ret: %d\n", __func__, ret);
 	mutex_unlock(&vote_against_sleep_lock);
 	return ret;
+}
+EXPORT_SYMBOL_GPL(msm_common_vote_against_sleep);
+
+static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
+		struct snd_ctl_elem_value *ucontrol)
+{
+	vote_against_sleep_enable = ucontrol->value.integer.value[0];
+	return msm_common_vote_against_sleep(vote_against_sleep_enable);
 }
 
 static int msm_vote_against_sleep_ctl_get(struct snd_kcontrol *kcontrol,
