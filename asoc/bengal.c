@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024. Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 #include <linux/clk.h>
@@ -56,6 +58,11 @@
 
 #define WCN_CDC_SLIM_RX_CH_MAX 2
 #define WCN_CDC_SLIM_TX_CH_MAX 3
+
+/*Disabling WCN BTFM interface configuration for AGATTI LE & DIVAR LE platform variant 
+  as split mode is not supported
+  This overrides device tree configuration when IS_AGATTI_DIVAR is defined.*/
+#define WCN_BTFM_INTF 0
 
 enum {
 	PRIM_MI2S = 0,
@@ -1143,6 +1150,12 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev)
 			dev_dbg(dev, "%s: No DT match wcn btfm interface\n",
 				__func__);
 		} else {
+
+			#if defined(IS_AGATTI_DIVAR) && (IS_AGATTI_DIVAR == 1)
+				dev_dbg(dev, "%s Disabling in Agatti LE and Divar LE as non-split mode  is not supported  \n",__func__);
+				wcn_btfm_intf = WCN_BTFM_INTF;
+			#endif
+
 			if (wcn_btfm_intf) {
 				memcpy(msm_bengal_dai_links + total_links,
 					msm_wcn_btfm_be_dai_links,
