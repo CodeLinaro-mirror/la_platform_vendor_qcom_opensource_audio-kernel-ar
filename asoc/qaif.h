@@ -17,11 +17,14 @@
 #include <sound/soc.h>
 #include <sound/soc-dai.h>
 #include <dt-bindings/sound/qcom,lpass.h>
+
 //#include <dt-bindings/sound/qcom,q6dsp-lpass-ports.h>
 
 //extend DAI ID from qcom,lpass.h. modify main header later.
 #define MI2S_SENARY				5
+#define MI2S_SEPTENARY			35
 
+#define SMMU_SID_OFFSET				32
 #define LPASS_MAX_MI2S_PORTS			(8)
 #define LPASS_MAX_AIF_DMA_IDX			(8)
 #define LPASS_MAX_CIF_DMA_IDX		(8)
@@ -62,10 +65,75 @@
 
 #define QAIF_DMA_CLK_RATE_HZ				153600000
 
+#define QAIF_DMACTL_WM_5					4
 #define QAIF_DMACTL_WM_8					7
 #define QAIF_DMACTL_BURSTEN					1
 
 #define QAIF_MAX_LANES						8
+
+/* QAIF_AUD_INTF_SYNC_CFG_REG bit masks and shifts */
+#define QAIF_AUD_INTF_SYNC_CFG_INV_SYNC_MASK    BIT(12)
+#define QAIF_AUD_INTF_SYNC_CFG_INV_SYNC_SHFT    12
+
+#define QAIF_AUD_INTF_SYNC_CFG_SYNC_DELAY_MASK  GENMASK(9, 8)
+#define QAIF_AUD_INTF_SYNC_CFG_SYNC_DELAY_SHFT  8
+
+#define QAIF_AUD_INTF_SYNC_CFG_SYNC_MODE_MASK   GENMASK(5, 4)
+#define QAIF_AUD_INTF_SYNC_CFG_SYNC_MODE_SHFT   4
+
+#define QAIF_AUD_INTF_SYNC_CFG_SYNC_SRC_MASK    BIT(0)
+#define QAIF_AUD_INTF_SYNC_CFG_SYNC_SRC_SHFT    0
+
+/* QAIF_AUD_INTF_LANE_CFG_REG bit masks and shifts  */
+#define QAIF_AUD_INTF_LANE_CFG_LOOPBACK_MASK    BIT(31)
+#define QAIF_AUD_INTF_LANE_CFG_LOOPBACK_SHFT    31
+
+#define QAIF_AUD_INTF_LANE_CFG_CTRL_DATA_OE_MASK    BIT(16)
+#define QAIF_AUD_INTF_LANE_CFG_CTRL_DATA_OE_SHFT    16
+
+#define QAIF_AUD_INTF_LANE_CFG_LANE_EN_MASK     GENMASK(15, 8)
+#define QAIF_AUD_INTF_LANE_CFG_LANE_EN_SHFT     8
+
+#define QAIF_AUD_INTF_LANE_CFG_LANE_DIR_MASK    GENMASK(7, 0)
+#define QAIF_AUD_INTF_LANE_CFG_LANE_DIR_SHFT    0
+
+/* ========== QAIF_AUD_INTF_BIT_WIDTH_CFG_REG bit masks and shifts ========== */
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_RX_MASK    GENMASK(28, 24)
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_RX_SHFT    24
+
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_TX_MASK    GENMASK(20, 16)
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_TX_SHFT    16
+
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_RX_MASK      GENMASK(12, 8)
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_RX_SHFT      8
+
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_TX_MASK      GENMASK(4, 0)
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_TX_SHFT      0
+
+/* ========== QAIF_AUD_INTF_BIT_WIDTH_CFG_REG - Combined masks for RMW ========== */
+/* RX-only fields mask (for preserving TX fields) */
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_RX_FIELDS_MASK  \
+    (QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_RX_MASK | \
+     QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_RX_MASK)
+
+/* TX-only fields mask (for preserving RX fields) */
+#define QAIF_AUD_INTF_BIT_WIDTH_CFG_TX_FIELDS_MASK  \
+    (QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_TX_MASK | \
+     QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_TX_MASK)
+
+/* ========== QAIF_AUD_INTF_MI2S_CFG_REG bit masks and shifts ========== */
+#define QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_RX_MASK    BIT(1)
+#define QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_RX_SHFT    1
+
+#define QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_TX_MASK    BIT(0)
+#define QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_TX_SHFT    0
+
+/* Combined masks for Read-Modify-Write operations */
+#define QAIF_AUD_INTF_MI2S_CFG_RX_FIELDS_MASK   \
+    (QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_RX_MASK)
+
+#define QAIF_AUD_INTF_MI2S_CFG_TX_FIELDS_MASK   \
+    (QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_TX_MASK)
 
 enum qxm_sel{
 	QXM0 = 0,
@@ -85,6 +153,7 @@ static inline bool is_cif_dma_port(int dai_id)
 	switch (dai_id) {
 	case LPASS_CDC_DMA_RX0 ... LPASS_CDC_DMA_RX9:
 	case LPASS_CDC_DMA_TX0 ... LPASS_CDC_DMA_TX8:
+	case LPASS_CDC_DMA_VA_TX0 ... LPASS_CDC_DMA_VA_TX8:
 		return true;
 	}
 	return false;
@@ -249,6 +318,7 @@ struct qaif_drv_data {
 	int num_clks;
 
 	struct clk *aud_dma_clk;
+	struct clk *aud_dma_mem_clk;
 
 	/* Qualcomm audio interface (QAIF) registers */
 	void __iomem *audio_qaif;
@@ -271,6 +341,7 @@ struct qaif_drv_data {
 	struct snd_pcm_substream *cif_substream[LPASS_MAX_CIF_DMA_IDX];
 
 	u64 smmu_csid_bits;
+	u64 smmu_sid_bits;
 
 	/* DMA Heap handle*/
 	struct dma_heap *dma_heap;
