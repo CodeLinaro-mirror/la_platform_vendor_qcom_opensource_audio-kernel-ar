@@ -956,15 +956,15 @@ static struct snd_soc_dai_link msm_wsa_wsa2_cdc_dma_be_dai_links[] = {
 static struct snd_soc_dai_link msm_rx_cdc_qaif_cpu_dma_be_dai_links[] = {
 	/* QAIF RX CDC DMA Backend DAI Links */
 	{
-		.name = LPASS_BE_RX_CDC_DMA_RX_0,
-		.stream_name = LPASS_BE_RX_CDC_DMA_RX_0,
+		.name = LPASS_BE_RX_CDC_DMA_RX_1,
+		.stream_name = LPASS_BE_RX_CDC_DMA_RX_1,
 		.playback_only = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST},
 		.ignore_pmdown_time = 1,
 		.ignore_suspend = 1,
 		.ops = &msm_common_be_ops,
-		SND_SOC_DAILINK_REG(rx_qaif_dma_rx0),
+		SND_SOC_DAILINK_REG(rx_qaif_dma_rx1),
 		.init = &msm_rx_tx_codec_init,
 	},
 };
@@ -1016,6 +1016,7 @@ static struct snd_soc_dai_link msm_rx_cdc_dma_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(rx_dma_rx3),
 	},
+#ifndef CONFIG_SND_SOC_SHIKRA
 	{
 		.name = LPASS_BE_RX_CDC_DMA_RX_5,
 		.stream_name = LPASS_BE_RX_CDC_DMA_RX_5,
@@ -1027,9 +1028,11 @@ static struct snd_soc_dai_link msm_rx_cdc_dma_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(rx_dma_rx5),
 	},
+#endif
 };
 
 static struct snd_soc_dai_link msm_tx_cdc_dma_be_dai_links[] = {
+#ifndef CONFIG_SND_SOC_SHIKRA
 	/* TX CDC DMA Backend DAI Links */
 	{
 		.name = LPASS_BE_TX_CDC_DMA_TX_4,
@@ -1041,9 +1044,11 @@ static struct snd_soc_dai_link msm_tx_cdc_dma_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(tx_dma_tx4),
 	},
+#endif
 };
 
 static struct snd_soc_dai_link msm_cdc_tx_va_dma_be_dai_links[] = {
+#ifndef CONFIG_SND_SOC_SHIKRA
 	{
 		.name = LPASS_BE_TX_CDC_DMA_TX_3,
 		.stream_name = LPASS_BE_TX_CDC_DMA_TX_3,
@@ -1064,6 +1069,7 @@ static struct snd_soc_dai_link msm_cdc_tx_va_dma_be_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		SND_SOC_DAILINK_REG(va_dma_tx0),
 	},
+#endif
 };
 
 static struct snd_soc_dai_link msm_cdc_qmp_dma_be_dai_links[] = {
@@ -1111,8 +1117,8 @@ static struct snd_soc_dai_link msm_cdc_qmp_dma_be_dai_links[] = {
 
 static struct snd_soc_dai_link msm_va_cdc_qaif_cpu_dma_be_dai_links[] = {
 	{
-		.name = LPASS_BE_VA_CDC_DMA_TX_0,
-		.stream_name = LPASS_BE_VA_CDC_DMA_TX_0,
+		.name = LPASS_BE_TX_CDC_DMA_TX_3,
+		.stream_name = LPASS_BE_TX_CDC_DMA_TX_3,
 		.capture_only = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST},
@@ -1122,6 +1128,40 @@ static struct snd_soc_dai_link msm_va_cdc_qaif_cpu_dma_be_dai_links[] = {
 	},
 };
 
+#ifdef CONFIG_QAIF_VA_NOT_SUPPORTED
+static struct snd_soc_dai_link msm_va_cdc_dma_be_dai_links[] = {
+	{
+		.name = LPASS_BE_TX_CDC_DMA_TX_3,
+		.stream_name = LPASS_BE_TX_CDC_DMA_TX_3,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(va_dma_tx0),
+	},
+	{
+		.name = LPASS_BE_TX_CDC_DMA_TX_4,
+		.stream_name = LPASS_BE_TX_CDC_DMA_TX_4,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(va_dma_tx1),
+	},
+	{
+		.name = LPASS_BE_TX_CDC_DMA_TX_0,
+		.stream_name = LPASS_BE_TX_CDC_DMA_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ignore_suspend = 1,
+		.ops = &msm_common_be_ops,
+		SND_SOC_DAILINK_REG(va_dma_tx2),
+	},
+};
+#else
 static struct snd_soc_dai_link msm_va_cdc_dma_be_dai_links[] = {
 	{
 		.name = LPASS_BE_VA_CDC_DMA_TX_1,
@@ -1144,6 +1184,7 @@ static struct snd_soc_dai_link msm_va_cdc_dma_be_dai_links[] = {
 		SND_SOC_DAILINK_REG(va_dma_tx2),
 	},
 };
+#endif
 
 /*
  * I2S interface pinctrl mapping
@@ -2512,7 +2553,8 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic4");
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic5");
 
-	lpass_cdc_set_port_map(lpass_cdc_component,
+	if (!pdata->wcd_disabled)
+		lpass_cdc_set_port_map(lpass_cdc_component,
 				ARRAY_SIZE(sm_rx_port_map), sm_rx_port_map);
 
 	card = rtd->card->snd_card;
