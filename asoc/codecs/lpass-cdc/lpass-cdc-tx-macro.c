@@ -747,7 +747,7 @@ static int lpass_cdc_tx_macro_dec_mode_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int ret = 0;
@@ -769,7 +769,7 @@ static int lpass_cdc_tx_macro_dec_mode_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value = ucontrol->value.integer.value[0];
@@ -792,7 +792,7 @@ static int lpass_cdc_tx_macro_bcs_ch_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 
@@ -808,7 +808,7 @@ static int lpass_cdc_tx_macro_bcs_ch_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value = ucontrol->value.enumerated.item[0];
@@ -825,7 +825,7 @@ static int lpass_cdc_tx_macro_swr_dmic_get(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 
@@ -841,7 +841,7 @@ static int lpass_cdc_tx_macro_swr_dmic_put(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value = ucontrol->value.integer.value[0];
@@ -859,7 +859,7 @@ static int lpass_cdc_tx_macro_get_dec_gain_bypass(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 
@@ -875,7 +875,7 @@ static int lpass_cdc_tx_macro_put_dec_gain_bypass(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value = ucontrol->value.integer.value[0];
@@ -892,7 +892,7 @@ static int lpass_cdc_tx_macro_get_bcs(struct snd_kcontrol *kcontrol,
                             struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 
@@ -908,7 +908,7 @@ static int lpass_cdc_tx_macro_set_bcs(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value = ucontrol->value.integer.value[0];
@@ -925,7 +925,7 @@ static int lpass_cdc_tx_macro_get_hpf_adapt_bypass(struct snd_kcontrol *kcontrol
                             struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 
@@ -941,7 +941,7 @@ static int lpass_cdc_tx_macro_set_hpf_adapt_bypass(struct snd_kcontrol *kcontrol
 			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value = ucontrol->value.integer.value[0];
@@ -968,7 +968,7 @@ static int lpass_cdc_tx_macro_get_bcs_ch_sel(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value = 0;
@@ -987,7 +987,7 @@ static int lpass_cdc_tx_macro_put_bcs_ch_sel(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct lpass_cdc_tx_macro_priv *tx_priv = NULL;
 	struct device *tx_dev = NULL;
 	int value;

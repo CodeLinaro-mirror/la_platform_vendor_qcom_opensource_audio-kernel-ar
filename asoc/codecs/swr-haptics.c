@@ -462,7 +462,7 @@ static int haptics_vmax_get(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct swr_haptics_dev *swr_hap =
 			snd_soc_component_get_drvdata(component);
 
@@ -476,7 +476,7 @@ static int haptics_vmax_put(struct snd_kcontrol *kcontrol,
 			struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct swr_haptics_dev *swr_hap =
 			snd_soc_component_get_drvdata(component);
 
@@ -490,7 +490,7 @@ static int haptics_get_visense(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct swr_haptics_dev *swr_hap =
 			snd_soc_component_get_drvdata(component);
 
@@ -502,7 +502,7 @@ static int haptics_set_visense(struct snd_kcontrol *kcontrol,
 			       struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct swr_haptics_dev *swr_hap =
 			snd_soc_component_get_drvdata(component);
 

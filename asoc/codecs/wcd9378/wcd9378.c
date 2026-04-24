@@ -2711,7 +2711,7 @@ static int wcd9378_tx_mode_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = NULL;
 	int ret = 0;
 	unsigned int path = 0;
@@ -2737,7 +2737,7 @@ static int wcd9378_tx_mode_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = NULL;
 	u32 mode_val;
 	unsigned int path = 0;
@@ -2768,7 +2768,7 @@ static int wcd9378_loopback_mode_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	u32 loopback_mode = 0;
 
 	if (!component)
@@ -2785,7 +2785,7 @@ static int wcd9378_loopback_mode_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	u32 loopback_mode = 0;
 
 	if (!component)
@@ -2807,7 +2807,7 @@ static int wcd9378_aux_dsm_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	u32 aux_dsm_in = 0;
 
 	if (!component)
@@ -2824,7 +2824,7 @@ static int wcd9378_aux_dsm_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	u32 aux_dsm_in = 0;
 
 	if (!component)
@@ -2846,7 +2846,7 @@ static int wcd9378_hph_dsm_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	u32 hph_dsm_in = 0;
 
 	if (!component)
@@ -2863,7 +2863,7 @@ static int wcd9378_hph_dsm_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	u32 hph_dsm_in = 0;
 
 	if (!component)
@@ -2884,7 +2884,7 @@ static int wcd9378_hph_dsm_put(struct snd_kcontrol *kcontrol,
 static int wcd9378_hph_put_gain(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 	u16 offset = ucontrol->value.enumerated.item[0];
 	u32 temp = 0;
@@ -2900,7 +2900,7 @@ static int wcd9378_hph_put_gain(struct snd_kcontrol *kcontrol,
 static int wcd9378_hph_get_gain(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 	u32 temp = 0;
 	u16 offset =  0;
@@ -2920,7 +2920,7 @@ static int wcd9378_ear_pa_gain_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int ear_gain = 0;
 
 	if (component == NULL)
@@ -2940,7 +2940,7 @@ static int wcd9378_ear_pa_gain_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int ear_gain = 0;
 
 	if (component == NULL)
@@ -2967,7 +2967,7 @@ static int wcd9378_aux_pa_gain_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int aux_gain = 0;
 
 	if (component == NULL)
@@ -2986,7 +2986,7 @@ static int wcd9378_aux_pa_gain_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	int aux_gain = 0;
 
 	if (component == NULL)
@@ -3011,7 +3011,7 @@ static int wcd9378_aux_pa_gain_put(struct snd_kcontrol *kcontrol,
 static int wcd9378_rx2_mode_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 =
 			snd_soc_component_get_drvdata(component);
 
@@ -3025,7 +3025,7 @@ static int wcd9378_rx2_mode_put(struct snd_kcontrol *kcontrol,
 static int wcd9378_rx_hph_mode_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 
 	ucontrol->value.enumerated.item[0] = wcd9378->hph_mode;
@@ -3036,7 +3036,7 @@ static int wcd9378_rx_hph_mode_get(struct snd_kcontrol *kcontrol,
 static int wcd9378_rx_hph_mode_put(struct snd_kcontrol *kcontrol,
 				   struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 
 	if (wcd9378->hph_mode == ucontrol->value.enumerated.item[0])
@@ -3074,7 +3074,7 @@ static int wcd9378_get_compander(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 	bool hphr;
 	struct soc_mixer_control *mc;
@@ -3091,7 +3091,7 @@ static int wcd9378_set_compander(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 =
 			snd_soc_component_get_drvdata(component);
 	int value = ucontrol->value.integer.value[0];
@@ -3209,7 +3209,7 @@ static int wcd9378_tx_master_ch_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = NULL;
 	int slave_ch_idx = -EINVAL;
 
@@ -3234,7 +3234,7 @@ static int wcd9378_tx_master_ch_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = NULL;
 	int slave_ch_idx = -EINVAL, idx = 0;
 
@@ -3266,7 +3266,7 @@ static int wcd9378_bcs_get(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 
 	ucontrol->value.integer.value[0] = wcd9378->bcs_dis;
@@ -3278,7 +3278,7 @@ static int wcd9378_bcs_put(struct snd_kcontrol *kcontrol,
 				 struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-			snd_soc_kcontrol_component(kcontrol);
+			snd_kcontrol_chip(kcontrol);
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 
 	wcd9378->bcs_dis = ucontrol->value.integer.value[0];

@@ -2083,7 +2083,7 @@ static int wcd939x_get_hph_type(struct snd_kcontrol *kcontrol,
 			      struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_mbhc *wcd939x_mbhc = wcd939x_soc_get_mbhc(component);
 	struct wcd_mbhc *mbhc;
 
@@ -2107,7 +2107,7 @@ static int wcd939x_hph_impedance_get(struct snd_kcontrol *kcontrol,
 	bool hphr;
 	struct soc_mixer_control *mc;
 	struct snd_soc_component *component =
-					snd_soc_kcontrol_component(kcontrol);
+					snd_kcontrol_chip(kcontrol);
 	struct wcd939x_mbhc *wcd939x_mbhc = wcd939x_soc_get_mbhc(component);
 
 	if (!wcd939x_mbhc) {

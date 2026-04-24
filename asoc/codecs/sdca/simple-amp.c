@@ -766,7 +766,7 @@ static int simple_amp_impl_def_reg_get(struct snd_kcontrol *kcontrol,
 static int simple_amp_impl_def_reg_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 	const char *input = ucontrol->value.bytes.data;
@@ -784,7 +784,7 @@ static SOC_ENUM_SINGLE_EXT_DECL(impl_def_reg_enum,
 static int simple_amp_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -797,7 +797,7 @@ static int simple_amp_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 static int simple_amp_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component =snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -819,7 +819,7 @@ static int simple_amp_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
 static int simple_amp_usage_modes_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -834,7 +834,7 @@ static int simple_amp_usage_modes_get(struct snd_kcontrol *kcontrol,
 static int simple_amp_usage_modes_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component =snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -853,7 +853,7 @@ static int simple_amp_usage_modes_put(struct snd_kcontrol *kcontrol,
 static int simple_amp_rx_ch_sel_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -865,7 +865,7 @@ static int simple_amp_rx_ch_sel_get(struct snd_kcontrol *kcontrol,
 static int simple_amp_rx_ch_sel_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 			snd_soc_component_get_drvdata(component);
 
@@ -887,7 +887,7 @@ static SOC_ENUM_SINGLE_EXT_DECL(simple_amp_rx_ch_sel_enum,
 static int simple_amp_debug_mode_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -898,7 +898,7 @@ static int simple_amp_debug_mode_get(struct snd_kcontrol *kcontrol,
 static int simple_amp_debug_mode_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component =snd_kcontrol_chip (kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -917,7 +917,7 @@ static SOC_ENUM_SINGLE_EXT_DECL(debug_mode_enum,
 static int simple_amp_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -928,7 +928,7 @@ static int simple_amp_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
 static int simple_amp_trigger_die_temp_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 
@@ -944,7 +944,7 @@ static int simple_amp_get_temp(struct snd_kcontrol *kcontrol,
 {
 
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct simple_amp_priv *simple_amp =
 				snd_soc_component_get_drvdata(component);
 	int ret = 0;

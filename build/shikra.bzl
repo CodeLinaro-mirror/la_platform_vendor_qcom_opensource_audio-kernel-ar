@@ -77,6 +77,7 @@ def define_shikra():
             "CONFIG_SND_SOC_ROULEUR",
             "CONFIG_SND_SOC_ROULEUR_SLAVE",
             "CONFIG_PM2250_SPMI",
-            "CONFIG_SND_SOC_QAIF_CPU"
+            "CONFIG_SND_SOC_QAIF_CPU",
+            "CONFIG_QAIF_VA_NOT_SUPPORTED"
         ]
     )
