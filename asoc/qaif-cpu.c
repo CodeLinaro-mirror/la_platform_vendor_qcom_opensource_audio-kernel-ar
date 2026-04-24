@@ -220,6 +220,7 @@ static int qaif_cif_daiops_hw_params(struct snd_pcm_substream *substream,
 			"error writing to intfctl active_ch_en reg field: %d\n", ret);
 		return ret;
 	}
+
 	return 0;
 }
 
@@ -376,8 +377,6 @@ static int qaif_aif_cfg_cpu_init_bitfields(struct device *dev,
 	return 0;
 }
 
-
-
 static int qaif_aif_cpu_init_bitfields(struct device *dev,
 			struct regmap *map)
 {
@@ -440,8 +439,8 @@ static int qaif_aif_cpu_init_bitfields(struct device *dev,
 	    IS_ERR(rd_dmactl->num_ot) || IS_ERR(wr_dmactl->num_ot) ||
 	    IS_ERR(rd_dmactl->dma_dyncclk) || IS_ERR(wr_dmactl->dma_dyncclk) ||
 	    IS_ERR(rd_dmactl->burst16) || IS_ERR(wr_dmactl->burst16) ||
-	    IS_ERR(rd_dmactl->burst8) || IS_ERR(wr_dmactl->burst8) || 
-	    IS_ERR(rd_dmactl->burst4) || IS_ERR(wr_dmactl->burst4) || 
+	    IS_ERR(rd_dmactl->burst8) || IS_ERR(wr_dmactl->burst8) ||
+	    IS_ERR(rd_dmactl->burst4) || IS_ERR(wr_dmactl->burst4) ||
 	    IS_ERR(rd_dmactl->burst2) || IS_ERR(wr_dmactl->burst2) ||
 	    IS_ERR(rd_dmactl->burst1) || IS_ERR(wr_dmactl->burst1) ||
 	    IS_ERR(rd_dmactl->shram_wm) || IS_ERR(wr_dmactl->shram_wm)) {
@@ -459,17 +458,7 @@ static int qaif_aif_cpu_init_bitfields(struct device *dev,
 static int qaif_aif_cpu_daiops_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 		unsigned int freq, int dir)
 {
-	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
-	const struct qaif_variant *v = drvdata->variant;
-	int idx = v->get_dma_idx(dai->driver->id);
-	int ret;
-
-	ret = clk_set_rate(drvdata->mi2s_osr_clk[idx], freq);
-	if (ret)
-		dev_err(dai->dev, "error setting mi2s osrclk to %u: %d\n",
-			freq, ret);
-
-	return ret;
+	return 0;
 }
 
 static int qaif_aif_cpu_daiops_startup(struct snd_pcm_substream *substream,
@@ -477,18 +466,16 @@ static int qaif_aif_cpu_daiops_startup(struct snd_pcm_substream *substream,
 {
 	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
 	const struct qaif_variant *v = drvdata->variant;
-	int idx = v->get_dma_idx(dai->driver->id);
-	int ret;
-
-	ret = clk_prepare_enable(drvdata->mi2s_osr_clk[idx]);
-	if (ret) {
-		dev_err(dai->dev, "error in enabling mi2s osr clk: %d\n", ret);
-		return ret;
+	int idx, ret = 0;
+	idx = v->get_dma_idx(dai->driver->id);
+	if (idx < 0) {
+		dev_err(dai->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
 	}
+
 	ret = clk_prepare(drvdata->mi2s_bit_clk[idx]);
 	if (ret) {
 		dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
-		clk_disable_unprepare(drvdata->mi2s_osr_clk[idx]);
 		return ret;
 	}
 	return 0;
@@ -500,25 +487,18 @@ static void qaif_aif_cpu_daiops_shutdown(struct snd_pcm_substream *substream,
 	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
 	const struct qaif_variant *v = drvdata->variant;
 	int idx = v->get_dma_idx(dai->driver->id);
+	if (idx < 0) {
+		dev_err(dai->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return;
+	}
 
-	clk_disable_unprepare(drvdata->mi2s_osr_clk[idx]);
-	/*
-	 * Ensure LRCLK is disabled even in device node validation.
-	 * Will not impact if disabled in qaif_aif_cpu_daiops_trigger()
-	 * suspend.
-	 */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 		regmap_write(drvdata->audio_qaif_map,
-			QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_TX);
+			QAIF_AUD_INTF_CTL_REG(idx), 0);
 	else
 		regmap_write(drvdata->audio_qaif_map,
-			QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_RX);
+			QAIF_AUD_INTF_CTL_REG(idx), 0);
 
-	/*
-	 * BCLK may not be enabled if qaif_aif_cpu_daiops_prepare is called before
-	 * qaif_aif_cpu_daiops_shutdown. It's paired with the clk_enable in
-	 * qaif_aif_cpu_daiops_prepare.
-	 */
 	if (drvdata->mi2s_was_prepared[idx]) {
 		drvdata->mi2s_was_prepared[idx] = false;
 		clk_disable(drvdata->mi2s_bit_clk[idx]);
@@ -527,6 +507,7 @@ static void qaif_aif_cpu_daiops_shutdown(struct snd_pcm_substream *substream,
 	clk_unprepare(drvdata->mi2s_bit_clk[idx]);
 }
 
+#if 0
 static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
 		struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
 {
@@ -546,6 +527,12 @@ static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	idx = v->get_dma_idx(dai->driver->id);
+
+	if (idx < 0) {
+		dev_err(dai->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
+
 	aif_intf_cfg = &v->aif_intf_cfg[idx];
 
 	if (!aif_intf_cfg) {
@@ -596,14 +583,14 @@ static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
 
 	ret = regmap_fields_write(aif_intfctl->lane_en, idx, aif_intf_cfg->lane_en_mask);
 	if (ret) {
-		dev_err(dai->dev, "Failed to write lane_en (mask=0x%02X): %d\n", 
+		dev_err(dai->dev, "Failed to write lane_en (mask=0x%02X): %d\n",
 			aif_intf_cfg->lane_en_mask, ret);
 		return ret;
 	}
 
 	ret = regmap_fields_write(aif_intfctl->lane_dir, idx, aif_intf_cfg->lane_dir_mask);
 	if (ret) {
-		dev_err(dai->dev, "Failed to write lane_dir (mask=0x%02X): %d\n", 
+		dev_err(dai->dev, "Failed to write lane_dir (mask=0x%02X): %d\n",
 			aif_intf_cfg->lane_dir_mask, ret);
 		return ret;
 	}
@@ -635,7 +622,7 @@ static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
 		}
 		ret = regmap_fields_write(aif_intfctl->slot_en_tx_mask, idx, aif_intf_cfg->slot_en_tx_mask);
 		if (ret) {
-			dev_err(dai->dev, "Failed to write slot_en_tx_mask (0x%08X): %d\n", 
+			dev_err(dai->dev, "Failed to write slot_en_tx_mask (0x%08X): %d\n",
 				aif_intf_cfg->slot_en_tx_mask, ret);
 			return ret;
 		}
@@ -667,7 +654,7 @@ static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
 		}
 		ret = regmap_fields_write(aif_intfctl->slot_en_rx_mask, idx, aif_intf_cfg->slot_en_rx_mask);
 		if (ret) {
-			dev_err(dai->dev, "Failed to write slot_en_rx_mask (0x%08X): %d\n", 
+			dev_err(dai->dev, "Failed to write slot_en_rx_mask (0x%08X): %d\n",
 				aif_intf_cfg->slot_en_rx_mask, ret);
 			return ret;
 		}
@@ -704,37 +691,253 @@ static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
 
 	return 0;
 }
+#else
+
+static int qaif_aif_cpu_daiops_hw_params(struct snd_pcm_substream *substream,
+		struct snd_pcm_hw_params *params, struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
+	struct qaif_variant *v = drvdata->variant;
+	unsigned int idx;
+	struct qaif_aif_config *aif_intf_cfg = NULL;
+	snd_pcm_format_t format = params_format(params);
+	unsigned int channels = params_channels(params);
+	unsigned int rate = params_rate(params);
+	unsigned int slot_width = 32;
+	int bitwidth, ret;
+	u32 sync_cfg_val, lane_cfg_val, mi2s_cfg_val, frame_cfg_val;
+	u32 tx_bw_fields, rx_bw_fields, bit_width_cfg_val;
+
+	idx = v->get_dma_idx(dai->driver->id);
+
+	if (idx < 0) {
+		dev_err(dai->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
+
+	aif_intf_cfg = &v->aif_intf_cfg[idx];
+
+	if (!aif_intf_cfg) {
+		dev_err(dai->dev, "AIF interface config not found\n");
+		return -EINVAL;
+	}
+	bitwidth = snd_pcm_format_width(format);
+	if (bitwidth < 0) {
+		dev_err(dai->dev, "invalid bit width given: %d\n", bitwidth);
+		return bitwidth;
+	}
+
+	/* Combine all fields into single value */
+	sync_cfg_val = ((aif_intf_cfg->invert_sync << QAIF_AUD_INTF_SYNC_CFG_INV_SYNC_SHFT) &
+					QAIF_AUD_INTF_SYNC_CFG_INV_SYNC_MASK) |
+				((aif_intf_cfg->sync_delay << QAIF_AUD_INTF_SYNC_CFG_SYNC_DELAY_SHFT) &
+					QAIF_AUD_INTF_SYNC_CFG_SYNC_DELAY_MASK) |
+				((aif_intf_cfg->sync_mode << QAIF_AUD_INTF_SYNC_CFG_SYNC_MODE_SHFT) &
+					QAIF_AUD_INTF_SYNC_CFG_SYNC_MODE_MASK) |
+				((aif_intf_cfg->sync_src << QAIF_AUD_INTF_SYNC_CFG_SYNC_SRC_SHFT) &
+					QAIF_AUD_INTF_SYNC_CFG_SYNC_SRC_MASK);
+
+	ret = regmap_write(drvdata->audio_qaif_map,
+					QAIF_AUD_INTF_SYNC_CFG_REG(idx), sync_cfg_val);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write QAIF_AUD_INTF_SYNC_CFG_REG: %d\n", ret);
+		return ret;
+	}
+
+	lane_cfg_val = ((aif_intf_cfg->loopback_en << QAIF_AUD_INTF_LANE_CFG_LOOPBACK_SHFT) &
+					QAIF_AUD_INTF_LANE_CFG_LOOPBACK_MASK) |
+				((aif_intf_cfg->ctrl_data_oe << QAIF_AUD_INTF_LANE_CFG_CTRL_DATA_OE_SHFT) &
+					QAIF_AUD_INTF_LANE_CFG_CTRL_DATA_OE_MASK) |
+				((aif_intf_cfg->lane_en_mask << QAIF_AUD_INTF_LANE_CFG_LANE_EN_SHFT) &
+					QAIF_AUD_INTF_LANE_CFG_LANE_EN_MASK) |
+				((aif_intf_cfg->lane_dir_mask << QAIF_AUD_INTF_LANE_CFG_LANE_DIR_SHFT) &
+					QAIF_AUD_INTF_LANE_CFG_LANE_DIR_MASK);
+
+	ret = regmap_write(drvdata->audio_qaif_map,
+					QAIF_AUD_INTF_LANE_CFG_REG(idx), lane_cfg_val);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write QAIF_AUD_INTF_LANE_CFG_REG: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_CFG_REG(idx), aif_intf_cfg->full_cycle_en);
+	if (ret) {
+		dev_err(dai->dev, "Failed to write QAIF_AUD_INTF_CFG_REG: %d\n", ret);
+		return ret;
+	}
+	dev_dbg(dai->dev, "%s: sync_cfg_val: %x, lane_cfg_val: %x, full_cycle_en: %x\n",
+			__func__, sync_cfg_val, lane_cfg_val, aif_intf_cfg->full_cycle_en);
+
+	ret = regmap_read(drvdata->audio_qaif_map, QAIF_AUD_INTF_BIT_WIDTH_CFG_REG(idx), &bit_width_cfg_val);
+	if (ret) {
+		dev_err(dai->dev, "Failed to read QAIF_AUD_INTF_BIT_WIDTH_CFG_REG: %d\n", ret);
+		return ret;
+	}
+
+	ret = regmap_read(drvdata->audio_qaif_map, QAIF_AUD_INTF_MI2S_CFG_REG(idx), &mi2s_cfg_val);
+	if (ret) {
+		dev_err(dai->dev, "Failed to read QAIF_AUD_INTF_MI2S_CFG_REG: %d\n", ret);
+		return ret;
+	}
+
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		slot_width = aif_intf_cfg->slot_width_tx;
+		/* Prepare TX field values */
+		tx_bw_fields = ((QAIF_AIF_SAMPLE_WIDTH(bitwidth) << QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_TX_SHFT) &
+					QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_TX_MASK) |
+					((QAIF_AIF_SLOT_WIDTH(slot_width) << QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_TX_SHFT) &
+					QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_TX_MASK);
+
+		/* Clear TX fields, preserve RX fields, write new TX values */
+		bit_width_cfg_val = (bit_width_cfg_val & ~QAIF_AUD_INTF_BIT_WIDTH_CFG_TX_FIELDS_MASK) | tx_bw_fields;
+
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_BIT_WIDTH_CFG_REG(idx), bit_width_cfg_val);
+		if (ret) {
+			dev_err(dai->dev, "Write to read QAIF_AUD_INTF_BIT_WIDTH_CFG_REG: %d\n", ret);
+			return ret;
+		}
+
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_ACTV_SLOT_EN_TX_REG(idx), aif_intf_cfg->slot_en_tx_mask);
+		if (ret) {
+			dev_err(dai->dev, "Write to read QAIF_AUD_INTF_ACTV_SLOT_EN_TX_REG: %d\n", ret);
+			return ret;
+		}
+
+		frame_cfg_val = (slot_width * aif_intf_cfg->bits_per_lane) - 1;
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_FRAME_CFG_REG(idx), frame_cfg_val);
+		if (ret) {
+			dev_err(dai->dev, "Failed to write QAIF_AUD_INTF_FRAME_CFG_REG: %d\n", ret);
+			return ret;
+		}
+
+		/* Clear TX field, preserve RX field */
+		mi2s_cfg_val &= ~QAIF_AUD_INTF_MI2S_CFG_TX_FIELDS_MASK;
+		if (channels >= 2) {
+			/* Set new TX mono mode value */
+			mi2s_cfg_val |= ((QAIF_AUD_INTF_CTL_STEREO << QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_TX_SHFT) &
+							QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_TX_MASK);
+		} else {
+			/* Set new TX mono mode value */
+			mi2s_cfg_val |= ((QAIF_AUD_INTF_CTL_MONO << QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_TX_SHFT) &
+							QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_TX_MASK);
+		}
+
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_MI2S_CFG_REG(idx), mi2s_cfg_val);
+		if (ret) {
+			dev_err(dai->dev, "Write to read QAIF_AUD_INTF_MI2S_CFG_REG: %d\n", ret);
+			return ret;
+		}
+		dev_err(dai->dev, "%s: TX - bit_width_cfg: %x, slot_en_mask: %x, frame_cfg: %x, mi2s_cfg: %x\n",
+			__func__, bit_width_cfg_val, aif_intf_cfg->slot_en_tx_mask, frame_cfg_val, mi2s_cfg_val);
+	} else {
+		slot_width = aif_intf_cfg->slot_width_tx;
+		/* Prepare RX field values */
+		rx_bw_fields = ((QAIF_AIF_SAMPLE_WIDTH(bitwidth) << QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_RX_SHFT) &
+					QAIF_AUD_INTF_BIT_WIDTH_CFG_SAMPLE_WIDTH_RX_MASK) |
+					((QAIF_AIF_SLOT_WIDTH(slot_width) << QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_RX_SHFT) &
+					QAIF_AUD_INTF_BIT_WIDTH_CFG_SLOT_WIDTH_RX_MASK);
+
+		/* Clear RX fields, preserve TX fields, write new RX values */
+		bit_width_cfg_val = (bit_width_cfg_val & ~QAIF_AUD_INTF_BIT_WIDTH_CFG_RX_FIELDS_MASK) | rx_bw_fields;
+
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_BIT_WIDTH_CFG_REG(idx), bit_width_cfg_val);
+		if (ret) {
+			dev_err(dai->dev, "Write to read QAIF_AUD_INTF_BIT_WIDTH_CFG_REG: %d\n", ret);
+			return ret;
+		}
+
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_ACTV_SLOT_EN_RX_REG(idx), aif_intf_cfg->slot_en_rx_mask);
+		if (ret) {
+			dev_err(dai->dev, "Write to read QAIF_AUD_INTF_ACTV_SLOT_EN_RX_REG: %d\n", ret);
+			return ret;
+		}
+
+		frame_cfg_val = (slot_width * aif_intf_cfg->bits_per_lane) - 1;
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_FRAME_CFG_REG(idx), frame_cfg_val);
+		if (ret) {
+			dev_err(dai->dev, "Failed to write QAIF_AUD_INTF_FRAME_CFG_REG: %d\n", ret);
+			return ret;
+		}
+
+		/* Clear RX field, preserve TX field */
+		mi2s_cfg_val &= ~QAIF_AUD_INTF_MI2S_CFG_RX_FIELDS_MASK;
+		if (channels >= 2) {
+			/* Set new RX mono mode value */
+			mi2s_cfg_val |= ((QAIF_AUD_INTF_CTL_STEREO << QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_RX_SHFT) &
+							QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_RX_MASK);
+		} else {
+			/* Set new RX mono mode value */
+			mi2s_cfg_val |= ((QAIF_AUD_INTF_CTL_MONO << QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_RX_SHFT) &
+							QAIF_AUD_INTF_MI2S_CFG_MONO_MODE_RX_MASK);
+		}
+		ret = regmap_write(drvdata->audio_qaif_map, QAIF_AUD_INTF_MI2S_CFG_REG(idx), mi2s_cfg_val);
+		if (ret) {
+			dev_err(dai->dev, "Write to read QAIF_AUD_INTF_MI2S_CFG_REG: %d\n", ret);
+			return ret;
+		}
+		dev_err(dai->dev, "%s: RX - bit_width_cfg: %x, slot_en_mask: %x, frame_cfg: %x, mi2s_cfg: %x\n",
+			__func__, bit_width_cfg_val, aif_intf_cfg->slot_en_rx_mask, frame_cfg_val, mi2s_cfg_val);
+	}
+
+	if (ret) {
+		dev_err(dai->dev, "error writing to aif_intfctl channels mode: %d\n",
+			ret);
+		return ret;
+	}
+
+	ret = clk_set_rate(drvdata->mi2s_bit_clk[idx],
+			   rate * slot_width * aif_intf_cfg->bits_per_lane);
+	if (ret) {
+		dev_err(dai->dev, "error setting mi2s bitclk to %u: %d\n",
+			rate * slot_width * aif_intf_cfg->bits_per_lane, ret);
+		return ret;
+	}
+	dev_dbg(dai->dev, "setting IBIT clock to %u\n",
+		rate * slot_width * aif_intf_cfg->bits_per_lane);
+
+	if (!drvdata->mi2s_was_prepared[idx]) {
+		ret = clk_enable(drvdata->mi2s_bit_clk[idx]);
+		if (ret) {
+			dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
+			return ret;
+		}
+		drvdata->mi2s_was_prepared[idx] = true;
+
+		dev_dbg(rtd->card->dev,	"%s: substream = %s  stream = %d\n",
+		__func__, substream->name, substream->stream);
+			snd_soc_dai_set_tdm_slot(codec_dai, 0x0f, 0b11, aif_intf_cfg->bits_per_lane, slot_width);
+			snd_soc_dai_set_sysclk(codec_dai, 0, rate * aif_intf_cfg->bits_per_lane * slot_width, 0);
+	}
+
+	return 0;
+}
+#endif
 
 static int qaif_aif_cpu_daiops_trigger(struct snd_pcm_substream *substream,
 		int cmd, struct snd_soc_dai *dai)
 {
 	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
 	const struct qaif_variant *v = drvdata->variant;
-	int idx = v->get_dma_idx(dai->driver->id);
-	int ret = -EINVAL;
+	int idx, ret = -EINVAL;
+
+	idx = v->get_dma_idx(dai->driver->id);
+	if (idx < 0) {
+		dev_err(dai->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		/*
-		 * Ensure qaif_aif BCLK/LRCLK is enabled during
-		 * device resume as qaif_aif_cpu_daiops_prepare() is not called
-		 * after the device resumes. We don't check mi2s_was_prepared before
-		 * enable/disable BCLK in trigger events because:
-		 *  1. These trigger events are paired, so the BCLK
-		 *     enable_count is balanced.
-		 *  2. the BCLK can be shared (ex: headset and headset mic),
-		 *     we need to increase the enable_count so that we don't
-		 *     turn off the shared BCLK while other devices are using
-		 *     it.
-		 */
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			ret = regmap_write(drvdata->audio_qaif_map,
-					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_TX);
-		} else  {
+				QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_TX);
+		} else {
 			ret = regmap_write(drvdata->audio_qaif_map,
-					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_RX);
+				QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_RX);
 		}
 		if (ret)
 			dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
@@ -742,23 +945,19 @@ static int qaif_aif_cpu_daiops_trigger(struct snd_pcm_substream *substream,
 		ret = clk_enable(drvdata->mi2s_bit_clk[idx]);
 		if (ret) {
 			dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
-			clk_disable(drvdata->mi2s_osr_clk[idx]);
 			return ret;
 		}
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		/*
-		 * To ensure qaif_aif BCLK/LRCLK is disabled during
-		 * device suspend.
-		 */
+
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 			ret = regmap_write(drvdata->audio_qaif_map,
-					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_TX);
-		} else  {
+				QAIF_AUD_INTF_CTL_REG(idx), 0);
+		} else {
 			ret = regmap_write(drvdata->audio_qaif_map,
-					QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET_RX);
+				QAIF_AUD_INTF_CTL_REG(idx), 0);
 		}
 		if (ret)
 			dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
@@ -774,41 +973,12 @@ static int qaif_aif_cpu_daiops_trigger(struct snd_pcm_substream *substream,
 static int qaif_aif_cpu_daiops_prepare(struct snd_pcm_substream *substream,
 		struct snd_soc_dai *dai)
 {
-	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
-	const struct qaif_variant *v = drvdata->variant;
-	int idx = v->get_dma_idx(dai->driver->id);
-	int ret;
-
-	/*
-	 * Check mi2s_was_prepared before enabling BCLK as qaif_aif_cpu_daiops_prepare can
-	 * be called multiple times. It's paired with the clk_disable in
-	 * qaif_aif_cpu_daiops_shutdown.
-	 */
-	if (!drvdata->mi2s_was_prepared[idx]) {
-		ret = clk_enable(drvdata->mi2s_bit_clk[idx]);
-		if (ret) {
-			dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
-			return ret;
-		}
-		drvdata->mi2s_was_prepared[idx] = true;
-	}
 	return 0;
 }
 
 static int qaif_aif_cpu_daiops_probe(struct snd_soc_dai *dai)
 {
-	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
-	const struct qaif_variant *v = drvdata->variant;
-	int idx = v->get_dma_idx(dai->driver->id);
-	int ret;
-
-	/* ensure audio ctrl is disabled */
-	ret = regmap_write(drvdata->audio_qaif_map,
-			QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_RESET);
-	if (ret)
-		dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
-
-	return ret;
+	return 0;
 }
 
 const struct snd_soc_dai_ops asoc_qcom_qaif_aif_cpu_dai_ops = {
@@ -969,7 +1139,7 @@ static bool __audio_qaif_regmap_accessible(struct device *dev, unsigned int reg,
 				return true;
 		}
 	}
-	return false;
+	return true;
 }
 
 static bool audio_qaif_regmap_writeable(struct device *dev, unsigned int reg)
@@ -1046,7 +1216,7 @@ static bool audio_qaif_regmap_volatile(struct device *dev, unsigned int reg)
 		if (reg == QAIF_CODEC_WRDMA_CURR_ADDR_REG(v, i))
 			return true;
 
-	return false;
+	return true;
 }
 
 static struct regmap_config audio_qaif_regmap_config = {
@@ -1104,14 +1274,14 @@ static int of_qaif_parse_aif_intf_cfg(struct device *dev,
 		ret = of_property_read_u32(intf_np, "qcom,qaif-intf-dai-id", &dai_id);
 		if (ret) {
 			dev_err(dev, "Missing dai-id for interface %d: %s ===\n", i, intf_np->name);
-			return -EINVAL;
+			continue;
 		}
 
 		if (v->get_dma_idx) {
 			intf_idx = v->get_dma_idx(dai_id);
 			if (intf_idx < 0) {
 				dev_err(dev, "invalid intf idx for : %d: %s ===\n", i, intf_np->name);
-				return -EINVAL;
+				continue;
 			}
 		} else {
 			dev_err(dev, "can not get intf idx for : %d: %s ===\n", i, intf_np->name);
@@ -1316,6 +1486,10 @@ static int of_qaif_cdc_dma_clks_parse(struct device *dev,
 	if (IS_ERR(data->aud_dma_clk))
 		return PTR_ERR(data->aud_dma_clk);
 
+	data->aud_dma_mem_clk = devm_clk_get(dev, "audio_core_cc_aud_dma_mem_clk");
+	if (IS_ERR(data->aud_dma_mem_clk))
+		return PTR_ERR(data->aud_dma_mem_clk);
+
 	return 0;
 }
 
@@ -1327,7 +1501,7 @@ int asoc_qcom_qaif_cpu_platform_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	const struct of_device_id *match;
 	int ret, i, dai_id, idx;
-
+	dev_dbg(&pdev->dev,"%s\n",__func__);
 	drvdata = devm_kzalloc(dev, sizeof(struct qaif_drv_data), GFP_KERNEL);
 	if (!drvdata)
 		return -ENOMEM;
@@ -1356,7 +1530,6 @@ int asoc_qcom_qaif_cpu_platform_probe(struct platform_device *pdev)
 		return PTR_ERR(drvdata->audio_qaif);
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "audio-qaif-core");
-
 	if (!res)
 		return -EINVAL;
 
@@ -1386,8 +1559,9 @@ int asoc_qcom_qaif_cpu_platform_probe(struct platform_device *pdev)
 		if (is_cif_dma_port(dai_id))
 			continue;
 		idx = variant->get_dma_idx(dai_id);
-		drvdata->mi2s_osr_clk[idx] = devm_clk_get_optional(dev,
-					     variant->dai_osr_clk_names[idx]);
+		if (idx < 0)
+			continue;
+
 		drvdata->mi2s_bit_clk[idx] = devm_clk_get(dev,
 						variant->dai_bit_clk_names[idx]);
 		if (IS_ERR(drvdata->mi2s_bit_clk[idx])) {
@@ -1431,7 +1605,7 @@ int asoc_qcom_qaif_cpu_platform_probe(struct platform_device *pdev)
 		dev_err(dev, "error registering platform driver: %d\n", ret);
 		goto err;
 	}
-
+	dev_dbg(&pdev->dev,"%s: QAIF CPU-Platform Driver Registered Successfully\n",__func__);
 err:
 	return ret;
 }

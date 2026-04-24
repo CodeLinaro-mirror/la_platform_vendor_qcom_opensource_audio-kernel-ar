@@ -231,6 +231,11 @@ static const DECLARE_TLV_DB_SCALE(fu21_digital_gain, -8400, 100, 0);
 #define WSA885X_DIG_TRIM_OTP_REG_3       0x8883
 #define WSA885X_DIG_TRIM_OTP_REG_4       0x8884
 
+/*TDM Slots*/
+#define WSA885X_TDM8 0X08
+#define WSA885X_TDM4 0X04
+#define WSA885X_TDM2 0X02
+
 struct wsa885x_temp_register {
 	int d1_msb;
 	int d1_lsb;
@@ -542,18 +547,26 @@ static int wsa885x_handle_ssr_reset(struct wsa885x_i2c_priv *wsa885x)
 /**
  * reg_update_sequence() - Configure TDM control registers sequence
  * @regmap: Regmap instance for register access
- *
+ * @slots: Number of slots to configure TDM CTL
  * This function configures the TDM control registers in a specific sequence
  * required for proper TDM operation. The sequence enables TDM mode and
  * configures the transmit channels.
  */
-static void reg_update_sequence(struct regmap *regmap)
+static void reg_update_sequence(struct regmap *regmap, int slots)
 {
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL1, 0x15);
 	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL1, 0x11);
 
 	/* Configure TDM control register 0 */
-	regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x04);
+	if (slots == WSA885X_TDM2)
+		regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x0);
+	else if (slots == WSA885X_TDM4)
+		regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x04);
+	else if (slots == WSA885X_TDM8)
+		regmap_write(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0xC);
+	else
+		pr_warn("Invalid TDM slot count: %d, expected 2, 4, or 8\n", slots);
+
 	regmap_update_bits(regmap, DIG_CTRL1_I2S_TDM_CTL0, 0x01, 0x01);
 
 	/* Configure TDM transmit channel settings */
@@ -817,7 +830,7 @@ static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG1_TDM_TX,
 						   0x60, 0x60);
 		/* Apply TDM control sequence */
-		reg_update_sequence(wsa885x->regmap);
+		reg_update_sequence(wsa885x->regmap, slots);
 		/* Enable transmit channels */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_TDM_CH_TX,
 						   0x04, 0x04);
@@ -831,7 +844,7 @@ static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 		/* Configure slot1 for current protection sense 0 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
 						   0x50, 0x50);
-		reg_update_sequence(wsa885x->regmap);
+		reg_update_sequence(wsa885x->regmap, slots);
 	} else if (wsa885x->rx_slot_mask == WSA885X_CHANNEL_MONO_RIGHT) {
 		/* Mono right channel configuration */
 		/* Configure slot0 for I-sense channel 1 */
@@ -840,7 +853,7 @@ static int codec_set_tdm_slot(struct snd_soc_dai *dai,
 		/* Configure slot1 for current protection sense 1 */
 		regmap_update_bits(wsa885x->regmap, DIG_CTRL1_I2S_CFG0_TDM_TX,
 						   0x60, 0x60);
-		reg_update_sequence(wsa885x->regmap);
+		reg_update_sequence(wsa885x->regmap, slots);
 	}
 
 	/* Enable I2S control */
@@ -939,6 +952,50 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 	return 0;
 }
 
+static int reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
+{
+	int ret = 0;
+	int ps = 0;
+
+	dev_dbg(wsa885x->component->dev,"%s()\n", __func__);
+
+	ret = wsa885x_handle_ssr_reset(wsa885x);
+	if (ret) {
+		dev_err(wsa885x->component->dev, "SSR reset failed: %d\n", ret);
+		return ret;
+	}
+
+	regmap_write(wsa885x->regmap, DIG_CTRL0_PA_FSM_CTL, 0x00);
+	/* Configure usage mode for thermal/speaker protection */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_OT23_USAGE,
+			 wsa885x->usage_mode);
+	/* Set cluster index for audio processing */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_IT21_CLUSERINDEX, 0x01);
+	/* Set posture number for speaker configuration */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PPU21_POSTURENUMBER, 0x01);
+
+	/* Apply requested volume */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X0_LSB, 0x00);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_MSB, wsa885x->stereo_voldB);
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_FU21_CH_VOL_CH2X1_LSB, 0x00);
+	/* Commit SDCA (Smart Device Class Audio) changes */
+	regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
+
+	/* Request power state 0 (active mode) */
+	regmap_write(wsa885x->regmap, SMP_AMP_CTRL_STEREO_PDE23_REQ_PS, 0x00);
+
+	ret = wait_for_pde_state(wsa885x, ps, SMP_AMP_CTRL_STEREO_PDE23_ACT_PS);
+	if (!ret) {
+		dev_dbg(wsa885x->component->dev,
+			"Successfully transitioned to power state %d\n", ps);
+	} else
+		dev_err(wsa885x->component->dev,
+			"Failed transitioned to power state %d\n", ps);
+
+	return ret;
+}
+
 /**
  * codec_mute_stream() - Mute/unmute audio stream and manage power states
  * @dai: Digital Audio Interface
@@ -1012,7 +1069,9 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 					"Successfully transitioned to power state %d\n", ps0);
 		} else {
 			dev_err(wsa885x->component->dev, "PS0 request failed\n");
-			goto exit;
+			ret = reinit_wsa885x_powerup(wsa885x);
+			if (ret)
+				return ret;
 		}
 
 		/* Configure power amplifier based on channel configuration */
@@ -1035,7 +1094,6 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 		/* Commit all changes */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
 	}
-exit:
 	return ret;
 }
 
@@ -1519,7 +1577,7 @@ static void wsa885x_regulator_disable(void *data)
 static int wsa885x_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 						  struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
 
@@ -1531,7 +1589,7 @@ static int wsa885x_stereo_gain_offset_get(struct snd_kcontrol *kcontrol,
 static int wsa885x_stereo_gain_offset_put(struct snd_kcontrol *kcontrol,
 						  struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 		snd_soc_component_get_drvdata(component);
 	long val = ucontrol->value.integer.value[0];
@@ -1559,7 +1617,7 @@ static int wsa885x_i2c_usage_modes_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1585,7 +1643,7 @@ static int wsa885x_i2c_usage_modes_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1614,7 +1672,7 @@ static int wsa885x_i2c_rx_slot_mask_get(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1637,7 +1695,7 @@ static int wsa885x_i2c_rx_slot_mask_put(struct snd_kcontrol *kcontrol,
 					struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-		snd_soc_kcontrol_component(kcontrol);
+		snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x_i2c =
 		snd_soc_component_get_drvdata(component);
 
@@ -1820,7 +1878,7 @@ static void wsa885x_temperature_work(struct work_struct *work)
 static int wsa885x_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 				snd_soc_component_get_drvdata(component);
 
@@ -1838,7 +1896,7 @@ static int wsa885x_trigger_die_temp_get(struct snd_kcontrol *kcontrol,
 static int wsa885x_trigger_die_temp_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)
 {
-	struct snd_soc_component *component = snd_soc_kcontrol_component(kcontrol);
+	struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 				snd_soc_component_get_drvdata(component);
 
@@ -1864,7 +1922,7 @@ static int wsa885x_get_temp(struct snd_kcontrol *kcontrol,
 			    struct snd_ctl_elem_value *ucontrol)
 {
 	struct snd_soc_component *component =
-				snd_soc_kcontrol_component(kcontrol);
+				snd_kcontrol_chip(kcontrol);
 	struct wsa885x_i2c_priv *wsa885x =
 				snd_soc_component_get_drvdata(component);
 	int ret = 0;

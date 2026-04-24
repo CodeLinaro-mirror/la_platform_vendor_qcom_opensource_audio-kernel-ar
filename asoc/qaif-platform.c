@@ -20,16 +20,16 @@
 
 #define DRV_NAME "qaif-platform"
 
-#define QAIF_PLATFORM_BUFFER_SIZE			(24 *  2 * 1024)
+#define QAIF_PLATFORM_BUFFER_MIN_SIZE		(960 * 2 * 2)	// 20 ms
+#define QAIF_PLATFORM_BUFFER_SIZE			(4 * QAIF_PLATFORM_BUFFER_MIN_SIZE)	// 80 ms
 #define QAIF_PLATFORM_PERIODS				2
-#define QAIF_CDC_DMA_LPM_BUFF_SIZE			(8 * 1024)
-#define QAIF_CDC_DMA_REGISTER_FIELDS_MAX	15
 #define QAIF_SMMU_SID_OFFSET				32
-
 
 static irqreturn_t qaif_aif_irq_handler(struct qaif_drv_data *drvdata, u32 summary_irq_status);
 static irqreturn_t qaif_cif_irq_handler(struct qaif_drv_data *drvdata, u32 summary_irq_status);
 //static irqreturn_t qaif_aud_inf_handler(struct qaif_drv_data *drvdata, u32 summary_irq_status);
+
+static int qaif_init(struct snd_soc_component *component);
 
 static const struct snd_pcm_hardware qaif_platform_aif_hardware = {
 	.info			=	SNDRV_PCM_INFO_MMAP |
@@ -48,7 +48,7 @@ static const struct snd_pcm_hardware qaif_platform_aif_hardware = {
 	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE,
 	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE /
 						QAIF_PLATFORM_PERIODS,
-	.period_bytes_min	=	QAIF_PLATFORM_BUFFER_SIZE /
+	.period_bytes_min	=	QAIF_PLATFORM_BUFFER_MIN_SIZE /
 						QAIF_PLATFORM_PERIODS,
 	.periods_min		=	QAIF_PLATFORM_PERIODS,
 	.periods_max		=	QAIF_PLATFORM_PERIODS,
@@ -69,10 +69,10 @@ static const struct snd_pcm_hardware qaif_platform_cif_hardware = {
 	.rate_max		=	192000,
 	.channels_min		=	1,
 	.channels_max		=	8,
-	.buffer_bytes_max	=	QAIF_CDC_DMA_LPM_BUFF_SIZE,
-	.period_bytes_max	=	QAIF_CDC_DMA_LPM_BUFF_SIZE /
+	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE,
+	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE /
 						QAIF_PLATFORM_PERIODS,
-	.period_bytes_min	=	QAIF_CDC_DMA_LPM_BUFF_SIZE /
+	.period_bytes_min	=	QAIF_PLATFORM_BUFFER_MIN_SIZE /
 						QAIF_PLATFORM_PERIODS,
 	.periods_min		=	QAIF_PLATFORM_PERIODS,
 	.periods_max		=	QAIF_PLATFORM_PERIODS,
@@ -110,6 +110,7 @@ static struct qaif_dma_mem_info* qaif_mem_alloc_attach(struct snd_soc_component 
 		dev_err(component->dev, "error attaching dma buffer\n");
 		goto free_dmabuf;
 	}
+
 	dma_mem_info->table = dma_buf_map_attachment(dma_mem_info->buf_attach, DMA_BIDIRECTIONAL);
 	if (IS_ERR(dma_mem_info->table)) {
 		dev_err(component->dev, "error mapping attachment\n");
@@ -126,8 +127,10 @@ static struct qaif_dma_mem_info* qaif_mem_alloc_attach(struct snd_soc_component 
 		dev_err(component->dev, "error mapping buffer: %d\n", ret);
 		goto end_cpu_access;
 	}
+
 	dma_mem_info->dma_addr = sg_dma_address(dma_mem_info->table->sgl);
 
+	dev_dbg(component->dev, "%s: dma_addr: %llx, vaddr: %p\n", __func__, dma_mem_info->dma_addr, dma_mem_info->iosys_vmap.vaddr);
 	return dma_mem_info;
 end_cpu_access:
 	dma_buf_end_cpu_access(dma_mem_info->dmabuf, DMA_BIDIRECTIONAL);
@@ -181,7 +184,7 @@ static struct qaif_dmactl *qaif_get_dmactl_handle(const struct snd_pcm_substream
 	struct qaif_variant *v = drvdata->variant;
 
 	switch (cpu_dai->driver->id) {
-	case MI2S_PRIMARY ... MI2S_QUINARY:
+	case MI2S_PRIMARY ... MI2S_SENARY:
 		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
 			dmactl = v->aif_rd_dmactl;
 		else
@@ -205,7 +208,6 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	struct snd_soc_pcm_runtime *soc_runtime = snd_soc_substream_to_rtd(substream);
 	struct snd_soc_dai *cpu_dai = snd_soc_rtd_to_cpu(soc_runtime, 0);
-	struct snd_pcm *pcm = soc_runtime->pcm;
 	struct snd_dma_buffer *buf;
 	struct qaif_drv_data *drvdata = snd_soc_component_get_drvdata(component);
 	const struct qaif_variant *v = drvdata->variant;
@@ -240,28 +242,36 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 		kfree(data);
 		return -EINVAL;
 	}
-
 	buf = &substream->dma_buffer;
-	buf->dev.dev = pcm->card->dev;
+	buf->dev.dev = component->dev;
 	buf->private_data = NULL;
 	/* Assign DMA buffer pointers */
 	buf->dev.type = SNDRV_DMA_TYPE_CONTINUOUS;
 
-	 //Todo: make it generic/based on usecase
 	dma_mem_info = qaif_mem_alloc_attach(component,
 					qaif_platform_aif_hardware.buffer_bytes_max);
 	if (!dma_mem_info)
 		return -ENOMEM;
 
+	clk_prepare_enable(drvdata->aud_dma_clk);
+	clk_prepare_enable(drvdata->aud_dma_mem_clk);
+
+
+	ret = qaif_init(component);
+	if (ret) {
+		dev_err(soc_runtime->dev, "qaif_init failed: %d\n", ret);
+		return -EINVAL;
+	}
+
 	switch (dai_id) {
-	case MI2S_PRIMARY ... MI2S_QUINARY:
+	case MI2S_PRIMARY ... MI2S_SENARY:
 		drvdata->aif_substream[stream_dma_idx] = substream;
 		drvdata->aif_dma_heap[stream_dma_idx] = dma_mem_info;
 		buf->bytes = qaif_platform_aif_hardware.buffer_bytes_max;
 		buf->addr = drvdata->aif_dma_heap[stream_dma_idx]->dma_addr;
 		buf->area = (unsigned char *)drvdata->aif_dma_heap[stream_dma_idx]->iosys_vmap.vaddr;
 
-		//snd_soc_set_runtime_hwparams(substream, &qaif_platform_aif_hardware);
+		snd_soc_set_runtime_hwparams(substream, &qaif_platform_aif_hardware);
 		runtime->dma_bytes = qaif_platform_aif_hardware.buffer_bytes_max;
 		break;
 	case LPASS_CDC_DMA_RX0 ... LPASS_CDC_DMA_RX9:
@@ -273,7 +283,7 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 		buf->addr = drvdata->cif_dma_heap[stream_dma_idx]->dma_addr;
 		buf->area = (unsigned char *)drvdata->cif_dma_heap[stream_dma_idx]->iosys_vmap.vaddr;
 
-		//snd_soc_set_runtime_hwparams(substream, &qaif_platform_cif_hardware);
+		snd_soc_set_runtime_hwparams(substream, &qaif_platform_cif_hardware);
 		runtime->dma_bytes = qaif_platform_cif_hardware.buffer_bytes_max;
 		break;
 	default:
@@ -288,6 +298,11 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 			ret);
 		return -EINVAL;
 	}
+	dev_dbg(soc_runtime->dev, "%s: runtime info - dma_area=%p, dma_addr=0x%llx, dma_bytes=%zu\n",
+       __func__,
+       runtime->dma_area,
+       (unsigned long long)runtime->dma_addr,
+       runtime->dma_bytes);
 
 	return 0;
 }
@@ -306,7 +321,7 @@ static int qaif_platform_pcmops_close(struct snd_soc_component *component,
 	data = runtime->private_data;
 
 	switch (dai_id) {
-	case MI2S_PRIMARY ... MI2S_QUINARY:
+	case MI2S_PRIMARY ... MI2S_SENARY:
 		drvdata->aif_substream[data->stream_dma_idx] = NULL;
 		qaif_mem_dealloc_detach(drvdata->aif_dma_heap[data->stream_dma_idx]);
 		drvdata->aif_dma_heap[data->stream_dma_idx] = NULL;
@@ -325,6 +340,7 @@ static int qaif_platform_pcmops_close(struct snd_soc_component *component,
 	if (v->free_stream_dma_idx)
 		v->free_stream_dma_idx(drvdata, data->stream_dma_idx, dai_id);
 	clk_disable_unprepare(drvdata->aud_dma_clk);
+	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
 	kfree(data);
 	return 0;
 }
@@ -347,6 +363,11 @@ static int qaif_platform_pcmops_hw_params(struct snd_soc_component *component,
 		return -EINVAL;
 	idx = v->get_dma_idx(dai_id);
 
+	if (idx < 0) {
+		dev_err(soc_runtime->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
+
 	// ToDo: Hardcoded for now, Later to modify dynamically
 	ret = regmap_fields_write(dmactl->burst4, idx, QAIF_DMACTL_BURSTEN);
 	if (ret) {
@@ -354,7 +375,7 @@ static int qaif_platform_pcmops_hw_params(struct snd_soc_component *component,
 		return ret;
 	}
 
-	ret = regmap_fields_write(dmactl->shram_wm, idx, QAIF_DMACTL_WM_8);
+	ret = regmap_fields_write(dmactl->shram_wm, idx, QAIF_DMACTL_WM_5);
 	if (ret) {
 		dev_err(soc_runtime->dev, "error updating shram_wm field: %d\n", ret);
 		return ret;
@@ -381,6 +402,11 @@ static int qaif_platform_pcmops_hw_free(struct snd_soc_component *component,
 		return -EINVAL;
 	idx = v->get_dma_idx(dai_id);
 
+	if (idx < 0) {
+		dev_err(soc_runtime->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
+
 	ret = regmap_fields_write(dmactl->enable, idx, QAIF_DMACTL_ENABLE_OFF);
 	if (ret)
 		dev_err(soc_runtime->dev, "error writing to rdmactl reg: %d\n", ret);
@@ -403,7 +429,7 @@ static int qaif_platform_pcmops_prepare(struct snd_soc_component *component,
 	const struct qaif_variant *v = drvdata->variant;
 	struct qaif_dmactl *dmactl;
 	struct regmap *map;
-	int bitwidth = snd_pcm_format_width(runtime->format);
+	int bitwidth = 32;//snd_pcm_format_width(runtime->format);
 	unsigned int channels = runtime->channels;
 	unsigned int rate = runtime->rate;
 	int ret, idx, dir = substream->stream;
@@ -415,10 +441,15 @@ static int qaif_platform_pcmops_prepare(struct snd_soc_component *component,
 	idx = v->get_dma_idx(dai_id);
 	map = drvdata->audio_qaif_map;
 
-	clk_set_rate(drvdata->aud_dma_clk, rate * bitwidth * channels);
-	clk_prepare_enable(drvdata->aud_dma_clk);
-	dev_dbg(soc_runtime->dev, "setting aud_dma_clk to %u\n",
-		rate * bitwidth * channels);
+	if (idx < 0) {
+		dev_err(soc_runtime->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
+
+	clk_set_rate(drvdata->aud_dma_clk, rate * bitwidth * channels * 100);
+	clk_set_rate(drvdata->aud_dma_mem_clk, rate * bitwidth * channels * 100);
+	dev_dbg(soc_runtime->dev, "setting aud_dma_clk & aud_dma_mem_clk to %u\n",
+		rate * bitwidth * channels * 100);
 
 	ret = regmap_write(map, QAIF_SID_MAP_REG(dir, dai_id),
 				drvdata->smmu_csid_bits);
@@ -437,15 +468,15 @@ static int qaif_platform_pcmops_prepare(struct snd_soc_component *component,
 	}
 
 	ret = regmap_write(map, QAIF_DMABUFF_REG(v, idx, dir, dai_id),
-			(snd_pcm_lib_buffer_bytes(substream) >> 2) - 1);
+			(snd_pcm_lib_buffer_bytes(substream) >> 3) - 1);
 	if (ret) {
 		dev_err(soc_runtime->dev, "error writing to rdmabuff reg: %d\n",
 			ret);
 		return ret;
 	}
 
-	ret = regmap_write(map, QAIF_DMAPER_REG(v, idx, dir, dai_id),
-			(snd_pcm_lib_period_bytes(substream) >> 2) - 1);
+	ret = regmap_write(map, QAIF_DMAPER_LEN_REG(v, idx, dir, dai_id),
+			(snd_pcm_lib_period_bytes(substream) >> 3) - 1);
 	if (ret) {
 		dev_err(soc_runtime->dev, "error writing to rdmaper reg: %d\n",
 			ret);
@@ -456,7 +487,7 @@ static int qaif_platform_pcmops_prepare(struct snd_soc_component *component,
 }
 
 static int qaif_platform_irq_clear(struct qaif_drv_data *drvdata,
-				qaif_irq_type_t irq_type, int dir, int idx)
+				int dir, qaif_irq_type_t irq_type, int idx)
 {
 	int ret = 0;
 	const struct qaif_variant *v = drvdata->variant;
@@ -464,19 +495,19 @@ static int qaif_platform_irq_clear(struct qaif_drv_data *drvdata,
 	unsigned int val_irqclr = BIT(idx);
 
 	if (dir == SNDRV_PCM_STREAM_PLAYBACK) {
-		ret |= regmap_write_bits(map, QAIF_EE_RDDMA_PERIOD_IRQ_CLR_REG(v, irq_type), val_irqclr, val_irqclr);
-		ret |= regmap_write_bits(map, QAIF_EE_RDDMA_UNDERFLOW_IRQ_CLR_REG(v, irq_type), val_irqclr, val_irqclr);
-		ret |= regmap_write_bits(map, QAIF_EE_RDDMA_ERR_RSP_IRQ_CLR_REG(v, irq_type), val_irqclr, val_irqclr);
+		ret |= regmap_write(map, QAIF_EE_RDDMA_PERIOD_IRQ_CLR_REG(v, irq_type), val_irqclr);
+		ret |= regmap_write(map, QAIF_EE_RDDMA_UNDERFLOW_IRQ_CLR_REG(v, irq_type), val_irqclr);
+		ret |= regmap_write(map, QAIF_EE_RDDMA_ERR_RSP_IRQ_CLR_REG(v, irq_type), val_irqclr);
 	} else {
-		ret |= regmap_write_bits(map, QAIF_EE_WRDMA_PERIOD_IRQ_CLR_REG(v, irq_type), val_irqclr, val_irqclr);
-		ret |= regmap_write_bits(map, QAIF_EE_WRDMA_OVERFLOW_IRQ_CLR_REG(v, irq_type), val_irqclr, val_irqclr);
-		ret |= regmap_write_bits(map, QAIF_EE_WRDMA_ERR_RSP_IRQ_CLR_REG(v, irq_type), val_irqclr, val_irqclr);
+		ret |= regmap_write(map, QAIF_EE_WRDMA_PERIOD_IRQ_CLR_REG(v, irq_type), val_irqclr);
+		ret |= regmap_write(map, QAIF_EE_WRDMA_OVERFLOW_IRQ_CLR_REG(v, irq_type), val_irqclr);
+		ret |= regmap_write(map, QAIF_EE_WRDMA_ERR_RSP_IRQ_CLR_REG(v, irq_type), val_irqclr);
 	}
 	return ret;
 }
 
 static int qaif_platform_irq_enable(struct qaif_drv_data *drvdata,
-				qaif_irq_type_t irq_type, int dir, int idx)
+				int dir, qaif_irq_type_t irq_type, int idx)
 {
 	int ret = 0;
 	const struct qaif_variant *v = drvdata->variant;
@@ -496,7 +527,7 @@ static int qaif_platform_irq_enable(struct qaif_drv_data *drvdata,
 }
 
 static int qaif_platform_irq_disable(struct qaif_drv_data *drvdata,
-				qaif_irq_type_t irq_type, int dir, int idx)
+				int dir, qaif_irq_type_t irq_type, int idx)
 {
 	int ret = 0;
 	const struct qaif_variant *v = drvdata->variant;
@@ -534,6 +565,11 @@ static int qaif_platform_pcmops_trigger(struct snd_soc_component *component,
 	idx = v->get_dma_idx(dai_id);
 	map = drvdata->audio_qaif_map;
 
+	if (idx < 0) {
+		dev_err(soc_runtime->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
@@ -551,7 +587,7 @@ static int qaif_platform_pcmops_trigger(struct snd_soc_component *component,
 			return ret;
 		}
 		switch (dai_id) {
-		case MI2S_PRIMARY ... MI2S_QUINARY:
+		case MI2S_PRIMARY ... MI2S_SENARY:
 			ret = qaif_platform_irq_clear(drvdata, substream->stream, QAIF_AIF_IRQ, idx);
 			if (ret) {
 				dev_err(soc_runtime->dev,
@@ -602,7 +638,7 @@ static int qaif_platform_pcmops_trigger(struct snd_soc_component *component,
 			return ret;
 		}
 		switch (dai_id) {
-		case MI2S_PRIMARY ... MI2S_QUINARY:
+		case MI2S_PRIMARY ... MI2S_SENARY:
 			ret = qaif_platform_irq_disable(drvdata, substream->stream, QAIF_AIF_IRQ, idx);
 			if (ret) {
 				dev_err(soc_runtime->dev,
@@ -644,6 +680,11 @@ static snd_pcm_uframes_t qaif_platform_pcmops_pointer(
 
 	map = drvdata->audio_qaif_map;
 	idx = v->get_dma_idx(dai_id);
+
+	if (idx < 0) {
+		dev_err(soc_runtime->dev, "%s: Invalid DMA index: %d\n", __func__, idx);
+		return -EINVAL;
+	}
 
 	ret = regmap_read(map,
 			QAIF_DMABASE_REG(v, idx, dir, dai_id), &base_addr);
@@ -705,7 +746,7 @@ static irqreturn_t qaif_process_dma_irq(struct qaif_drv_data *drvdata,
 	struct snd_pcm_substream *stream = NULL;
 	unsigned int reg = 0;
 	int dma_idx, stream_dma_idx, rv, num_dma = 0;
-	int stream_offset = (dma_type == DMA_TYPE_WRDMA) ? v->wrdma_start : 0;
+	int stream_offset = (dma_type == DMA_TYPE_WRDMA) ? v->wrdma_start : 0; // handle for CIF & AIF both
 	irqreturn_t ret = IRQ_NONE;
 	u32 mask = 0;
 
@@ -755,6 +796,7 @@ static irqreturn_t qaif_aif_irq_handler(struct qaif_drv_data *drvdata, u32 summa
 	const struct qaif_variant *v = drvdata->variant;
 	irqreturn_t ret = IRQ_NONE;
 	struct snd_pcm_substream **substream = drvdata->aif_substream;
+
 	// period_irq handling.
 	if(summary_irq_status & QAIF_SUMMARY_BITMASK_AIF_PERIOD_RDDMA)
 	{
@@ -876,7 +918,7 @@ static irqreturn_t asoc_platform_qaif_irq(int irq, void *data)
 {
 	struct qaif_drv_data *drvdata = data;
 	const struct qaif_variant *v = drvdata->variant;
-	unsigned int summary_irq_status;
+	u32 summary_irq_status;
 	int rv, client;
 	irqreturn_t ret = IRQ_NONE;
 
@@ -886,6 +928,7 @@ static irqreturn_t asoc_platform_qaif_irq(int irq, void *data)
 		pr_err("error reading from irqstat reg: %d\n", rv);
 		return IRQ_NONE;
 	}
+	pr_info("%s: summary_irq_status =0x%08x\n", __func__, summary_irq_status);
 	if (!(summary_irq_status & QAIF_ALL_CLIENTS_MASK))
 		return IRQ_NONE;
 	for (client = 0; client < ARRAY_SIZE(qaif_irq_clients); client++) {
@@ -907,6 +950,7 @@ static int qaif_platform_pcmops_suspend(struct snd_soc_component *component)
 	regcache_cache_only(map, true);
 	regcache_mark_dirty(map);
 	clk_disable(drvdata->aud_dma_clk);
+	clk_disable(drvdata->aud_dma_mem_clk);
 	return 0;
 }
 
@@ -915,6 +959,7 @@ static int qaif_platform_pcmops_resume(struct snd_soc_component *component)
 	struct qaif_drv_data *drvdata = snd_soc_component_get_drvdata(component);
 	struct regmap *map;
 	clk_enable(drvdata->aud_dma_clk);
+	clk_enable(drvdata->aud_dma_mem_clk);
 	map = drvdata->audio_qaif_map;
 
 	regcache_cache_only(map, false);
@@ -933,6 +978,8 @@ static int qaif_platform_copy(struct snd_soc_component *component,
 	// rt->dma_area is the vaddr from iosys_vmap - regular kernel memory
 	dma_buf = (void *)(rt->dma_area + pos +
 			   channel * (rt->dma_bytes / rt->channels));
+
+	pr_info("%s: pos: %lx, dma_buf: %p, stream: %d, bytes: %lu\n", __func__, pos, dma_buf, substream->stream, bytes);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		copied = copy_from_iter(dma_buf, bytes, buf);
@@ -1072,114 +1119,46 @@ static int qaif_config_shram(struct qaif_drv_data *drvdata)
 	return 0;
 }
 
-static int qaif_init(struct platform_device *pdev)
+static int qaif_init(struct snd_soc_component *component)
 {
-	struct qaif_drv_data *drvdata = platform_get_drvdata(pdev);
+	struct qaif_drv_data *drvdata = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
 	ret = qaif_config_shram(drvdata);
 	if (ret) {
-		dev_err(&pdev->dev, "QAIF: Failed to config shram: %d\n", ret);
+		dev_err(component->dev, "QAIF: Failed to config shram: %d\n", ret);
 		return ret;
 	}
 
 	ret = qaif_map_ee_resource(drvdata);
 	if (ret) {
-		dev_err(&pdev->dev, "QAIF: Failed to map EE resources: %d\n", ret);
+		dev_err(component->dev, "QAIF: Failed to map EE resources: %d\n", ret);
 		return ret;
 	}
 
 	ret = qaif_map_dma_path(drvdata);
 	if (ret) {
-		dev_err(&pdev->dev, "QAIF: Failed to map EE resources: %d\n", ret);
+		dev_err(component->dev, "QAIF: Failed to map EE resources: %d\n", ret);
 		return ret;
 	}
 
 	return 0;
 }
 
-static int qaif_clear_irq(struct qaif_drv_data *drvdata, bool clear)
-{
-	struct qaif_variant *v = drvdata->variant;
-	int client, status = 0;
-	u32 rd_mask, wr_mask;
-
-	for (client = 0; client < DMA_TYPE_MAX; client++) {
-		if(status)
-			break;
-		switch(client) {
-			case QAIF_AIF_IRQ:
-				rd_mask = clear ? GENMASK(v->num_rddma - 1, 0) : 0;
-				wr_mask = clear ? GENMASK(v->num_wrdma - 1, 0) : 0;
-				break;
-
-			case QAIF_CIF_IRQ:
-				rd_mask = clear ? GENMASK(v->num_codec_rddma - 1, 0) : 0;
-				wr_mask = clear ? GENMASK(v->num_codec_wrdma - 1, 0) : 0;
-				break;
-
-			default:
-				// not supported
-				continue;
-		}
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_RDDMA_PERIOD_IRQ_CLR_REG(v, client), rd_mask);
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_WRDMA_PERIOD_IRQ_CLR_REG(v, client), wr_mask);
-
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_RDDMA_UNDERFLOW_IRQ_CLR_REG(v, client),rd_mask);
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_WRDMA_OVERFLOW_IRQ_CLR_REG(v, client), wr_mask);
-
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_RDDMA_ERR_RSP_IRQ_CLR_REG(v, client), rd_mask);
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_WRDMA_ERR_RSP_IRQ_CLR_REG(v, client), wr_mask);
-	}
-	return status;
-}
-
-static int qaif_enable_irq(struct qaif_drv_data *drvdata, bool enable)
-{
-	struct qaif_variant *v = drvdata->variant;
-	int client, status = 0;
-	u32 rd_mask, wr_mask;
-
-	for (client = 0; client < DMA_TYPE_MAX; client++) {
-		if(status)
-			break;
-		switch(client) {
-			case QAIF_AIF_IRQ:
-				rd_mask = enable ? GENMASK(v->num_rddma - 1, 0) : 0;
-				wr_mask = enable ? GENMASK(v->num_wrdma - 1, 0) : 0;
-
-				break;
-			case QAIF_CIF_IRQ:
-				rd_mask = enable ? GENMASK(v->num_codec_rddma - 1, 0) : 0;
-				wr_mask = enable ? GENMASK(v->num_codec_wrdma - 1, 0) : 0;
-
-				break;
-			default:
-				// not supported
-				continue;
-		}
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_RDDMA_PERIOD_IRQ_EN_REG(v, client), rd_mask);
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_WRDMA_PERIOD_IRQ_EN_REG(v, client), wr_mask);
-
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_RDDMA_UNDERFLOW_IRQ_EN_REG(v, client), rd_mask);
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_WRDMA_OVERFLOW_IRQ_EN_REG(v, client), wr_mask);
-
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_RDDMA_ERR_RSP_IRQ_EN_REG(v, client), rd_mask);
-		status |= regmap_write(drvdata->audio_qaif_map, QAIF_EE_WRDMA_ERR_RSP_IRQ_EN_REG(v, client), wr_mask);
-	}
-	return status;
-}
 
 static void of_qaif_parse_heap_and_sid_info(struct device *dev,
 					struct qaif_drv_data *drvdata)
 {
 	int ret = 0;
+	u64 smmu_sid = 0;
+	u64 smmu_sid_mask = 0xFFFFFFFFFFFFFFFF;
+	struct of_phandle_args iommuspec;
 	// Parse DMA heap name from device tree
 	ret = of_property_read_string(dev->of_node, "qcom,dma-heap-name",
 						 &drvdata->dma_heap_name);
 	if (ret) {
 		dev_warn(dev, "qcom,dma-heap-name not found, using default\n");
-		drvdata->dma_heap_name = "qcom,audio-carveout";
+		drvdata->dma_heap_name = "qcom,audio-cma";
 	}
 
 	ret = of_property_read_u64(dev->of_node, "qcom,smmu-csid-bit",
@@ -1190,6 +1169,16 @@ static void of_qaif_parse_heap_and_sid_info(struct device *dev,
 			__func__);
 		drvdata->smmu_csid_bits = 0;
 	}
+	ret = of_parse_phandle_with_args(dev->of_node, "iommus",
+					"#iommu-cells", 0, &iommuspec);
+	if (ret)
+		dev_err(dev, "%s: could not get smmu SID, ret = %d\n",
+			__func__, ret);
+	else
+		smmu_sid = (iommuspec.args[0] & smmu_sid_mask);
+
+	drvdata->smmu_sid_bits = smmu_sid << SMMU_SID_OFFSET;
+	dev_dbg(dev, "smmu_sid: %llx, drvdata->smmu_sid_bits: %llx\n",smmu_sid, drvdata->smmu_sid_bits);
 }
 
 int asoc_qcom_qaif_platform_register(struct platform_device *pdev)
@@ -1197,7 +1186,7 @@ int asoc_qcom_qaif_platform_register(struct platform_device *pdev)
 	struct qaif_drv_data *drvdata = platform_get_drvdata(pdev);
 	struct device *dev = &pdev->dev;
 	int ret = 0;
-
+	dev_dbg(&pdev->dev,"%s\n",__func__);
 	if (!drvdata || !drvdata->variant) {
 		dev_err(&pdev->dev, "Invalid drvdata or variant\n");
 		return -EINVAL;
@@ -1210,23 +1199,22 @@ int asoc_qcom_qaif_platform_register(struct platform_device *pdev)
 		dev_err(&pdev->dev, "dma_heap find failed: %d\n", ret);
 		return -EINVAL;
 	}
-
-	ret = qaif_init(pdev);
-	if (ret) {
-		dev_err(&pdev->dev, "qaif_init failed: %d\n", ret);
-		return ret;
+#if 0
+	drvdata->domain = iommu_get_domain_for_dev(dev);
+	if (!drvdata->dma_heap) {
+		dev_err(&pdev->dev, "iommu_get_domain_for_dev failed: %d\n", ret);
 	}
+	ret = iommu_attach_device(drvdata->domain, dev);
+	if (ret) {
+		dev_err(&pdev->dev, "iommu_get_domain_for_dev failed: %d\n", ret);
+	}
+
+#endif
 
 	drvdata->audio_qaif_irq = platform_get_irq_byname(pdev, "qaif-irq-audio-core");
 	if (drvdata->audio_qaif_irq < 0)
 		return -ENODEV;
 
-	ret = qaif_enable_irq(drvdata, 0); //disable all irqs.
-	if (ret) {
-		dev_err(&pdev->dev, "failed to enable irq: %d\n", ret);
-		return ret;
-	}
-	ret = qaif_clear_irq(drvdata, 1); //clear all irqs.
 	ret = devm_request_irq(&pdev->dev, drvdata->audio_qaif_irq,
 			asoc_platform_qaif_irq, IRQF_TRIGGER_HIGH,
 			"qaif-irq-audio-core", drvdata);
@@ -1234,7 +1222,7 @@ int asoc_qcom_qaif_platform_register(struct platform_device *pdev)
 		dev_err(&pdev->dev, "irq request failed: %d\n", ret);
 		return ret;
 	}
-
+	dev_dbg(&pdev->dev,"%s: Register QAIF Platform\n",__func__);
 	return devm_snd_soc_register_component(&pdev->dev,
 			&qaif_component_driver, NULL, 0);
 }

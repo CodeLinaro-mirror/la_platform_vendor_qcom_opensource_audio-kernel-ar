@@ -13,12 +13,10 @@
 #include "qaif.h"
 
 struct qaif_dmaidx_dai_map shikra_aif_dma_dai_map[] = {
-		{ MI2S_PRIMARY },
-		{ MI2S_SECONDARY },
-		{ MI2S_TERTIARY },
 		{ MI2S_QUATERNARY },
 		{ MI2S_QUINARY },
-		{ MI2S_SENARY }
+		{ MI2S_SENARY },
+		{ MI2S_SEPTENARY }
 };
 
 struct qaif_dmaidx_dai_map shikra_cif_rx_dma_dai_map[] = {
@@ -158,7 +156,7 @@ static struct snd_soc_dai_driver shikra_qaif_cpu_dai_driver[] = {
 			.channels_max	= 2,
 		},
 		.ops = &asoc_qcom_qaif_aif_cpu_dai_ops,
-	},{
+	}, {
 		.id = MI2S_SENARY,
 		.name = "Senary MI2S",
 		.playback = {
@@ -172,6 +170,29 @@ static struct snd_soc_dai_driver shikra_qaif_cpu_dai_driver[] = {
 		},
 		.capture = {
 			.stream_name = "Senary MI2S Capture",
+			.formats = SNDRV_PCM_FMTBIT_S16 |
+				SNDRV_PCM_FMTBIT_S32,
+			.rates = SNDRV_PCM_RATE_48000,
+			.rate_min	= 48000,
+			.rate_max	= 48000,
+			.channels_min	= 2,
+			.channels_max	= 2,
+		},
+		.ops = &asoc_qcom_qaif_aif_cpu_dai_ops,
+	}, {
+		.id = MI2S_SEPTENARY,
+		.name = "Septenary MI2S",
+		.playback = {
+			.stream_name = "Septenary MI2S Playback",
+			.formats	= SNDRV_PCM_FMTBIT_S16,
+			.rates = SNDRV_PCM_RATE_48000,
+			.rate_min	= 48000,
+			.rate_max	= 48000,
+			.channels_min	= 2,
+			.channels_max	= 2,
+		},
+		.capture = {
+			.stream_name = "Septenary MI2S Capture",
 			.formats = SNDRV_PCM_FMTBIT_S16 |
 				SNDRV_PCM_FMTBIT_S32,
 			.rates = SNDRV_PCM_RATE_48000,
@@ -217,7 +238,7 @@ static struct snd_soc_dai_driver shikra_qaif_cpu_dai_driver[] = {
 			.rate_min	= 48000,
 			.rate_max	= 48000,
 			.channels_min	= 1,
-			.channels_max	= 1,
+			.channels_max	= 4,
 		},
 		.ops	= &asoc_qcom_qaif_cif_dai_ops,
 	}, {
@@ -230,7 +251,7 @@ static struct snd_soc_dai_driver shikra_qaif_cpu_dai_driver[] = {
 			.rate_min	= 48000,
 			.rate_max	= 48000,
 			.channels_min	= 1,
-			.channels_max	= 1,
+			.channels_max	= 4,
 		},
 		.ops	= &asoc_qcom_qaif_cif_dai_ops,
 	},
@@ -240,7 +261,7 @@ static int shikra_qaif_get_dma_idx(unsigned int dai_id)
 {
 	int i;
 	switch (dai_id) {
-	case MI2S_PRIMARY ... MI2S_QUINARY:
+	case MI2S_PRIMARY ... MI2S_SENARY:
 		for (i = 0; i < ARRAY_SIZE(shikra_aif_dma_dai_map); i++) {
 			if (shikra_aif_dma_dai_map[i].dai_id == dai_id) {
 				return i;
@@ -286,7 +307,7 @@ static int shikra_qaif_alloc_stream_dma_idx(struct qaif_drv_data *drvdata,
 		return -EINVAL;
 
 	switch (dai_id) {
-	case MI2S_PRIMARY ... MI2S_QUINARY:
+	case MI2S_PRIMARY ... MI2S_SENARY:
 		if (direction == SNDRV_PCM_STREAM_PLAYBACK) {
 			index = shikra_qaif_get_dma_idx(dai_id);
 			if (index >= v->num_rddma)
@@ -329,7 +350,7 @@ static int shikra_qaif_free_stream_dma_idx(struct qaif_drv_data *drvdata,
 				 int index, unsigned int dai_id)
 {
 	switch (dai_id) {
-	case MI2S_PRIMARY ... MI2S_QUINARY:
+	case MI2S_PRIMARY ... MI2S_SENARY:
 		clear_bit(index, &drvdata->aif_dma_idx_bit_map);
 		break;
 	case LPASS_CDC_DMA_RX0 ... LPASS_CDC_DMA_RX9:
@@ -598,10 +619,7 @@ static struct qaif_variant shikra_qaif_data = {
 	.num_dai			= ARRAY_SIZE(shikra_qaif_cpu_dai_driver),
 	// Below Clocks should be mapped as per interface index
 	.dai_osr_clk_names		= (const char *[]) {
-							"audio_core_cc_ext_mclka_clk",
-							"audio_core_cc_ext_mclka_clk",
-							"audio_core_cc_ext_mclka_clk",
-							"audio_core_cc_ext_mclka_clk"
+							"null"
 							},
 	.dai_bit_clk_names		= (const char *[]) {
 							"audio_core_cc_aif_if0_ibit_clk",	//if0
