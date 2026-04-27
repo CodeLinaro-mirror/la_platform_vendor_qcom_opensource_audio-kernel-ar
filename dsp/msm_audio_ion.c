@@ -995,7 +995,7 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 		msm_audio_ion_data->smmu_sid_bits =
 			smmu_sid << MSM_AUDIO_SMMU_SID_OFFSET;
 	} else {
-		msm_audio_ion_data->driver_name = "msm_audio_ion_cma";
+		msm_audio_ion_data->driver_name = "msm_audio_ion";
 	}
 
 	if (!rc)
