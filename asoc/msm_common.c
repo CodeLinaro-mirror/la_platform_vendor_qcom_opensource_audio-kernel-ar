@@ -417,7 +417,13 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 		mutex_lock(&pdata->lock[index]);
 		if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) == 0) {
 			if ((strnstr(stream_name, "TDM", strlen(stream_name)))) {
-				slots = pdata->tdm_max_slots;
+				if (pdata->onchip_tdm_port_configured &&
+					pdata->onchip_tdm_max_slots > 0 &&
+					pdata->onchip_tdm_port_index == index)
+					slots = pdata->onchip_tdm_max_slots;
+				else
+					slots = pdata->tdm_max_slots;
+
 				rate = params_rate(params);
 
 				ret = get_tdm_clk_id(index);
@@ -717,6 +723,23 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 		dev_info(&pdev->dev, "%s: Using default tdm max slot: %d\n",
 			__func__, common_pdata->tdm_max_slots);
 	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,onchip-tdm-port-index",
+		&common_pdata->onchip_tdm_port_index);
+	if (ret)
+		dev_info(&pdev->dev, "%s: No DT match for onchip tdm port index\n",
+			__func__);
+	else
+		common_pdata->onchip_tdm_port_configured = true;
+
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,onchip-tdm-max-slots",
+		&common_pdata->onchip_tdm_max_slots);
+	if (ret)
+		dev_info(&pdev->dev, "%s: No DT match for onchip tdm max slots\n",
+			__func__);
+	dev_dbg(&pdev->dev, "%s:onchip tdm port index:%d port_configured:%d  max slots:%d\n",
+		__func__, common_pdata->onchip_tdm_port_index, common_pdata->onchip_tdm_port_configured,
+		common_pdata->onchip_tdm_max_slots);
 
 	/* Register LPASS audio hw vote */
 	lpass_audio_hw_vote = devm_clk_get(&pdev->dev, "lpass_audio_hw_vote");
