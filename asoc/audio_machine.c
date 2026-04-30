@@ -2213,9 +2213,16 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 	}
 
-	if (strstr(rtd->card->name, "wsa883x")) {
-		lpass_cdc_set_port_map(lpass_cdc_component,
-			ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+	if (strnstr(rtd->card->name, "wsa883x", strlen(rtd->card->name))) {
+		if (strnstr(rtd->card->name, "ravelin", strlen(rtd->card->name)) ||
+			strnstr(rtd->card->name, "bourtzi", strlen(rtd->card->name))) {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+				ARRAY_SIZE(sm_wsa_port_map_legacy),
+				sm_wsa_port_map_legacy);
+		} else {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+				ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+		}
 		return msm_int_wsa883x_init(rtd);
 	} else if (strstr(rtd->card->name, "wsa884x")) {
 		lpass_cdc_set_port_map(lpass_cdc_component,
@@ -2397,9 +2404,17 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic4");
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic5");
 
-	if (!pdata->wcd_disabled)
-		lpass_cdc_set_port_map(lpass_cdc_component,
-				ARRAY_SIZE(sm_rx_port_map), sm_rx_port_map);
+	if (!pdata->wcd_disabled) {
+		if (strnstr(rtd->card->name, "ravelin", strlen(rtd->card->name)) ||
+			strnstr(rtd->card->name, "bourtzi", strlen(rtd->card->name))) {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+					ARRAY_SIZE(sm_rx_port_map_legacy),
+					sm_rx_port_map_legacy);
+		} else {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+					ARRAY_SIZE(sm_rx_port_map), sm_rx_port_map);
+		}
+	}
 
 	card = rtd->card->snd_card;
 	if (!pdata->codec_root) {
