@@ -1042,6 +1042,9 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 adc_mux_reg = 0;
 	u16 adc_mux0_reg = 0;
 	u16 tx_fs_reg = 0;
+#ifdef CONFIG_BOLERO_VER_2P85
+	u16 adapt_ctrl = 0;
+#endif
 	struct device *va_dev = NULL;
 	struct lpass_cdc_va_macro_priv *va_priv = NULL;
 	int hpf_delay = LPASS_CDC_VA_TX_DMIC_HPF_DELAY_MS;
@@ -1070,6 +1073,10 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 			LPASS_CDC_VA_MACRO_ADC_MUX_CFG_OFFSET * decimator;
 	tx_fs_reg = LPASS_CDC_VA_TX0_TX_PATH_CTL +
 				LPASS_CDC_VA_MACRO_TX_PATH_OFFSET * decimator;
+#ifdef CONFIG_BOLERO_VER_2P85
+	adapt_ctrl = LPASS_VA_CDC_ADPT0_ADPT_CTRL +
+			LPASS_CDC_VA_MACRO_TX_PATH_OFFSET * decimator;
+#endif
 	va_priv->pcm_rate[decimator] = (snd_soc_component_read(component,
 				tx_fs_reg) & 0x0F);
 
@@ -1083,6 +1090,10 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 			LPASS_CDC_VA_MACRO_ADC_MODE_CFG0_SHIFT);
 		break;
 	case SND_SOC_DAPM_POST_PMU:
+#ifdef CONFIG_BOLERO_VER_2P85
+		//Disable adapt block
+		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
+#endif
 		/* Enable TX CLK */
 		snd_soc_component_update_bits(component,
 				tx_vol_ctl_reg, 0x20, 0x20);
