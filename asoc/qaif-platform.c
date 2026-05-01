@@ -20,9 +20,12 @@
 
 #define DRV_NAME "qaif-platform"
 
-#define QAIF_PLATFORM_BUFFER_MIN_SIZE		(960 * 2 * 2)	// 20 ms
-#define QAIF_PLATFORM_BUFFER_SIZE			(4 * QAIF_PLATFORM_BUFFER_MIN_SIZE)	// 80 ms
-#define QAIF_PLATFORM_PERIODS				2
+#define QAIF_PLATFORM_BUFFER_MIN_SIZE		(960 * 2 * 2)   // 20 ms @ 48kHz S16 stereo = 3840 bytes
+#define QAIF_PLATFORM_PERIOD_BYTES_MIN		(960 * 2 * 2)   // min period = 960 frames @ S16 stereo = 3840 bytes
+#define QAIF_PLATFORM_BUFFER_SIZE			(4 * QAIF_PLATFORM_BUFFER_MIN_SIZE)  // 80 ms = 15360 bytes
+#define QAIF_PLATFORM_PERIODS_MIN			2
+#define QAIF_PLATFORM_PERIODS_MAX			4   // 4 × 3840 = 15360 = buffer_bytes_max
+
 #define QAIF_SMMU_SID_OFFSET				32
 
 static irqreturn_t qaif_aif_irq_handler(struct qaif_drv_data *drvdata, u32 summary_irq_status);
@@ -46,12 +49,10 @@ static const struct snd_pcm_hardware qaif_platform_aif_hardware = {
 	.channels_min		=	1,
 	.channels_max		=	8,
 	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE,
-	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE /
-						QAIF_PLATFORM_PERIODS,
-	.period_bytes_min	=	QAIF_PLATFORM_BUFFER_MIN_SIZE /
-						QAIF_PLATFORM_PERIODS,
-	.periods_min		=	QAIF_PLATFORM_PERIODS,
-	.periods_max		=	QAIF_PLATFORM_PERIODS,
+	.period_bytes_min	=	QAIF_PLATFORM_PERIOD_BYTES_MIN,
+	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE / QAIF_PLATFORM_PERIODS_MIN,
+	.periods_min		=	QAIF_PLATFORM_PERIODS_MIN,
+	.periods_max		=	QAIF_PLATFORM_PERIODS_MAX,
 	.fifo_size		=	0,
 };
 
@@ -70,12 +71,10 @@ static const struct snd_pcm_hardware qaif_platform_cif_hardware = {
 	.channels_min		=	1,
 	.channels_max		=	8,
 	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE,
-	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE /
-						QAIF_PLATFORM_PERIODS,
-	.period_bytes_min	=	QAIF_PLATFORM_BUFFER_MIN_SIZE /
-						QAIF_PLATFORM_PERIODS,
-	.periods_min		=	QAIF_PLATFORM_PERIODS,
-	.periods_max		=	QAIF_PLATFORM_PERIODS,
+	.period_bytes_min	=	QAIF_PLATFORM_PERIOD_BYTES_MIN,
+	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE / QAIF_PLATFORM_PERIODS_MIN,
+	.periods_min		=	QAIF_PLATFORM_PERIODS_MIN,
+	.periods_max		=	QAIF_PLATFORM_PERIODS_MAX,
 	.fifo_size		=	0,
 };
 
@@ -262,6 +261,7 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 		dev_err(soc_runtime->dev, "qaif_init failed: %d\n", ret);
 		return -EINVAL;
 	}
+	drvdata->qaif_init_ref_cnt++;
 
 	switch (dai_id) {
 	case MI2S_PRIMARY ... MI2S_SENARY:
@@ -337,6 +337,12 @@ static int qaif_platform_pcmops_close(struct snd_soc_component *component,
 		break;
 	}
 
+	if (drvdata->qaif_init_ref_cnt > 0)
+		drvdata->qaif_init_ref_cnt--;
+	else
+		dev_dbg(component->dev, "%s: QAIF init ref cnt: %d, skipping decrement\n",
+					__func__, drvdata->qaif_init_ref_cnt);
+
 	if (v->free_stream_dma_idx)
 		v->free_stream_dma_idx(drvdata, data->stream_dma_idx, dai_id);
 	clk_disable_unprepare(drvdata->aud_dma_clk);
@@ -368,7 +374,6 @@ static int qaif_platform_pcmops_hw_params(struct snd_soc_component *component,
 		return -EINVAL;
 	}
 
-	// ToDo: Hardcoded for now, Later to modify dynamically
 	ret = regmap_fields_write(dmactl->burst4, idx, QAIF_DMACTL_BURSTEN);
 	if (ret) {
 		dev_err(soc_runtime->dev, "error updating burst4 field: %d\n", ret);
@@ -928,7 +933,7 @@ static irqreturn_t asoc_platform_qaif_irq(int irq, void *data)
 		pr_err("error reading from irqstat reg: %d\n", rv);
 		return IRQ_NONE;
 	}
-	pr_info("%s: summary_irq_status =0x%08x\n", __func__, summary_irq_status);
+	pr_debug("%s: summary_irq_status =0x%08x\n", __func__, summary_irq_status);
 	if (!(summary_irq_status & QAIF_ALL_CLIENTS_MASK))
 		return IRQ_NONE;
 	for (client = 0; client < ARRAY_SIZE(qaif_irq_clients); client++) {
@@ -979,7 +984,7 @@ static int qaif_platform_copy(struct snd_soc_component *component,
 	dma_buf = (void *)(rt->dma_area + pos +
 			   channel * (rt->dma_bytes / rt->channels));
 
-	pr_info("%s: pos: %lx, dma_buf: %p, stream: %d, bytes: %lu\n", __func__, pos, dma_buf, substream->stream, bytes);
+	pr_debug("%s: pos: %lx, dma_buf: %p, stream: %d, bytes: %lu\n", __func__, pos, dma_buf, substream->stream, bytes);
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		copied = copy_from_iter(dma_buf, bytes, buf);
@@ -1124,6 +1129,12 @@ static int qaif_init(struct snd_soc_component *component)
 	struct qaif_drv_data *drvdata = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
+	if (drvdata->qaif_init_ref_cnt) {
+		dev_info(component->dev, "%s: QAIF init is done already: ref cnt: %d\n",
+				__func__, drvdata->qaif_init_ref_cnt);
+		return 0;
+	}
+
 	ret = qaif_config_shram(drvdata);
 	if (ret) {
 		dev_err(component->dev, "QAIF: Failed to config shram: %d\n", ret);
@@ -1141,7 +1152,8 @@ static int qaif_init(struct snd_soc_component *component)
 		dev_err(component->dev, "QAIF: Failed to map EE resources: %d\n", ret);
 		return ret;
 	}
-
+	dev_dbg(component->dev, "%s: QAIF init is done ref cnt: %d\n",
+			__func__, drvdata->qaif_init_ref_cnt);
 	return 0;
 }
 
@@ -1222,7 +1234,8 @@ int asoc_qcom_qaif_platform_register(struct platform_device *pdev)
 		dev_err(&pdev->dev, "irq request failed: %d\n", ret);
 		return ret;
 	}
-	dev_dbg(&pdev->dev,"%s: Register QAIF Platform\n",__func__);
+	drvdata->qaif_init_ref_cnt = 0;
+	dev_info(&pdev->dev,"%s: Register QAIF Platform\n",__func__);
 	return devm_snd_soc_register_component(&pdev->dev,
 			&qaif_component_driver, NULL, 0);
 }

@@ -1605,7 +1605,7 @@ int asoc_qcom_qaif_cpu_platform_probe(struct platform_device *pdev)
 		dev_err(dev, "error registering platform driver: %d\n", ret);
 		goto err;
 	}
-	dev_dbg(&pdev->dev,"%s: QAIF CPU-Platform Driver Registered Successfully\n",__func__);
+	dev_info(&pdev->dev,"%s: QAIF CPU-Platform Driver Registered Successfully\n",__func__);
 err:
 	return ret;
 }
