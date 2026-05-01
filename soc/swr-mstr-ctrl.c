@@ -1401,6 +1401,7 @@ static void swrm_disable_ports(struct swr_master *master,
 					     u8 bank)
 {
 	u32 value;
+	bool update_sinterval;
 	struct swr_port_info *port_req;
 	int i;
 	struct swrm_mports *mport;
@@ -1420,8 +1421,43 @@ static void swrm_disable_ports(struct swr_master *master,
 		mport = &(swrm->mport_cfg[i]);
 		if (!mport->port_en)
 			continue;
+		update_sinterval = false;
+
+		/*
+		 * During disconnect, bus clock can be reduced before disable
+		 * programming happens. Recompute sinterval for active ports
+		 * so port timing remains aligned with the updated bus clock.
+		 */
+		if (swrm->clk_stop_mode0_supp &&
+				swrm->dynamic_port_map_supported &&
+				mport->req_ch && mport->ch_rate) {
+			mport->sinterval =
+				((swrm->bus_clk * 2) / mport->ch_rate) - 1;
+			update_sinterval = true;
+			list_for_each_entry(port_req, &mport->port_req_list, list) {
+				if (port_req->req_ch)
+					port_req->sinterval = mport->sinterval;
+			}
+		}
 
 		list_for_each_entry(port_req, &mport->port_req_list, list) {
+			/*
+			 * Program active slave sample interval after bus clock
+			 * update to keep slave timing aligned with master.
+			 */
+			if (update_sinterval && port_req->req_ch) {
+				swrm_cmd_fifo_wr_cmd(swrm,
+					(port_req->sinterval & 0xFF),
+					port_req->dev_num, get_cmd_id(swrm),
+					SWRS_DP_SAMPLE_CONTROL_1_BANK(
+						port_req->slave_port_id, bank));
+				swrm_cmd_fifo_wr_cmd(swrm,
+					((port_req->sinterval >> 8) & 0xFF),
+					port_req->dev_num, get_cmd_id(swrm),
+					SWRS_DP_SAMPLE_CONTROL_2_BANK(
+						port_req->slave_port_id, bank));
+			}
+
 			/* skip ports with no change req's*/
 			if (port_req->req_ch == port_req->ch_en)
 				continue;
@@ -1445,6 +1481,10 @@ static void swrm_disable_ports(struct swr_master *master,
 		swr_master_write(swrm,
 				SWRM_DP_PORT_CTRL_BANK((i + 1), bank),
 				value);
+		/* DP_PORT_CTRL holds SI LSB only, so update SI MSB separately. */
+		if (update_sinterval)
+			swr_master_write(swrm, SWRM_DP_SAMPLECTRL2_BANK((i + 1), bank),
+					((mport->sinterval >> 8) & 0xFF));
 		dev_dbg(swrm->dev, "%s: mport :%d, reg: 0x%x, val: 0x%x\n",
 			__func__, i,
 			(SWRM_DP_PORT_CTRL_BANK((i + 1), bank)), value);
