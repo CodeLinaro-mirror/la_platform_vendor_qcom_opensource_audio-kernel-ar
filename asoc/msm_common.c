@@ -293,9 +293,34 @@ static bool is_fractional_sample_rate(unsigned int sample_rate)
 	return false;
 }
 
-static int get_mi2s_clk_id(int index)
+static int get_lpaif_intf_index(const char *stream_name)
+{
+	if (strnstr(stream_name, "LPAIF_RXTX", strlen(stream_name)))
+		return LPAIF_RXTX;
+	else if (strnstr(stream_name, "LPAIF_AUD", strlen(stream_name))) {
+		if (strnstr(stream_name, "PRIMARY", strlen(stream_name)))
+			return LPAIF_AUD_PRI;
+		else if (strnstr(stream_name, "SECONDARY", strlen(stream_name)))
+			return LPAIF_AUD_SEC;
+	} else if (strnstr(stream_name, "LPAIF_VA", strlen(stream_name)))
+		return LPAIF_VA;
+	else if (strnstr(stream_name, "LPAIF_WSA", strlen(stream_name)))
+		return LPAIF_WSA;
+	return -EINVAL;
+}
+
+static int get_mi2s_clk_id(int index, const char *stream_name,
+			    struct msm_common_pdata *pdata)
 {
 	int clk_id = -EINVAL;
+	int lpaif_idx = get_lpaif_intf_index(stream_name);
+
+	/* Use DT-provided clock ID if set (non-zero) for this LPAIF interface */
+	if (pdata && lpaif_idx >= 0 && pdata->clk_id[lpaif_idx]) {
+		pr_debug("%s: using DT clk id: %d for stream %s\n",
+			 __func__, pdata->clk_id[lpaif_idx], stream_name);
+		return pdata->clk_id[lpaif_idx];
+	}
 
 	switch(index) {
 	case PRI_MI2S_TDM_AUXPCM:
@@ -326,9 +351,18 @@ static int get_mi2s_clk_id(int index)
 	return clk_id;
 }
 
-static int get_tdm_clk_id(int index)
+static int get_tdm_clk_id(int index, const char *stream_name,
+			   struct msm_common_pdata *pdata)
 {
 	int clk_id = -EINVAL;
+	int lpaif_idx = get_lpaif_intf_index(stream_name);
+
+	/* Use DT-provided clock ID if set (non-zero) for this LPAIF interface */
+	if (pdata && lpaif_idx >= 0 && pdata->clk_id[lpaif_idx]) {
+		pr_debug("%s: using DT clk id: %d for stream %s\n",
+			 __func__, pdata->clk_id[lpaif_idx], stream_name);
+		return pdata->clk_id[lpaif_idx];
+	}
 
 	switch(index) {
 	case PRI_MI2S_TDM_AUXPCM:
@@ -423,7 +457,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				slots = pdata->tdm_max_slots;
 				rate = params_rate(params);
 
-				ret = get_tdm_clk_id(index);
+				ret = get_tdm_clk_id(index, stream_name, pdata);
 				if ( ret < 0)
 					goto done;
 
@@ -456,7 +490,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				}
 			} else if ((strnstr(stream_name, "MI2S", strlen(stream_name)))) {
 
-				ret =  get_mi2s_clk_id(index);
+				ret =  get_mi2s_clk_id(index, stream_name, pdata);
 				if (ret < 0)
 					goto done;
 
@@ -579,10 +613,24 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 
 	if (index >= 0) {
 		mutex_lock(&pdata->lock[index]);
+		if (pdata->mi2s_gpio_p[index]) {
+			atomic_dec(&pdata->mi2s_gpio_ref_cnt[index]);
+			if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) == 0)  {
+				ret = msm_cdc_pinctrl_select_sleep_state(
+					pdata->mi2s_gpio_p[index]);
+				if (ret)
+					dev_err(card->dev,
+					"%s: pinctrl set actv fail %d\n",
+					__func__, ret);
+			} else if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) < 0) {
+				atomic_set(&pdata->mi2s_gpio_ref_cnt[index], 0);
+			}
+		}
+
 		atomic_dec(&pdata->lpass_intf_clk_ref_cnt[index]);
 		if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) == 0) {
 			if ((strnstr(stream_name, "TDM", strlen(stream_name)))) {
-				ret = get_tdm_clk_id(index);
+				ret = get_tdm_clk_id(index, stream_name, pdata);
 				if (ret > 0) {
 					intf_clk_cfg.clk_id = ret;
 					ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 0);
@@ -591,7 +639,7 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 						__func__, ret);
 				}
 			} else if((strnstr(stream_name, "MI2S", strlen(stream_name)))) {
-				ret = get_mi2s_clk_id(index);
+				ret = get_mi2s_clk_id(index, stream_name, pdata);
 				if (ret > 0) {
 					intf_clk_cfg.clk_id = ret;
 					ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 0);
@@ -611,20 +659,6 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 			}
 		} else if (atomic_read(&pdata->lpass_intf_clk_ref_cnt[index]) < 0) {
 			atomic_set(&pdata->lpass_intf_clk_ref_cnt[index], 0);
-		}
-
-		if (pdata->mi2s_gpio_p[index]) {
-			atomic_dec(&pdata->mi2s_gpio_ref_cnt[index]);
-			if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) == 0)  {
-				ret = msm_cdc_pinctrl_select_sleep_state(
-					pdata->mi2s_gpio_p[index]);
-				if (ret)
-					dev_err(card->dev,
-					"%s: pinctrl set actv fail %d\n",
-					__func__, ret);
-			} else if (atomic_read(&pdata->mi2s_gpio_ref_cnt[index]) < 0) {
-				atomic_set(&pdata->mi2s_gpio_ref_cnt[index], 0);
-			}
 		}
 		mutex_unlock(&pdata->lock[index]);
 	}
@@ -706,6 +740,7 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 	struct msm_common_pdata *common_pdata = NULL;
 	int count, ret = 0;
 	uint32_t val_array[MI2S_TDM_AUXPCM_MAX] = {0};
+	uint32_t val = 0;
 	struct clk *lpass_audio_hw_vote = NULL;
 	common_pdata = kcalloc(1, sizeof(struct msm_common_pdata), GFP_KERNEL);
 	if (!common_pdata)
@@ -783,6 +818,43 @@ int msm_common_snd_init(struct platform_device *pdev, struct snd_soc_card *card)
 			common_pdata->mi2s_clk_attribute[count] =
 				val_array[count];
 		}
+	}
+
+	/*
+	 * Read optional DT clock ID overrides for specific LPAIF interfaces.
+	 * A single clock ID is used for both MI2S and TDM on the same interface.
+	 * If a property is absent the hardcoded default clock ID is used.
+	 *
+	 */
+	if (!of_property_read_u32(pdev->dev.of_node,
+				  "qcom,lpaif-rxtx-clk-id", &val)) {
+		common_pdata->clk_id[LPAIF_RXTX] = val;
+		dev_info(&pdev->dev, "%s: LPAIF_RXTX clk id = %d\n",
+			 __func__, common_pdata->clk_id[LPAIF_RXTX]);
+	}
+	if (!of_property_read_u32(pdev->dev.of_node,
+				  "qcom,lpaif-aud-pri-clk-id", &val)) {
+		common_pdata->clk_id[LPAIF_AUD_PRI] = val;
+		dev_info(&pdev->dev, "%s: LPAIF_AUD-PRIMARY clk id = %d\n",
+			 __func__, common_pdata->clk_id[LPAIF_AUD_PRI]);
+	}
+	if (!of_property_read_u32(pdev->dev.of_node,
+				  "qcom,lpaif-aud-sec-clk-id", &val)) {
+		common_pdata->clk_id[LPAIF_AUD_SEC] = val;
+		dev_info(&pdev->dev, "%s: LPAIF_AUD-SECONDARY clk id = %d\n",
+			 __func__, common_pdata->clk_id[LPAIF_AUD_SEC]);
+	}
+	if (!of_property_read_u32(pdev->dev.of_node,
+				  "qcom,lpaif-va-clk-id", &val)) {
+		common_pdata->clk_id[LPAIF_VA] = val;
+		dev_info(&pdev->dev, "%s: LPAIF_VA clk id = %d\n",
+			 __func__, common_pdata->clk_id[LPAIF_VA]);
+	}
+	if (!of_property_read_u32(pdev->dev.of_node,
+				  "qcom,lpaif-wsa-clk-id", &val)) {
+		common_pdata->clk_id[LPAIF_WSA] = val;
+		dev_info(&pdev->dev, "%s: LPAIF_WSA clk id = %d\n",
+			 __func__, common_pdata->clk_id[LPAIF_WSA]);
 	}
 
 	common_pdata->mi2s_gpio_p[PRI_MI2S_TDM_AUXPCM] = of_parse_phandle(pdev->dev.of_node,
