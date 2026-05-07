@@ -2968,8 +2968,8 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	if (pdata)
 		common_pdata = pdata->common_pdata;
 
-	msm_common_snd_deinit(common_pdata);
 	snd_event_master_deregister(&pdev->dev);
+	msm_common_snd_deinit(common_pdata);
 	snd_soc_unregister_card(card);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
