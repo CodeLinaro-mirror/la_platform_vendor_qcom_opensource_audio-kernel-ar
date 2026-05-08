@@ -1008,12 +1008,23 @@ int wsa884x_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 		return -EINVAL;
 
 	wsa884x = snd_soc_component_get_drvdata(component);
+
+	if (!wsa884x)
+		return -EINVAL;
+
+	mutex_lock(&wsa884x->res_lock);
 	if (wsa884x->entry) {
 		dev_dbg(wsa884x->dev,
 			"%s:wsa884x module already created\n", __func__);
+		mutex_unlock(&wsa884x->res_lock);
 		return 0;
 	}
+
 	card = component->card;
+	if (!card) {
+		mutex_unlock(&wsa884x->res_lock);
+		return -EINVAL;
+	}
 
 	snprintf(name, sizeof(name), "%s.%llx", "wsa884x",
 		 wsa884x->swr_slave->addr);
@@ -1024,11 +1035,14 @@ int wsa884x_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 	if (!wsa884x->entry) {
 		dev_dbg(component->dev, "%s: failed to create wsa884x entry\n",
 			__func__);
+		mutex_unlock(&wsa884x->res_lock);
 		return -ENOMEM;
 	}
 	wsa884x->entry->mode = S_IFDIR | 0555;
 	if (snd_info_register(wsa884x->entry) < 0) {
 		snd_info_free_entry(wsa884x->entry);
+		wsa884x->entry = NULL;
+		mutex_unlock(&wsa884x->res_lock);
 		return -ENOMEM;
 	}
 
@@ -1039,6 +1053,8 @@ int wsa884x_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 		dev_dbg(component->dev, "%s: failed to create wsa884x version entry\n",
 			__func__);
 		snd_info_free_entry(wsa884x->entry);
+		wsa884x->entry = NULL;
+		mutex_unlock(&wsa884x->res_lock);
 		return -ENOMEM;
 	}
 
@@ -1050,6 +1066,8 @@ int wsa884x_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 	if (snd_info_register(version_entry) < 0) {
 		snd_info_free_entry(version_entry);
 		snd_info_free_entry(wsa884x->entry);
+		wsa884x->entry = NULL;
+		mutex_unlock(&wsa884x->res_lock);
 		return -ENOMEM;
 	}
 	wsa884x->version_entry = version_entry;
@@ -1062,7 +1080,10 @@ int wsa884x_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 			"%s: failed to create wsa884x variant entry\n",
 			__func__);
 		snd_info_free_entry(version_entry);
+		wsa884x->version_entry = NULL;
 		snd_info_free_entry(wsa884x->entry);
+		wsa884x->entry = NULL;
+		mutex_unlock(&wsa884x->res_lock);
 		return -ENOMEM;
 	}
 
@@ -1074,11 +1095,15 @@ int wsa884x_codec_info_create_codec_entry(struct snd_info_entry *codec_root,
 	if (snd_info_register(variant_entry) < 0) {
 		snd_info_free_entry(variant_entry);
 		snd_info_free_entry(version_entry);
+		wsa884x->version_entry = NULL;
 		snd_info_free_entry(wsa884x->entry);
+		wsa884x->entry = NULL;
+		mutex_unlock(&wsa884x->res_lock);
 		return -ENOMEM;
 	}
 	wsa884x->variant_entry = variant_entry;
 
+	mutex_unlock(&wsa884x->res_lock);
 	return 0;
 }
 EXPORT_SYMBOL(wsa884x_codec_info_create_codec_entry);
