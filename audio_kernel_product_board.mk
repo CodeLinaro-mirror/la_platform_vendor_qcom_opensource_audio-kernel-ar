@@ -57,9 +57,9 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif
 
-SUPPORTED_PLATFORMS := gen4 msmnile
+SUPPORTED_PLATFORMS := gen4 msmnile auto_gen
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM),$(SUPPORTED_PLATFORMS)))
-ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq))
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq auto_gen_prime))
 PRODUCT_PACKAGES  += $(KERNEL_MODULES_OUT)/machine_dlkm.ko \
         $(KERNEL_MODULES_OUT)/stub_dlkm.ko
 endif   #msmnile
