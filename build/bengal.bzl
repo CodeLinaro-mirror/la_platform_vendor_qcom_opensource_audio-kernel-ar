@@ -32,6 +32,9 @@ def define_bengal():
             "wsa881x_analog_dlkm",
             "wcd937x_dlkm",
             "wcd937x_slave_dlkm",
+            "rouleur_dlkm",
+            "rouleur_slave_dlkm",
+            "pm2250_spmi_dlkm",
         ],
         config_options = [
             "CONFIG_SND_SOC_BENGAL",
@@ -45,5 +48,8 @@ def define_bengal():
             "CONFIG_SND_SOC_WCD9XXX_V2",
             "CONFIG_DIGITAL_CDC_RSC_MGR",
             "CONFIG_SND_SOC_WCD_MBHC_ADC",
+            "CONFIG_SND_SOC_ROULEUR",
+            "CONFIG_SND_SOC_ROULEUR_SLAVE",
+            "CONFIG_PM2250_SPMI",
         ],
     )
