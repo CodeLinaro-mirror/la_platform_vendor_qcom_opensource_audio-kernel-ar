@@ -395,19 +395,7 @@ err:
 	return rc;
 }
 
-void msm_audio_fd_list_debug(void)
-{
-	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
-
-	list_for_each_entry(msm_audio_fd_data,
-			&msm_audio_ion_fd_list.fd_list, list) {
-		pr_debug("%s fd %d handle %pK phy. addr %pK\n", __func__,
-			msm_audio_fd_data->fd, msm_audio_fd_data->handle,
-			(void *)msm_audio_fd_data->paddr);
-	}
-}
-
-void msm_audio_update_fd_list(struct msm_audio_fd_data *msm_audio_fd_data)
+static void msm_audio_update_fd_list(struct msm_audio_fd_data *msm_audio_fd_data)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data1 = NULL;
 
@@ -425,7 +413,7 @@ void msm_audio_update_fd_list(struct msm_audio_fd_data *msm_audio_fd_data)
 	mutex_unlock(&(msm_audio_ion_fd_list.list_mutex));
 }
 
-void msm_audio_delete_fd_entry(void *handle, int handle_fd)
+static void msm_audio_delete_fd_entry(void *handle, int handle_fd)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 	struct list_head *ptr, *next;
@@ -503,7 +491,7 @@ static int msm_audio_set_hyp_assign(int fd, bool assign)
 }
 #endif
 
-void msm_audio_get_handle(int fd, void **handle)
+static void msm_audio_get_handle(int fd, void **handle)
 {
 	struct msm_audio_fd_data *msm_audio_fd_data = NULL;
 
@@ -1140,13 +1128,13 @@ static struct platform_driver msm_audio_ion_driver = {
 	.remove = msm_audio_ion_remove,
 };
 
-int __init msm_audio_ion_init(void)
+static int __init msm_audio_ion_init(void)
 {
 	pr_debug("%s: msm_audio_ion_init called \n",__func__);
 	return platform_driver_register(&msm_audio_ion_driver);
 }
 
-void msm_audio_ion_exit(void)
+static void msm_audio_ion_exit(void)
 {
 	platform_driver_unregister(&msm_audio_ion_driver);
 }

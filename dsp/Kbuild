@@ -232,9 +232,6 @@ LINUX_INC +=	-Iinclude/linux
 INCS +=		$(COMMON_INC) \
 		$(UAPI_INC)
 
-EXTRA_CFLAGS += $(INCS)
-
-
 CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-DANI_LITTLE_BIT_ENDIAN \
 		-DDOT11F_LITTLE_ENDIAN_HOST \
@@ -246,6 +243,7 @@ CDEFINES +=	-DANI_LITTLE_BYTE_ENDIAN \
 		-D__linux__
 
 KBUILD_CPPFLAGS += $(CDEFINES)
+KBUILD_CFLAGS += $(INCS)
 
 # Currently, for versions of gcc which support it, the kernel Makefile
 # is disabling the maybe-uninitialized warning.  Re-enable it for the
