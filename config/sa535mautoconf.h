@@ -3,8 +3,6 @@
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * Copyright (c) 2020, The Linux Foundation. All rights reserved.
  */
-
-#define CONFIG_PINCTRL_WCD 1
 #define CONFIG_AUDIO_EXT_CLK 1
 #define CONFIG_MSM_CDC_PINCTRL 1
 #define CONFIG_MSM_QDSP6_GPR_RPMSG 1
@@ -24,4 +22,3 @@
 #define CONFIG_SND_SOC_QDSP6V2 1
 #define CONFIG_SND_SOC_MSM_STUB 1
 #define CONFIG_SND_EVENT 1
-#define CONFIG_WCD9XXX_CODEC_CORE_V2 1

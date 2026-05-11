@@ -14,10 +14,6 @@ static int __init wcd9xxx_core_init(void)
 	int ret[NUM_DRIVERS_REG_RET] = {0};
 	int i = 0;
 
-	ret[0] = msm_cdc_pinctrl_drv_init();
-	if (ret[0])
-		pr_err("%s: Failed init pinctrl drv: %d\n", __func__, ret[0]);
-
 	ret[1] = wcd9xxx_irq_drv_init();
 	if (ret[1])
 		pr_err("%s: Failed init irq drv: %d\n", __func__, ret[1]);
@@ -39,7 +35,6 @@ static void __exit wcd9xxx_core_exit(void)
 {
 	wcd9xxx_exit();
 	wcd9xxx_irq_drv_exit();
-	msm_cdc_pinctrl_drv_exit();
 }
 module_exit(wcd9xxx_core_exit);
 
