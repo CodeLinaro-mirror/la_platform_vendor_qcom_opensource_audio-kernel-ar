@@ -104,6 +104,8 @@ struct lpass_cdc_priv {
 	u8 dmic_4_5_clk_div;
 	u8 dmic_6_7_clk_div;
 	struct proc_dir_entry *lpass_cdc_proc_entry;
+	u32 rate_gen_base_addr;
+	u32 rate_gen_size;
 };
 
 struct regmap *lpass_cdc_regmap_init(struct device *dev,

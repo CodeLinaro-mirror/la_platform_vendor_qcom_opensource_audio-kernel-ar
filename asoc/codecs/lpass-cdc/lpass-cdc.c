@@ -46,6 +46,39 @@ static u16 lpass_cdc_mclk_mux_tbl[MAX_MACRO][MCLK_MUX_MAX] = {
 
 static bool lpass_cdc_is_valid_codec_dev(struct device *dev);
 
+/* Register offsets relative to rate-gen base */
+#define LPASS_RATE_GEN_COUNTER_0_OFFSET		0x4
+#define LPASS_RATE_GEN_DELAY_OFFSET		0x10
+#define LPASS_RATE_GEN_CTRL_OFFSET		0x0
+
+static void lpass_cdc_update_rate_gen_sequence(struct lpass_cdc_priv *priv)
+{
+	void __iomem *io_base;
+
+	if (!priv->rate_gen_base_addr || !priv->rate_gen_size)
+		return;
+
+	io_base = ioremap(priv->rate_gen_base_addr, priv->rate_gen_size);
+	if (!io_base) {
+		dev_err(priv->dev, "%s: ioremap failed for rate-gen base 0x%x size 0x%x\n",
+			__func__, priv->rate_gen_base_addr, priv->rate_gen_size);
+		return;
+	}
+
+	iowrite32(0x960, io_base + LPASS_RATE_GEN_COUNTER_0_OFFSET);
+	iowrite32(0x16, io_base + LPASS_RATE_GEN_DELAY_OFFSET);
+	iowrite32(0x1, io_base + LPASS_RATE_GEN_CTRL_OFFSET);
+
+	dev_dbg(priv->dev, "%s: COUNTER_0=0x%x DELAY=0x%x CTRL=0x%x\n",
+		__func__,
+		ioread32(io_base + LPASS_RATE_GEN_COUNTER_0_OFFSET),
+		ioread32(io_base + LPASS_RATE_GEN_DELAY_OFFSET),
+		ioread32(io_base + LPASS_RATE_GEN_CTRL_OFFSET));
+
+	iounmap(io_base);
+}
+
+
 int lpass_cdc_set_port_map(struct snd_soc_component *component,
 			u32 size, void *data)
 {
@@ -1391,55 +1424,11 @@ static const struct proc_ops lpass_cdc_proc_ops = {
 	.proc_read = lpass_cdc_proc_read,
 };
 
-#ifdef CONFIG_BOLERO_VER_4P0
-/* Register addresses */
-#define LPASS_RATE_GEN_CTRL		0x7EED000
-#define LPASS_RATE_GEN_COUNTER_0	0x7EED004
-#define LPASS_RATE_GEN_DELAY		0x7EED010
-
-/* Register base and size for ioremap */
-#define LPASS_RATE_GEN_BASE		0x7EED000
-#define LPASS_RATE_GEN_SIZE		0x1000
-
-/**
- * lpass_rate_gen_write_regs - ioremap and write to rate generator registers
- *
- * This function maps the rate generator registers and writes sample values
- */
-static void lpass_rate_gen_write_regs(void)
-{
-	void __iomem *io_base;
-
-	/* ioremap the register region */
-	io_base = ioremap(LPASS_RATE_GEN_BASE, LPASS_RATE_GEN_SIZE);
-	if (!io_base) {
-		pr_err("%s: Failed to ioremap rate gen registers\n", __func__);
-		return;
-	}
-
-	/* Write to LPASS_RATE_GEN_COUNTER_0 */
-	iowrite32(0x960, io_base + (LPASS_RATE_GEN_COUNTER_0 - LPASS_RATE_GEN_BASE));
-
-	/* Write to LPASS_RATE_GEN_DELAY */
-	iowrite32(0x16, io_base + (LPASS_RATE_GEN_DELAY - LPASS_RATE_GEN_BASE));
-
-		/* Write to LPASS_RATE_GEN_CTRL */
-	iowrite32(0x1, io_base + (LPASS_RATE_GEN_CTRL - LPASS_RATE_GEN_BASE));
-
-	pr_debug("%s: COUNTER: 0x%X delay: 0x%X cntrl: 0x%X \n", __func__,
-			ioread32(io_base + (LPASS_RATE_GEN_COUNTER_0 - LPASS_RATE_GEN_BASE)),
-			ioread32(io_base + (LPASS_RATE_GEN_DELAY - LPASS_RATE_GEN_BASE)),
-			ioread32(io_base + (LPASS_RATE_GEN_CTRL - LPASS_RATE_GEN_BASE)));
-
-	/* Unmap when done */
-	iounmap(io_base);
-}
-#endif
-
 static int lpass_cdc_probe(struct platform_device *pdev)
 {
 	struct lpass_cdc_priv *priv;
 	u32 num_macros = 0;
+	u32 rate_gen_base_addr = 0, rate_gen_size = 0;
 	int ret;
 	struct clk *lpass_core_hw_vote = NULL;
 	struct clk *lpass_audio_hw_vote = NULL;
@@ -1541,6 +1530,30 @@ static int lpass_cdc_probe(struct platform_device *pdev)
 		ret = 0;
 	}
 	priv->lpass_audio_hw_vote = lpass_audio_hw_vote;
+
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,rate-gen-base-addr",
+				   &rate_gen_base_addr);
+	if (ret) {
+		dev_dbg(&pdev->dev, "%s: qcom,rate-gen-base-addr not found, skipping\n",
+			__func__);
+		ret = 0;
+		goto skip_rate_gen;
+	}
+
+	ret = of_property_read_u32(pdev->dev.of_node, "qcom,rate-gen-size",
+				   &rate_gen_size);
+	if (ret || !rate_gen_size) {
+		dev_err(&pdev->dev, "%s: invalid qcom,rate-gen-size\n", __func__);
+	}
+
+	priv->rate_gen_base_addr = rate_gen_base_addr;
+	priv->rate_gen_size = rate_gen_size;
+
+	dev_dbg(&pdev->dev, "%s: rate-gen base 0x%x size 0x%x\n",
+		 __func__, rate_gen_base_addr, rate_gen_size);
+
+skip_rate_gen:
+
 	schedule_work(&priv->lpass_cdc_add_child_devices_work);
 
 	return 0;
@@ -1626,9 +1639,9 @@ core_clk_vote:
 		}
 	}
 	priv->core_clk_vote_count++;
-#ifdef CONFIG_BOLERO_VER_4P0
-	lpass_rate_gen_write_regs();
-#endif
+
+	if (priv->core_audio_vote_count > 0 && priv->core_clk_vote_count > 0)
+		lpass_cdc_update_rate_gen_sequence(priv);
 
 done:
 	mutex_unlock(&priv->vote_lock);
