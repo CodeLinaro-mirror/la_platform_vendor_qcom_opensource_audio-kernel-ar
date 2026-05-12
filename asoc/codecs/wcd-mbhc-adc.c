@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #include <linux/module.h>
 #include <linux/init.h>
@@ -101,8 +101,8 @@ static int wcd_measure_adc_continuous(struct wcd_mbhc *mbhc)
 	WCD_MBHC_REG_UPDATE_BITS(WCD_MBHC_ADC_EN, 1);
 
 	while (retry--) {
-		/* wait for 3 msec before reading ADC result */
-		usleep_range(3000, 3100);
+		/* wait for 20 msec before reading ADC result */
+		usleep_range(20000, 20100);
 
 		/* Read ADC result */
 		WCD_MBHC_REG_READ(WCD_MBHC_ADC_RESULT, adc_result);
@@ -604,7 +604,7 @@ static void wcd_mbhc_adc_detect_plug_type(struct wcd_mbhc *mbhc)
 
 	if (mbhc->mbhc_cb->mbhc_micbias_control) {
 		mbhc->mbhc_cb->mbhc_micbias_control(component, MIC_BIAS_2,
-						    MICB_ENABLE);
+				MICB_ENABLE);
 	} else {
 		pr_err("%s: Mic Bias is not enabled\n", __func__);
 		return;
