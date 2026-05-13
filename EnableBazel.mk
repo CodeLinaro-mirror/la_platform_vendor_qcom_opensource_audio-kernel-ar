@@ -59,6 +59,7 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd_core_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/mbhc_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/swr_dmic_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9xxx_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa881x_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/swr_haptics_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/sdca_registers_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/stub_dlkm.ko
