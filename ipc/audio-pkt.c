@@ -879,16 +879,15 @@ static int audio_pkt_platform_driver_probe(struct platform_device *pdev)
 			device_create(audpkt_dev[i].audio_pkt_class, NULL,
 				MKDEV(MAJOR(audpkt_dev[i].audio_pkt_major),
 				MINOR(MINOR_NUMBER_FIRST)+i),
-				NULL, audpkt_drv_name[i]);
+				NULL, "%s", audpkt_drv_name[i]);
 		if (IS_ERR(audpkt_dev[i].dev)) {
 			ret = PTR_ERR(audpkt_dev[i].dev);
 			AUDIO_PKT_ERR("device_create failed ret:%ld\n",
 					PTR_ERR(audpkt_dev[i].dev));
 			goto err_device;
 		}
-		strlcpy(audpkt_dev[i].dev_name, audpkt_drv_name[i], strlen(audpkt_drv_name[i])+1);
+		strscpy(audpkt_dev[i].dev_name, audpkt_drv_name[i], sizeof(audpkt_dev[i].dev_name));
 		strlcpy(audpkt_dev[i].ch_name, channel_name[i], strlen(channel_name[i])+1);
-		dev_set_name(audpkt_dev[i].dev, audpkt_dev[i].dev_name);
 
 		mutex_init(&audpkt_dev[i].lock);
 
