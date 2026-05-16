@@ -558,6 +558,11 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 	dev_info(dev, "%s: gpr-lite probe success\n",
 		__func__);
 
+#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
+	gpr_set_q6_state(GPR_SUBSYS_LOADED);
+	gpr_set_modem_state(GPR_SUBSYS_LOADED);
+#endif
+
 	return 0;
 }
 
