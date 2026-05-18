@@ -240,6 +240,11 @@ audio_modules.register(
             ":%b_wcd938x_dlkm",
             ":%b_wcd937x_dlkm",
 	],
+    conditional_deps = {
+        "CONFIG_SND_SOC_ROULEUR": [
+            ":%b_rouleur_dlkm",
+        ],
+    },
 )
 # >>>> ASOC/CODEC MODULES <<<<
 audio_modules.register(

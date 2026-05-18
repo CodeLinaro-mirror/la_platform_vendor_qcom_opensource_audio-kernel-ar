@@ -94,6 +94,31 @@ static struct port_params rx_frame_params_dsd[SWR_MSTR_PORT_LEN] = {
 	{0xFF,  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, /* IPCM */
 };
 
+static struct port_params rx_frame_params_rouleur[SWR_MSTR_PORT_LEN] = {
+	{3,  0,  0,  0xFF, 0xFF, 1,    0xFF, 0xFF, 1},
+	{31, 0,  0,  3,    6,    7,    0,    0xFF, 0},
+	{31, 1,  0,  0xFF, 0xFF, 4,    1,    0xFF, 0},
+	{7,  1,  0,  0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0},
+	{0,  0,  0,  0xFF, 0xFF, 0xFF, 0xFF, 0,    0},
+};
+
+static struct port_params rx_frame_params_dsd_rouleur[SWR_MSTR_PORT_LEN] = {
+	{3,  0,  0,  0xFF, 0xFF, 1,    0xFF, 0xFF, 1},
+	{31, 0,  0,  3,    6,    7,    0,    0xFF, 0},
+	{31, 11, 11, 0xFF, 0xFF, 4,    1,    0xFF, 0},
+	{7,  9,  0,  0xFF, 0xFF, 0xFF, 0xFF, 1,    0},
+	{3,  1,  0,  0xFF, 0xFF, 0xFF, 0xFF, 3,    0},
+};
+
+/* Headset(44.1K) + PCM Haptics */
+static struct port_params rx_frame_params_44p1KHz_rouleur[SWR_MSTR_PORT_LEN] = {
+	{3,  0,  0,  0xFF, 0xFF, 1,    0xFF, 0xFF, 1, 0x00, 0x00}, /* HPH/EAR */
+	{63, 0,  0,  3,    6,    7,    0,    0xFF, 0, 0x00, 0x02}, /* HPH_CLH */
+	{31, 11, 11, 0xFF, 0xFF, 4,    1,    0xFF, 0, 0x00, 0x02}, /* HPH_CMP */
+	{3,  1,  0,  0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0, 0x00, 0x00}, /* LO/AUX */
+	{0,  0,  0,  0xFF, 0xFF, 0xFF, 0xFF, 0,    0, 0x00, 0x00}, /* DSD */
+};
+
 #ifdef CONFIG_BOLERO_VER_4P0
 static struct port_params rx_frame_params_default[SWR_MSTR_PORT_LEN] = {
 	{3,     0,    0,    0xFF, 0xFF, 1,    0xFF, 0xFF, 1,    0x00, 0x00}, /* 1. HPH/EAR */
@@ -185,6 +210,12 @@ static struct swr_mstr_port_map sm_wsa8855_port_map[] = {
 static struct swr_mstr_port_map sm_wsa2_port_map[] = {
 	{WSA2_MACRO, SWR_UC0, wsa2_frame_params_default},
 	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
+};
+
+static struct swr_mstr_port_map sm_port_map_rouleur[] = {
+	{RX_MACRO, SWR_UC0, rx_frame_params_rouleur},
+	{RX_MACRO, SWR_UC1, rx_frame_params_dsd_rouleur},
+	{RX_MACRO, SWR_UC2, rx_frame_params_44p1KHz_rouleur},
 };
 
 #endif /* _CANOE_PORT_CONFIG */
