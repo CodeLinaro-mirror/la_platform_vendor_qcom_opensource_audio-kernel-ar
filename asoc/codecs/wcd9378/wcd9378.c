@@ -4730,6 +4730,9 @@ err_lock_init:
 	mutex_destroy(&wcd9378->wakeup_lock);
 	mutex_destroy(&wcd9378->sys_usage_lock);
 err:
+	msm_cdc_release_supplies(dev, wcd9378->supplies,
+			    pdata->regulator, pdata->num_supplies);
+
 	return ret;
 }
 

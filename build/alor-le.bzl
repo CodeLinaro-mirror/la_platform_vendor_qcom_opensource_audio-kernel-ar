@@ -4,7 +4,7 @@ load(":module_mgr.bzl", "define_target_modules")
 def define_alorle():
     define_target_modules(
         target = "alor-le",
-        variants = ["consolidate", "perf", "debug-defconfig"],
+        variants = ["consolidate", "perf", "debug-defconfig", "defconfig"],
         registry = audio_modules,
         modules = [
             "q6_dlkm",
@@ -27,6 +27,7 @@ def define_alorle():
             "wcd9xxx_dlkm",
             "swr_haptics_dlkm",
             "stub_dlkm",
+            "hdmi_dlkm",
             "lpass_cdc_dlkm",
             "lpass_cdc_wsa_macro_dlkm",
             "lpass_cdc_wsa2_macro_dlkm",
@@ -60,6 +61,7 @@ def define_alorle():
             "CONFIG_AUDIO_BTFM_PROXY",
             "CONFIG_SND_SOC_WCD9XXX_V2",
             "CONFIG_SND_SOC_WCD_MBHC_ADC",
+            "CONFIG_MSM_EXT_DISPLAY",
             "CONFIG_SND_SOC_QMP",
             "CONFIG_SND_SOC_SIMPLE_AMP",
         ]
