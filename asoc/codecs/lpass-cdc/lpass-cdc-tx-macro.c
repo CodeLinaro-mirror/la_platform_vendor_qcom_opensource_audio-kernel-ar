@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -610,11 +610,21 @@ static int lpass_cdc_tx_macro_tx_mixer_put(struct snd_kcontrol *kcontrol,
 		return -EINVAL;
 
 	if (enable) {
-		set_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
-		tx_priv->active_ch_cnt[dai_id]++;
+		if (test_bit(dec_id, &tx_priv->active_ch_mask[dai_id])) {
+			dev_err(component->dev, "%s: channel is already enabled, dec_id = %d, dai_id = %d\n",
+					__func__, dec_id, dai_id);
+		} else {
+			set_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
+			tx_priv->active_ch_cnt[dai_id]++;
+		}
 	} else {
-		tx_priv->active_ch_cnt[dai_id]--;
-		clear_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
+		if (!test_bit(dec_id, &tx_priv->active_ch_mask[dai_id])) {
+			dev_err(component->dev, "%s: channel is already disabled, dec_id = %d, dai_id = %d\n",
+					__func__, dec_id, dai_id);
+		} else {
+			tx_priv->active_ch_cnt[dai_id]--;
+			clear_bit(dec_id, &tx_priv->active_ch_mask[dai_id]);
+		}
 	}
 	snd_soc_dapm_mixer_update_power(widget->dapm, kcontrol, enable, update);
 
