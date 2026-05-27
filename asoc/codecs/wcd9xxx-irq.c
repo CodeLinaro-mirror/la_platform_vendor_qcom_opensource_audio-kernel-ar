@@ -319,6 +319,8 @@ static irqreturn_t wcd9xxx_irq_thread(int irq, void *data)
 		 * process interrupts.
 		 */
 		msleep(10);
+		wcd9xxx_unlock_sleep(wcd9xxx_res);
+		return IRQ_HANDLED;
 	}
 
 	memset(status, 0, sizeof(status));
@@ -327,6 +329,13 @@ static irqreturn_t wcd9xxx_irq_thread(int irq, void *data)
 		status, num_irq_regs);
 
 	if (ret < 0) {
+		if (ret == -ETIMEDOUT) {
+			dev_warn_ratelimited(wcd9xxx->dev,
+				"IRQ status read timed out (-110), deferring (IRQ %d stays alive)\n",
+				irq);
+			wcd9xxx_unlock_sleep(wcd9xxx_res);
+			return IRQ_HANDLED;
+		}
 		dev_err(wcd9xxx_res->dev,
 				"Failed to read interrupt status: %d\n", ret);
 		goto err_disable_irq;

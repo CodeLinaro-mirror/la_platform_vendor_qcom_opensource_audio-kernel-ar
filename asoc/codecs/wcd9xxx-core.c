@@ -294,6 +294,10 @@ static int wcd9xxx_slim_read_device(struct wcd9xxx *wcd9xxx, unsigned short reg,
 	}
 
 	while (1) {
+		if (!wcd9xxx->dev_up) {
+			ret = 0;
+			break;
+		}
 		mutex_lock(&wcd9xxx->xfer_lock);
 		ret = slim_read(interface ?
 			       wcd9xxx->slim_slave : wcd9xxx->slim, reg_addr, bytes, dest);
@@ -303,6 +307,17 @@ static int wcd9xxx_slim_read_device(struct wcd9xxx *wcd9xxx, unsigned short reg,
 		if (likely(ret == 0) || (--slim_read_tries == 0))
 			break;
 		usleep_range(5000, 5100);
+		/*
+		 * Bug fix: re-check dev_up after sleep.
+		 * SSR may clear dev_up during the 5ms window; without this
+		 * guard the next iteration fires slim_read on a torn-down
+		 * device returning -EAGAIN until retries are exhausted and
+		 * IRQ 145 is disabled by the WCD IRQ handler.
+		 */
+		if (!wcd9xxx->dev_up) {
+			ret = 0;
+			break;
+		}
 	}
 
 	if (ret)
@@ -331,6 +346,10 @@ static int wcd9xxx_slim_write_device(struct wcd9xxx *wcd9xxx,
 	}
 
 	while (1) {
+		if (!wcd9xxx->dev_up) {
+			ret = 0;
+			break;
+		}
 		mutex_lock(&wcd9xxx->xfer_lock);
 		ret = slim_write(interface ?
 				wcd9xxx->slim_slave : wcd9xxx->slim,
@@ -480,22 +499,22 @@ int wcd9xxx_slim_bulk_write(struct wcd9xxx *wcd9xxx,
 		pr_err("%s: Invalid parameters\n", __func__);
 		return -EINVAL;
 	}
+	mutex_lock(&wcd9xxx->io_lock);
 
 	if (!wcd9xxx->dev_up) {
 		dev_dbg_ratelimited(
 			wcd9xxx->dev, "%s: No write allowed. dev_up = %d\n",
 			__func__, wcd9xxx->dev_up);
-		return 0;
+		ret = 0;
+		goto done;
 	}
 
-	mutex_lock(&wcd9xxx->io_lock);
 	reg = bulk_reg->reg;
 	ret = wcd9xxx_page_write(wcd9xxx, &reg);
 	if (ret) {
 		pr_err("%s: Page write error for reg: 0x%x\n",
 			__func__, reg);
-		mutex_unlock(&wcd9xxx->io_lock);
-		return ret;
+		goto done;
 	}
 
 	for (i = 0; i < size; i++) {
@@ -508,12 +527,13 @@ int wcd9xxx_slim_bulk_write(struct wcd9xxx *wcd9xxx,
 			bytes_allowed = wcd9xxx_slim_get_allowed_slice(wcd9xxx, bytes_to_write);
 			msg.num_bytes = bytes_allowed;
 			msg.wbuf = bulk_reg->buf;
+			mutex_lock(&wcd9xxx->xfer_lock);
 			ret = slim_xfer_msg(wcd9xxx->slim, &msg, SLIM_MSG_MC_CHANGE_VALUE);
-
-			if (ret) {
+			mutex_unlock(&wcd9xxx->xfer_lock);
+			if(ret) {
 				dev_err(wcd9xxx->dev, "%s:bulk write failed, ret = %d\n",
-				__func__, ret);
-				break;
+						__func__, ret);
+				goto done;
 			}
 			bytes_to_write = bytes_to_write - bytes_allowed;
 			msg.wbuf = ((u8 *)msg.wbuf) + bytes_allowed;
@@ -521,6 +541,7 @@ int wcd9xxx_slim_bulk_write(struct wcd9xxx *wcd9xxx,
 		bulk_reg++;
 	}
 
+done:
 	/* 100 usec sleep is needed as per HW requirement */
 	usleep_range(100, 110);
 	mutex_unlock(&wcd9xxx->io_lock);
@@ -563,6 +584,7 @@ static int wcd9xxx_device_init(struct wcd9xxx *wcd9xxx)
 
 	mutex_init(&wcd9xxx->io_lock);
 	mutex_init(&wcd9xxx->xfer_lock);
+	mutex_init(&wcd9xxx->stream_lock);
 	mutex_init(&wcd9xxx->reset_lock);
 
 	ret = wcd9xxx_bringup(wcd9xxx->dev);
@@ -641,6 +663,7 @@ err:
 	wcd9xxx_core_res_deinit(&wcd9xxx->core_res);
 err_bring_up:
 	mutex_destroy(&wcd9xxx->reset_lock);
+	mutex_destroy(&wcd9xxx->stream_lock);
 	mutex_destroy(&wcd9xxx->xfer_lock);
 	mutex_destroy(&wcd9xxx->io_lock);
 	return ret;
@@ -655,6 +678,7 @@ static void wcd9xxx_device_exit(struct wcd9xxx *wcd9xxx)
 	wcd9xxx_reset_low(wcd9xxx->dev);
 	wcd9xxx_core_res_deinit(&wcd9xxx->core_res);
 	mutex_destroy(&wcd9xxx->io_lock);
+	mutex_destroy(&wcd9xxx->stream_lock);
 	mutex_destroy(&wcd9xxx->xfer_lock);
 	mutex_destroy(&wcd9xxx->reset_lock);
 }
