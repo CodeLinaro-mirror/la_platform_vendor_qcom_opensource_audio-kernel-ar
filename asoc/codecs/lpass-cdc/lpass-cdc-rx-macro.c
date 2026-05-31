@@ -512,6 +512,7 @@ struct lpass_cdc_rx_macro_priv {
 	bool pre_dev_up;
 	bool hph_pwr_mode;
 	bool hph_hd2_mode;
+	bool bypass_startup_pulse;
 	struct mutex mclk_lock;
 	struct mutex swr_clk_lock;
 	struct rx_swr_ctrl_data *swr_ctrl_data;
@@ -1348,6 +1349,11 @@ static int lpass_cdc_rx_macro_mclk_enable(
 			regmap_update_bits(regmap,
 				LPASS_CDC_RX_CLK_RST_CTRL_FS_CNT_CONTROL,
 				0x02, 0x00);
+			if (rx_priv->bypass_startup_pulse) {
+				regmap_update_bits(regmap,
+					LPASS_CDC_RX_CLK_RST_CTRL_FS_CNT_CONTROL,
+					0x80, 0x80);
+			}
 			regmap_update_bits(regmap,
 				LPASS_CDC_RX_CLK_RST_CTRL_FS_CNT_CONTROL,
 				0x01, 0x01);
@@ -4801,6 +4807,12 @@ static int lpass_cdc_rx_macro_probe(struct platform_device *pdev)
 			__func__, "qcom,default-clk-id");
 		default_clk_id = RX_CORE_CLK;
 	}
+
+	if (of_find_property(pdev->dev.of_node, "bypass-startup-pulse", NULL))
+		rx_priv->bypass_startup_pulse = true;
+	else
+		rx_priv->bypass_startup_pulse = false;
+
 	if (of_find_property(pdev->dev.of_node, is_used_rx_swr_gpio_dt,
 			     NULL)) {
 		ret = of_property_read_u32(pdev->dev.of_node,
