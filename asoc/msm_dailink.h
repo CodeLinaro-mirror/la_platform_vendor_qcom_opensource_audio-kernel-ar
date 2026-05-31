@@ -697,12 +697,14 @@ SND_SOC_DAILINK_DEFS(rx_qaif_dma_rx0,
 
 SND_SOC_DAILINK_DEFS(rx_qaif_dma_rx1,
 	DAILINK_COMP_ARRAY(COMP_CPU("CDC DMA RX1")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "rx_macro_rx2")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "rx_macro_rx2"),
+						COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("a000000.audio")));
 
 SND_SOC_DAILINK_DEFS(va_qaif_dma_tx0,
 	DAILINK_COMP_ARRAY(COMP_CPU("CDC DMA VA0")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "va_macro_tx1")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "va_macro_tx1"),
+						COMP_CODEC("rouleur-codec", "rouleur_cdc")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("a000000.audio")));
 
 SND_SOC_DAILINK_DEFS(quin_qaif_mi2s_rx,
