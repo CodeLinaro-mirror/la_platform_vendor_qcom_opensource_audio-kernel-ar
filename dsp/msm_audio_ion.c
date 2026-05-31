@@ -32,6 +32,7 @@
 #include <linux/firmware/qcom/qcom_scm.h>
 #include <soc/qcom/secure_buffer.h>
 #include <linux/of.h>
+#include <linux/of_reserved_mem.h>
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(6, 13, 0))
 MODULE_IMPORT_NS("DMA_BUF");
@@ -842,6 +843,52 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	return ret;
 }
 
+static int __audio_mem_hyp_assign(struct device *dev, u64 *source_vms,
+					struct qcom_scm_vmperm  *dest_vms,
+					int dest_nelems)
+{
+	struct device_node *mem_node;
+	struct reserved_mem *rmem;
+
+	mem_node = of_parse_phandle(dev->of_node, "qcom,ddr-dma-memory-region", 0);
+	if (!mem_node) {
+		pr_err("%s: Could not parse memory region\n", __func__);
+		return -EINVAL;
+	}
+
+	rmem = of_reserved_mem_lookup(mem_node);
+	of_node_put(mem_node);
+	if (!rmem) {
+		pr_err("%s: Failed to get rmem\n", __func__);
+		return -EINVAL;
+	}
+
+	pr_debug("%s: hyp_assign_phys addr = 0x%llu size = %llu.\n", __func__,
+		 (unsigned long long)rmem->base, (unsigned long long)rmem->size);
+
+	return qcom_scm_assign_mem(rmem->base, rmem->size, source_vms, dest_vms, dest_nelems);
+
+}
+
+static int audio_mem_hyp_assign(struct device *dev)
+{
+	u64 src_vmid_map_list = BIT(VMID_HLOS);
+	struct qcom_scm_vmperm dest_vmid_map[] = {{VMID_MSS_MSA, PERM_READ|PERM_WRITE},
+		{VMID_LPASS, PERM_READ|PERM_WRITE}};
+	return __audio_mem_hyp_assign(dev, &src_vmid_map_list,
+					   dest_vmid_map, ARRAY_SIZE(dest_vmid_map));
+}
+
+static int audio_mem_hyp_unassign(struct device *dev)
+{
+	u64 src_vmid_map_list  = BIT(VMID_MSS_MSA) | BIT(VMID_LPASS);
+	struct qcom_scm_vmperm dest_vmid_map[] = {{VMID_HLOS, PERM_READ|PERM_WRITE}};
+
+	of_reserved_mem_device_release(dev);
+	return __audio_mem_hyp_assign(dev, &src_vmid_map_list,
+					   dest_vmid_map, ARRAY_SIZE(dest_vmid_map));
+}
+
 static const struct of_device_id msm_audio_ion_dt_match[] = {
 	{ .compatible = "qcom,msm-audio-ion" },
 	{ .compatible = "qcom,msm-audio-ion-cma"},
@@ -950,6 +997,14 @@ static int msm_audio_ion_probe(struct platform_device *pdev)
 	if (!smmu_enabled)
 		dev_dbg(dev, "%s: SMMU is Disabled\n", __func__);
 
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,use-ddr-for-dma")) {
+		rc = audio_mem_hyp_assign(dev);
+		if (rc) {
+			dev_err(dev, "%s: Hyp assign for ddr dma memory region failed, rc:%d\n", __func__, rc);
+			return rc;
+		}
+	}
+
 #ifndef CONFIG_SPF_CORE
 	q6_state = apr_get_q6_state();
 	if (q6_state == APR_SUBSYS_DOWN) {
@@ -1028,6 +1083,15 @@ static int msm_audio_ion_remove(struct platform_device *pdev)
 	ion_data->smmu_enabled = 0;
 	ion_data->device_status = 0;
 	msm_audio_ion_unreg_chrdev(ion_data);
+	int rc;
+
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,use-ddr-for-dma")) {
+		rc = audio_mem_hyp_unassign(&pdev->dev);
+		if (rc) {
+			dev_err(&pdev->dev, "%s: Hyp unassign for ddr dma memory region failed rc:%d\n", __func__, rc);
+		}
+	}
+
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
 #endif
