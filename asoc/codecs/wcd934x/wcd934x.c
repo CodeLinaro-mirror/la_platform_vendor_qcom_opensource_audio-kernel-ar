@@ -899,7 +899,7 @@ static int tavil_codec_enable_anc(struct snd_soc_dapm_widget *w,
 			snd_soc_dapm_to_component(w->dapm);
 	struct tavil_priv *tavil = snd_soc_component_get_drvdata(component);
 	const char *filename;
-	const struct firmware *fw;
+	const struct firmware *fw = NULL;
 	int i;
 	int ret = 0;
 	int num_anc_slots;
@@ -3151,7 +3151,7 @@ static int tavil_codec_config_mad(struct snd_soc_component *component)
 {
 	int ret = 0;
 	int idx;
-	const struct firmware *fw;
+	const struct firmware *fw = NULL;
 	struct firmware_cal *hwdep_cal = NULL;
 	struct wcd_mad_audio_cal *mad_cal = NULL;
 	const void *data;
