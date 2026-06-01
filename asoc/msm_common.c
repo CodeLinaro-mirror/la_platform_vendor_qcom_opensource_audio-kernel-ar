@@ -400,9 +400,9 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 {
 	int ret = 0;
 	int slot_width = TDM_SLOT_WIDTH_BITS;
-	int slots;
-	int sample_width;
-	unsigned int rate;
+	int slots = 0;
+	int sample_width = 0;
+	unsigned int rate = 0;
 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
 	const char *stream_name = rtd->dai_link->stream_name;
 	struct snd_soc_card *card = rtd->card;
