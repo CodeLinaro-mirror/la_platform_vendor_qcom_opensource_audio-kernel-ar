@@ -1723,9 +1723,10 @@ static int wcd9378_codec_enable_hphl_pa(struct snd_soc_dapm_widget *w,
 					SLV_BOLERO_EVT_RX_COMPANDER_SOFT_RST,
 					(WCD_RX1 << 0x10));
 
-		blocking_notifier_call_chain(&wcd9378->mbhc->notifier,
-					WCD_EVENT_POST_HPHL_PA_OFF,
-					&wcd9378->mbhc->wcd_mbhc);
+		if (wcd9378->mbhc)
+			blocking_notifier_call_chain(&wcd9378->mbhc->notifier,
+						WCD_EVENT_POST_HPHL_PA_OFF,
+						&wcd9378->mbhc->wcd_mbhc);
 		break;
 	default:
 		break;
@@ -1779,9 +1780,10 @@ static int wcd9378_codec_enable_hphr_pa(struct snd_soc_dapm_widget *w,
 					SLV_BOLERO_EVT_RX_COMPANDER_SOFT_RST,
 					(WCD_RX2 << 0x10));
 
-		blocking_notifier_call_chain(&wcd9378->mbhc->notifier,
-					WCD_EVENT_POST_HPHR_PA_OFF,
-					&wcd9378->mbhc->wcd_mbhc);
+		if (wcd9378->mbhc)
+			blocking_notifier_call_chain(&wcd9378->mbhc->notifier,
+						WCD_EVENT_POST_HPHR_PA_OFF,
+						&wcd9378->mbhc->wcd_mbhc);
 		break;
 	default:
 		break;
@@ -2424,7 +2426,7 @@ int wcd9378_micbias_control(struct snd_soc_component *component,
 						micb_usage_val);
 				wcd9378->curr_micbias2 = mb->micb2_mv;
 			}
-			if (post_on_event)
+			if (post_on_event && wcd9378->mbhc)
 				blocking_notifier_call_chain(
 						&wcd9378->mbhc->notifier,
 						post_on_event,
@@ -2595,6 +2597,11 @@ static int wcd9378_event_notify(struct notifier_block *block,
 			blocking_notifier_call_chain(&wcd9378->notifier,
 						WCD9378_EVT_SSR_DOWN,
 						NULL);
+		if (!wcd9378->mbhc) {
+			dev_err(component->dev, "%s: mbhc not initialized\n",
+				__func__);
+			break;
+		}
 		wcd9378->mbhc->wcd_mbhc.deinit_in_progress = true;
 		mbhc = &wcd9378->mbhc->wcd_mbhc;
 		wcd9378->usbc_hs_status = get_usbc_hs_status(component,
@@ -2619,6 +2626,11 @@ static int wcd9378_event_notify(struct notifier_block *block,
 		regcache_mark_dirty(wcd9378->regmap);
 		regcache_sync(wcd9378->regmap);
 		/* Initialize MBHC module */
+		if (!wcd9378->mbhc) {
+			dev_err(component->dev, "%s: mbhc not initialized\n",
+				__func__);
+			break;
+		}
 		mbhc = &wcd9378->mbhc->wcd_mbhc;
 		ret = wcd9378_mbhc_post_ssr_init(wcd9378->mbhc, component);
 		if (ret) {
@@ -4745,6 +4757,13 @@ static int wcd9378_remove(struct platform_device *pdev)
 	struct wcd9378_priv *wcd9378 = NULL;
 
 	wcd9378 = platform_get_drvdata(pdev);
+	if (!wcd9378) {
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
+		return 0;
+#else
+		return;
+#endif
+	}
 	component_master_del(&pdev->dev, &wcd9378_comp_ops);
 	mutex_destroy(&wcd9378->micb_lock);
 	mutex_destroy(&wcd9378->wakeup_lock);
