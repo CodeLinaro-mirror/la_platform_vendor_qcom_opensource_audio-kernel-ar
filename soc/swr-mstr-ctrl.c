@@ -1542,7 +1542,7 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->lane_ctrl = 0;
 	} else {
 		/* copy master port config to slave */
-		if (swrm->master_id == MASTER_ID_RX)
+		if (swrm->master_id == MASTER_ID_RX || swrm->master_id == MASTER_ID_WSA2)
 			port_req->sinterval = mport->sinterval;
 		else
 			port_req->sinterval =
