@@ -166,7 +166,7 @@ struct snd_lsm_lab_control {
 struct snd_lsm_event_status {
 	__u16 status;
 	__u16 payload_size;
-	__u8 payload[0];
+	__u8 payload[];
 };
 
 struct snd_lsm_event_status_v3 {
@@ -174,7 +174,7 @@ struct snd_lsm_event_status_v3 {
 	__u32 timestamp_msw;
 	__u16 status;
 	__u16 payload_size;
-	__u8 payload[0];
+	__u8 payload[];
 };
 
 struct snd_lsm_detection_params {
@@ -309,7 +309,7 @@ struct lsm_params_get_info {
 	__u32 param_size;
 	__u32 param_type;
 	__u16 stage_idx;
-	__u8 payload[0];
+	__u8 payload[];
 } __packed;
 
 #define SNDRV_LSM_DEREG_SND_MODEL _IOW('U', 0x01, int)
