@@ -375,7 +375,8 @@ SND_SOC_DAILINK_DEFS(quat_mi2s_tx,
 
 SND_SOC_DAILINK_DEFS(quin_mi2s_rx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("acm8625s.0-002c", "acm8625s-hifi")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-rx"),
+			   COMP_CODEC("acm8625s.0-002c", "acm8625s-hifi")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(quin_mi2s_tx,
