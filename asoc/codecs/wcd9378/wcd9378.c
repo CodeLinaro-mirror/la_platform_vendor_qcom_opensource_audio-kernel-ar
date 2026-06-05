@@ -1116,6 +1116,48 @@ static int wcd9378_sys_usage_bit_get(
 	return 0;
 }
 
+static bool wcd9378_is_adc_path_active(struct wcd9378_priv *wcd9378,
+					int adc_idx)
+{
+	switch (adc_idx) {
+	case 0:
+		return test_bit(TX0_AMIC1_EN, &wcd9378->sys_usage_status) ||
+		       test_bit(TX0_AMIC2_EN, &wcd9378->sys_usage_status);
+	case 1:
+		return test_bit(TX1_AMIC2_EN, &wcd9378->sys_usage_status) ||
+		       test_bit(TX1_AMIC3_EN, &wcd9378->sys_usage_status);
+	case 2:
+		return test_bit(TX2_AMIC1_EN, &wcd9378->sys_usage_status) ||
+		       test_bit(TX2_AMIC4_EN, &wcd9378->sys_usage_status);
+	default:
+		return false;
+	}
+}
+
+/*
+ * wcd9378_is_multi_mic_scenario - check if more than one TX ADC path is active
+ * @component: codec component handle
+ *
+ * Use sys_usage_status instead of MUX registers or status_mask. MUX settings
+ * can be stale after route changes, and status_mask bits are also used for
+ * transient sequencer state. sys_usage_status tracks the currently powered TX
+ * ADC paths and avoids false multi-mic detection for VA/headset single-mic
+ * cases.
+ */
+static bool wcd9378_is_multi_mic_scenario(struct snd_soc_component *component)
+{
+	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
+	int adc_count = 0;
+	int idx;
+
+	for (idx = 0; idx < 3; idx++) {
+		if (wcd9378_is_adc_path_active(wcd9378, idx))
+			adc_count++;
+	}
+
+	return adc_count > 1;
+}
+
 static int wcd9378_tx_sequencer_enable(struct snd_soc_dapm_widget *w,
 			       struct snd_kcontrol *kcontrol, int event)
 {
@@ -1146,6 +1188,76 @@ static int wcd9378_tx_sequencer_enable(struct snd_soc_dapm_widget *w,
 		}
 
 		rate = wcd9378_get_clk_rate(wcd9378->tx_mode[w->shift - ADC1]);
+		/*
+		 * In a multi-mic scenario, ensure the SWR bus clock is at least
+		 * 9.6MHz when the first ADC sequencer is enabled. This prevents
+		 * a mid-stream clock rate change (e.g. 4.8MHz -> 9.6MHz when the
+		 * second ADC starts in ADC_LP mode) that can intermittently mute
+		 * a channel. Single-mic ADC_LP recordings are unaffected and
+		 * continue to use 4.8MHz.
+		 */
+		if (rate < SWR_CLK_RATE_9P6MHZ &&
+				wcd9378_is_multi_mic_scenario(component)) {
+			int _idx;
+
+			dev_dbg(component->dev,
+				"%s: multi-mic scenario, upgrading SWR clk rate to 9.6MHz\n",
+				__func__);
+			rate = SWR_CLK_RATE_9P6MHZ;
+			/*
+			 * If another ADC path is already active at a lower
+			 * clock rate, reconnect it at 9.6MHz now. This
+			 * prevents a mid-stream bus clock change when the
+			 * current ADC connects at 9.6MHz.
+			 */
+			for (_idx = 0; _idx < 3; _idx++) {
+				int _adc_shift = ADC1 + _idx;
+
+				if (_adc_shift == w->shift)
+					continue;
+				if (!wcd9378_is_adc_path_active(wcd9378, _idx))
+					continue;
+				if (wcd9378_get_clk_rate(wcd9378->tx_mode[_idx]) >=
+						SWR_CLK_RATE_9P6MHZ)
+					continue;
+				dev_dbg(component->dev,
+					"%s: reconnecting active ADC at 9.6MHz to avoid bus clk change\n",
+					__func__);
+				wcd9378_tx_connect_port(component, _adc_shift,
+							0, false);
+				/*
+				 * If ADC2 had MBHC connected at 4.8MHz, also
+				 * disconnect it before the datapath disable so
+				 * all ports are consistent.
+				 */
+				if (_adc_shift == ADC2 &&
+				    test_bit(AMIC2_BCS_ENABLE,
+					     &wcd9378->status_mask))
+					wcd9378_tx_connect_port(component, MBHC,
+								0, false);
+				/*
+				 * Apply the disconnect now so the SWR bus clock
+				 * change (4.8MHz -> 9.6MHz, ssp_period 3->6)
+				 * happens here — while no active channel is
+				 * running — rather than later when ADC1 is being
+				 * initialized. This is the key step that prevents
+				 * the mid-stream clock change from muting ch2.
+				 */
+				swr_slvdev_datapath_control(
+						wcd9378->tx_swr_dev,
+						wcd9378->tx_swr_dev->dev_num,
+						false);
+				wcd9378_tx_connect_port(component, _adc_shift,
+							SWR_CLK_RATE_9P6MHZ,
+							true);
+				if (_adc_shift == ADC2 &&
+				    test_bit(AMIC2_BCS_ENABLE,
+					     &wcd9378->status_mask))
+					wcd9378_tx_connect_port(component, MBHC,
+								SWR_CLK_RATE_9P6MHZ,
+								true);
+			}
+		}
 		if (w->shift == ADC2 && ((snd_soc_component_read(component,
 				WCD9378_TX_NEW_TX_CH12_MUX) &
 				WCD9378_TX_NEW_TX_CH12_MUX_CH2_SEL_MASK) == 0x10)) {
