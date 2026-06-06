@@ -20,11 +20,12 @@
 
 #define DRV_NAME "qaif-platform"
 
-#define QAIF_PLATFORM_BUFFER_MIN_SIZE		(960 * 2 * 2)   // 20 ms @ 48kHz S16 stereo = 3840 bytes
-#define QAIF_PLATFORM_PERIOD_BYTES_MIN		(960 * 2 * 2)   // min period = 960 frames @ S16 stereo = 3840 bytes
-#define QAIF_PLATFORM_BUFFER_SIZE			(4 * QAIF_PLATFORM_BUFFER_MIN_SIZE)  // 80 ms = 15360 bytes
-#define QAIF_PLATFORM_PERIODS_MIN			2
-#define QAIF_PLATFORM_PERIODS_MAX			4   // 4 × 3840 = 15360 = buffer_bytes_max
+/* period: 5ms @ 48kHz/S16/1ch min, 40ms @ 48kHz/S16/4ch max */
+#define QAIF_PLATFORM_PERIOD_BYTES_MIN		(48 * 5  * 1 * 2)	/* 480 B */
+#define QAIF_PLATFORM_PERIOD_BYTES_MAX		(48 * 40 * 4 * 2)	/* 15360 B */
+#define QAIF_PLATFORM_PERIODS_MIN		2
+#define QAIF_PLATFORM_PERIODS_MAX		4
+#define QAIF_PLATFORM_BUFFER_BYTES_MAX		(QAIF_PLATFORM_PERIODS_MIN * QAIF_PLATFORM_PERIOD_BYTES_MAX)	/* 30720 B */
 
 #define QAIF_SMMU_SID_OFFSET				32
 
@@ -48,9 +49,9 @@ static const struct snd_pcm_hardware qaif_platform_aif_hardware = {
 	.rate_max		=	192000,
 	.channels_min		=	1,
 	.channels_max		=	8,
-	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE,
+	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_BYTES_MAX,
 	.period_bytes_min	=	QAIF_PLATFORM_PERIOD_BYTES_MIN,
-	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE / QAIF_PLATFORM_PERIODS_MIN,
+	.period_bytes_max	=	QAIF_PLATFORM_PERIOD_BYTES_MAX,
 	.periods_min		=	QAIF_PLATFORM_PERIODS_MIN,
 	.periods_max		=	QAIF_PLATFORM_PERIODS_MAX,
 	.fifo_size		=	0,
@@ -70,9 +71,9 @@ static const struct snd_pcm_hardware qaif_platform_cif_hardware = {
 	.rate_max		=	192000,
 	.channels_min		=	1,
 	.channels_max		=	8,
-	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE,
+	.buffer_bytes_max	=	QAIF_PLATFORM_BUFFER_BYTES_MAX,
 	.period_bytes_min	=	QAIF_PLATFORM_PERIOD_BYTES_MIN,
-	.period_bytes_max	=	QAIF_PLATFORM_BUFFER_SIZE / QAIF_PLATFORM_PERIODS_MIN,
+	.period_bytes_max	=	QAIF_PLATFORM_PERIOD_BYTES_MAX,
 	.periods_min		=	QAIF_PLATFORM_PERIODS_MIN,
 	.periods_max		=	QAIF_PLATFORM_PERIODS_MAX,
 	.fifo_size		=	0,
