@@ -35,6 +35,7 @@
 #define SWR_NAME	"swr-mgr"
 
 #define SWR_MSTR_PORT_LEN	13 /* Number of master ports */
+#define SWR_MSTR_PORT_LEN_LEGACY	8 /* Number of master ports */
 
 #define SWRM_VERSION_1_0 0x01010000
 #define SWRM_VERSION_1_2 0x01030000
@@ -173,6 +174,8 @@ struct swr_mstr_ctrl {
 	struct notifier_block event_notifier;
 	struct work_struct dc_presence_work;
 	u8 num_ports;
+	u8 ports_cnt;
+	u32 legacy_ports_en;
 	struct swrm_port_type
 			port_mapping[SWR_MSTR_PORT_LEN + 1][SWR_MAX_CH_PER_PORT];
 	int swr_irq;
