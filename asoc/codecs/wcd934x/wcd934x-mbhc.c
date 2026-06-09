@@ -1060,10 +1060,6 @@ int tavil_mbhc_post_ssr_init(struct wcd934x_mbhc *mbhc,
 		return -EINVAL;
 
 	wcd_mbhc = &mbhc->wcd_mbhc;
-	if (wcd_mbhc == NULL) {
-		pr_err("%s: wcd_mbhc is NULL\n", __func__);
-		return -EINVAL;
-	}
 
 	tavil_mbhc_hs_detect_exit(component);
 	wcd_mbhc_deinit(wcd_mbhc);
@@ -1113,11 +1109,6 @@ int tavil_mbhc_init(struct wcd934x_mbhc **mbhc,
 	wcd934x_mbhc->fw_data = fw_data;
 	BLOCKING_INIT_NOTIFIER_HEAD(&wcd934x_mbhc->notifier);
 	wcd_mbhc = &wcd934x_mbhc->wcd_mbhc;
-	if (wcd_mbhc == NULL) {
-		pr_err("%s: wcd_mbhc is NULL\n", __func__);
-		ret = -EINVAL;
-		goto err;
-	}
 
 
 	/* Setting default mbhc detection logic to ADC for Tavil */

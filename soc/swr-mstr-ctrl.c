@@ -1528,10 +1528,6 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 	} else if (swrm->master_id == MASTER_ID_BT) {
 		port_req->sinterval =
 				((swrm->bus_clk * 2) / port_req->ch_rate) - 1;
-		if (mport->dir == 0)
-			port_req->offset1 = 0;
-		else
-			port_req->offset1 = 0x14;
 		port_req->offset2 = 0x00;
 		port_req->hstart = 1;
 		port_req->hstop = 0xF;
@@ -1546,7 +1542,7 @@ static void swrm_get_device_frame_shape(struct swr_mstr_ctrl *swrm,
 		port_req->lane_ctrl = 0;
 	} else {
 		/* copy master port config to slave */
-		if (swrm->master_id == MASTER_ID_RX)
+		if (swrm->master_id == MASTER_ID_RX || swrm->master_id == MASTER_ID_WSA2)
 			port_req->sinterval = mport->sinterval;
 		else
 			port_req->sinterval =
@@ -3422,8 +3418,8 @@ static int swrm_probe(struct platform_device *pdev)
 
 		if (swrm->master_id == MASTER_ID_TX || swrm->master_id == MASTER_ID_BT) {
 			swrm->mport_cfg[i].sinterval = 0xFFFF;
-			if (swrm->master_id == MASTER_ID_BT && i > 3)
-				swrm->mport_cfg[i].offset1 = 0x14;
+			if (swrm->master_id == MASTER_ID_BT)
+				swrm->mport_cfg[i].offset1 = i * 0x14;
 			else
 				swrm->mport_cfg[i].offset1 = 0x00;
 			swrm->mport_cfg[i].offset2 = 0x00;
@@ -4040,29 +4036,28 @@ static int swrm_device_down(struct device *dev)
 int swrm_register_wake_irq(struct swr_mstr_ctrl *swrm)
 {
 	int ret = 0;
-	int irq, dir_apps_irq;
+	int irq;
 
 	if (!swrm->ipc_wakeup) {
 		irq = of_get_named_gpio(swrm->dev->of_node,
 					"qcom,swr-wakeup-irq", 0);
 		if (gpio_is_valid(irq)) {
-			swrm->wake_irq = gpio_to_irq(irq);
-			if (swrm->wake_irq < 0) {
-				dev_err_ratelimited(swrm->dev,
+			irq = gpio_to_irq(irq);
+			if (irq < 0) {
+				dev_err(swrm->dev,
 					"Unable to configure irq\n");
-				return swrm->wake_irq;
+				return irq;
 			}
 		} else {
-			dir_apps_irq = platform_get_irq_byname(swrm->pdev,
+			irq = platform_get_irq_byname(swrm->pdev,
 							"swr_wake_irq");
-			if (dir_apps_irq < 0) {
-				dev_err_ratelimited(swrm->dev,
+			if (irq < 0) {
+				dev_err(swrm->dev,
 					"TLMM connect gpio not found\n");
 				return -EINVAL;
 			}
-			swrm->wake_irq = dir_apps_irq;
 		}
-		ret = request_threaded_irq(swrm->wake_irq, NULL,
+		ret = request_threaded_irq(irq, NULL,
 					   swrm_wakeup_interrupt,
 					   IRQF_TRIGGER_HIGH | IRQF_ONESHOT,
 					   "swr_wake_irq", swrm);
@@ -4071,7 +4066,8 @@ int swrm_register_wake_irq(struct swr_mstr_ctrl *swrm)
 				__func__, ret);
 			return -EINVAL;
 		}
-		irq_set_irq_wake(swrm->wake_irq, 1);
+		irq_set_irq_wake(irq, 1);
+		swrm->wake_irq = irq;
 	}
 	return ret;
 }
