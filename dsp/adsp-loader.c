@@ -17,6 +17,7 @@
 #include <linux/workqueue.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/slab.h>
+#include <linux/math64.h>
 #include <linux/mutex.h>
 #include <linux/notifier.h>
 #include <linux/timekeeping.h>
@@ -229,10 +230,14 @@ static ssize_t adsp_ssr_store(struct kobject *kobj,
 	time_diff_ns = timestamp - last_adsp_power_up_ts;
 	if (rproc_state == RPROC_ADSP_BOOT_UP &&
 			time_diff_ns < 30 * NSEC_PER_SEC_ULL) {
+		u64 ts_sec, ts_nsec_frac, time_remaining_s;
+
+		ts_sec = div64_u64_rem(last_adsp_power_up_ts,
+				       NSEC_PER_SEC_ULL, &ts_nsec_frac);
+		time_remaining_s = div64_u64(30 * NSEC_PER_SEC_ULL - time_diff_ns,
+					     NSEC_PER_SEC_ULL);
 		dev_err(&pdev->dev, "ssr happened at %llu.%llu, ignore this request %llu s\n",
-		last_adsp_power_up_ts / NSEC_PER_SEC_ULL,
-		last_adsp_power_up_ts % NSEC_PER_SEC_ULL,
-		(30 * NSEC_PER_SEC_ULL - time_diff_ns) / NSEC_PER_SEC_ULL);
+		ts_sec, ts_nsec_frac, time_remaining_s);
 		mutex_unlock(&dsp_status_lock);
 		return -EAGAIN;
 	}
