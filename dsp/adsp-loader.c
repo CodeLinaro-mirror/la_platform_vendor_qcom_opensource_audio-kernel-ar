@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2012-2014, 2017-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022, 2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/init.h>
@@ -17,6 +17,10 @@
 #include <linux/workqueue.h>
 #include <linux/nvmem-consumer.h>
 #include <linux/slab.h>
+#include <linux/math64.h>
+#include <linux/mutex.h>
+#include <linux/notifier.h>
+#include <linux/timekeeping.h>
 #include <linux/remoteproc.h>
 #include <linux/remoteproc/qcom_rproc.h>
 
@@ -27,12 +31,30 @@
 #define IMAGE_UNLOAD_CMD 0
 #define MAX_FW_IMAGES 4
 #define ADSP_LOADER_APM_TIMEOUT_MS 10000
+#define NSEC_PER_SEC_ULL 1000000000ULL
 
 enum spf_subsys_state {
 	SPF_SUBSYS_DOWN,
 	SPF_SUBSYS_UP,
 	SPF_SUBSYS_LOADED,
 	SPF_SUBSYS_UNKNOWN,
+};
+
+enum adsp_ssr_state {
+	RPROC_ADSP_BOOT_IN_PROGRESS,
+	RPROC_ADSP_BOOT_UP,
+	RPROC_ADSP_SHUTDOWN_IN_PROGRESS,
+	RPROC_ADSP_SHUTDOWN_FINISH,
+	RPROC_ADSP_NULL,
+	RPROC_ADSP_MAX,
+};
+
+static char *rproc_state_string[RPROC_ADSP_MAX] = {
+	"booting",
+	"up",
+	"shutting down",
+	"down",
+	"default",
 };
 
 static ssize_t adsp_boot_store(struct kobject *kobj,
@@ -48,6 +70,9 @@ struct adsp_loader_private {
 	struct kobject *boot_adsp_obj;
 	struct attribute_group *attr_group;
 	char *adsp_fw_name;
+	bool ssr_triggered;
+	struct notifier_block ssr_nb;
+	void *ssr_notif_hdl;
 };
 
 static struct kobj_attribute adsp_boot_attribute =
@@ -65,7 +90,10 @@ static struct attribute *attrs[] = {
 static struct work_struct adsp_ldr_work;
 static struct platform_device *adsp_private;
 static void adsp_loader_unload(struct platform_device *pdev);
+static u64 last_adsp_power_up_ts;
+static DEFINE_MUTEX(dsp_status_lock);
 
+static enum adsp_ssr_state rproc_state = RPROC_ADSP_NULL;
 
 static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 {
@@ -97,12 +125,35 @@ static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 	if (rc) {
 		dev_err(&pdev->dev,
 			"%s: ADSP state = %x\n", __func__, adsp_state);
+	}
+
+	if (priv->ssr_triggered) {
+		priv->ssr_triggered = false;
+		if (rc)
+			adsp_state = SPF_SUBSYS_DOWN;
+	} else if (rc) {
+		dev_err(&pdev->dev,
+			"%s: failed to read adsp state\n", __func__);
 		goto fail;
 	}
 
 	{
 		adsp_state = spf_core_is_apm_ready(ADSP_LOADER_APM_TIMEOUT_MS);
 		if (adsp_state == SPF_SUBSYS_DOWN) {
+			if (!priv->adsp_fw_name) {
+				dev_info(&pdev->dev, "%s: Load default ADSP\n",
+					__func__);
+			} else {
+				dev_info(&pdev->dev, "%s: Load ADSP with fw name %s\n",
+					__func__, priv->adsp_fw_name);
+				rc = rproc_set_firmware(priv->pil_h,
+					priv->adsp_fw_name);
+				if (rc) {
+					dev_err(&pdev->dev, "%s: rproc set firmware failed,\n",
+						__func__);
+					goto fail;
+				}
+			}
 			rc = rproc_boot(priv->pil_h);
 			if (rc) {
 				dev_err(&pdev->dev, "%s: pil get failed,\n",
@@ -110,8 +161,8 @@ static void adsp_load_fw(struct work_struct *adsp_ldr_work)
 				goto fail;
 			}
 		} else if (adsp_state == SPF_SUBSYS_LOADED) {
-		dev_dbg(&pdev->dev,
-			"%s: ADSP state = %x\n", __func__, adsp_state);
+			dev_dbg(&pdev->dev,
+				"%s: ADSP state = %x\n", __func__, adsp_state);
 		}
 
 		dev_dbg(&pdev->dev, "%s: Q6/ADSP image is loaded\n", __func__);
@@ -136,6 +187,8 @@ static ssize_t adsp_ssr_store(struct kobject *kobj,
 	struct rproc *adsp_dev = NULL;
 	struct platform_device *pdev = adsp_private;
 	struct adsp_loader_private *priv = NULL;
+	u64 timestamp = 0;
+	u64 time_diff_ns = 0;
 
 	dev_dbg(&pdev->dev, "%s: going to call adsp ssr\n ", __func__);
 
@@ -153,12 +206,48 @@ static ssize_t adsp_ssr_store(struct kobject *kobj,
 	if (!adsp_dev)
 		return -EINVAL;
 
-	dev_err(&pdev->dev, "requesting for ADSP restart\n");
+	dev_dbg(&pdev->dev, "requesting for ADSP restart\n");
 
+	if (!mutex_trylock(&dsp_status_lock)) {
+		dev_err(&pdev->dev, "status_lock is hold, SSR ongoing, ignore this request\n");
+		return -EAGAIN;
+	}
+
+	if (rproc_state != RPROC_ADSP_BOOT_UP && rproc_state != RPROC_ADSP_NULL) {
+		dev_err(&pdev->dev, "adsp state already changed[%s], ignore this request\n",
+					rproc_state_string[rproc_state]);
+		mutex_unlock(&dsp_status_lock);
+		return -EAGAIN;
+	}
+
+	timestamp = ktime_get_ns();
+	if (timestamp < last_adsp_power_up_ts) {
+		/* this should not happen, just assure code robust */
+		mutex_unlock(&dsp_status_lock);
+		return -EAGAIN;
+	}
+
+	time_diff_ns = timestamp - last_adsp_power_up_ts;
+	if (rproc_state == RPROC_ADSP_BOOT_UP &&
+			time_diff_ns < 30 * NSEC_PER_SEC_ULL) {
+		u64 ts_sec, ts_nsec_frac, time_remaining_s;
+
+		ts_sec = div64_u64_rem(last_adsp_power_up_ts,
+				       NSEC_PER_SEC_ULL, &ts_nsec_frac);
+		time_remaining_s = div64_u64(30 * NSEC_PER_SEC_ULL - time_diff_ns,
+					     NSEC_PER_SEC_ULL);
+		dev_err(&pdev->dev, "ssr happened at %llu.%llu, ignore this request %llu s\n",
+		ts_sec, ts_nsec_frac, time_remaining_s);
+		mutex_unlock(&dsp_status_lock);
+		return -EAGAIN;
+	}
+	mutex_unlock(&dsp_status_lock);
+	priv->ssr_triggered = true;
 	rproc_shutdown(adsp_dev);
+
 	adsp_loader_do(adsp_private);
 
-	dev_dbg(&pdev->dev, "%s :: ADSP restarted\n", __func__);
+	dev_info(&pdev->dev, "%s :: ADSP restarted\n", __func__);
 	return count;
 }
 
@@ -214,6 +303,7 @@ static int adsp_loader_init_sysfs(struct platform_device *pdev)
 
 	priv->pil_h = NULL;
 	priv->boot_adsp_obj = NULL;
+	priv->ssr_triggered = false;
 	priv->attr_group = devm_kzalloc(&pdev->dev,
 				sizeof(*(priv->attr_group)),
 				GFP_KERNEL);
@@ -262,6 +352,9 @@ static int adsp_loader_remove(struct platform_device *pdev)
 	if (!priv)
 		return 0;
 
+	if (!IS_ERR_OR_NULL(priv->ssr_notif_hdl))
+		qcom_unregister_ssr_notifier(priv->ssr_notif_hdl, &priv->ssr_nb);
+
 	if (priv->pil_h) {
 		rproc_shutdown(priv->pil_h);
 		priv->pil_h = NULL;
@@ -274,6 +367,36 @@ static int adsp_loader_remove(struct platform_device *pdev)
 	}
 
 	return 0;
+}
+
+static int audio_notifier_ssr_adsp_cb(struct notifier_block *this,
+				unsigned long opcode, void *data)
+{
+	mutex_lock(&dsp_status_lock);
+	switch (opcode) {
+	case QCOM_SSR_BEFORE_SHUTDOWN:
+		rproc_state = RPROC_ADSP_SHUTDOWN_IN_PROGRESS;
+		break;
+	case QCOM_SSR_AFTER_SHUTDOWN:
+		rproc_state = RPROC_ADSP_SHUTDOWN_FINISH;
+		break;
+	case QCOM_SSR_BEFORE_POWERUP:
+		rproc_state = RPROC_ADSP_BOOT_IN_PROGRESS;
+		break;
+	case QCOM_SSR_AFTER_POWERUP:
+		rproc_state = RPROC_ADSP_BOOT_UP;
+		last_adsp_power_up_ts = ktime_get_ns();
+		break;
+	default:
+		rproc_state = RPROC_ADSP_NULL;
+		break;
+	}
+	mutex_unlock(&dsp_status_lock);
+
+	pr_debug("[%s]opcode[%lu] rproc_state:%s\n", __func__, opcode,
+						rproc_state_string[rproc_state]);
+
+	return NOTIFY_DONE;
 }
 
 static int adsp_loader_probe(struct platform_device *pdev)
@@ -375,6 +498,8 @@ static int adsp_loader_probe(struct platform_device *pdev)
 		goto wqueue;
 	}
 	memcpy(&adsp_var_idx, buf, len);
+	dev_info(&pdev->dev, "%s: adsp variant fuse reg value: 0x%x\n",
+		__func__, adsp_var_idx);
 	kfree(buf);
 
 	/* Get count of fw images */
@@ -432,6 +557,13 @@ static int adsp_loader_probe(struct platform_device *pdev)
 		}
 	}
 wqueue:
+	priv->ssr_nb.notifier_call = audio_notifier_ssr_adsp_cb;
+	priv->ssr_notif_hdl = qcom_register_ssr_notifier("lpass", &priv->ssr_nb);
+	if (IS_ERR_OR_NULL(priv->ssr_notif_hdl)) {
+		dev_err(&pdev->dev, "%s: Failed to register SSR notifier\n", __func__);
+		priv->ssr_notif_hdl = NULL;
+	}
+
 	INIT_WORK(&adsp_ldr_work, adsp_load_fw);
 	if (adsp_fw_bit_values)
 		devm_kfree(&pdev->dev, adsp_fw_bit_values);
