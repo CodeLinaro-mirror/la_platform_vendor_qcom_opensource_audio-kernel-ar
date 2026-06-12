@@ -87,8 +87,8 @@ static const struct snd_pcm_hardware dummy_dma_hardware = {
 	.info               = SNDRV_PCM_INFO_INTERLEAVED |
 					SNDRV_PCM_INFO_BLOCK_TRANSFER,
 	.buffer_bytes_max   = 128*1024,
-	.period_bytes_min   = PCM_HW_PAGE_SIZE,
-	.period_bytes_max   = PCM_HW_PAGE_SIZE*2,
+	.period_bytes_min   = 1,
+	.period_bytes_max   = 128*1024,
 	.periods_min        = 2,
 	.periods_max        = 128,
 };
