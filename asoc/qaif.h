@@ -24,6 +24,7 @@
 #define MI2S_SENARY				5
 #define MI2S_SEPTENARY			35
 
+#define QAIF_DMA_CLOCK_FREQ 			38400000
 #define SMMU_SID_OFFSET				32
 #define LPASS_MAX_MI2S_PORTS			(8)
 #define LPASS_MAX_AIF_DMA_IDX			(8)
