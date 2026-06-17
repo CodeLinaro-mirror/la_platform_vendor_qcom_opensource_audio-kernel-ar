@@ -1369,7 +1369,6 @@ static int wsa881x_probe(struct snd_soc_component *component)
 	char w_name[MAX_NAME_LEN];
 	struct snd_soc_dapm_context *dapm =
                         snd_soc_component_get_dapm(component);
-
 	if (!wsa881x)
 		return -EINVAL;
 	snd_soc_component_init_regmap(component, wsa881x->regmap);
@@ -1551,7 +1550,6 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 	char buffer[MAX_NAME_LEN];
 	const char *wsa881x_name_prefix_of = NULL;
 	struct wsa_ctrl_platform_data *plat_data = NULL;
-
 	wsa881x = devm_kzalloc(&pdev->dev, sizeof(struct wsa881x_priv),
 			    GFP_KERNEL);
 	if (!wsa881x)
@@ -1738,7 +1736,6 @@ static int wsa881x_swr_probe(struct swr_device *pdev)
 
 	mutex_init(&wsa881x->res_lock);
 	mutex_init(&wsa881x->temp_lock);
-
 	return 0;
 err_mem:
 	kfree(wsa881x->wsa881x_name_prefix);

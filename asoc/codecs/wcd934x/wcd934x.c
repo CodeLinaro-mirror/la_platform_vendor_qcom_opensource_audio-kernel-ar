@@ -1978,13 +1978,15 @@ static int tavil_codec_enable_tx(struct snd_soc_dapm_widget *w,
 					      dai->direction);
 		break;
 	case SND_SOC_DAPM_POST_PMD:
-		if (!dai->bus_down_in_recovery)
-			ret = tavil_codec_enable_slim_chmask(dai, false);
+		ret = wcd9xxx_disconnect_port_tx(core);
 		if (ret < 0) {
-                      ret = wcd9xxx_disconnect_port_tx(core);			
-                      dev_dbg(component->dev, "%s: Disconnect TX port, ret = %d\n",
-				 __func__, ret);
+			dev_err(component->dev, "%s: Disconnect TX port, ret = %d\n", __func__, ret);
 		}
+                if (!dai->bus_down_in_recovery)
+                        ret = tavil_codec_enable_slim_chmask(dai, false);
+                else
+                        dev_err(component->dev, "%s: bus in recovery skip enable slim_chmask",__func__);
+
 		break;
 	}
 	return ret;
@@ -4867,7 +4869,7 @@ static u8 tavil_get_dmic_clk_val(struct snd_soc_component *component,
 	u32 div_factor;
 	u8 dmic_ctl_val;
 
-	dev_err(component->dev,
+	dev_dbg(component->dev,
 		"%s: mclk_rate = %d, dmic_sample_rate = %d\n",
 		__func__, mclk_rate, dmic_clk_rate);
 
@@ -10530,7 +10532,6 @@ static int tavil_soc_codec_probe(struct snd_soc_component *component)
 			snd_soc_component_get_dapm(component);
 	int i, ret;
 	void *ptr = NULL;
-
 	control = dev_get_drvdata(component->dev->parent);
 
 	snd_soc_component_init_regmap(component, control->regmap);
@@ -11351,7 +11352,6 @@ static int tavil_probe(struct platform_device *pdev)
 	struct wcd9xxx_resmgr_v2 *resmgr;
 	struct wcd9xxx_power_region *cdc_pwr;
 	const __be32 *micb_prop;
-
 	tavil = devm_kzalloc(&pdev->dev, sizeof(struct tavil_priv),
 			    GFP_KERNEL);
 	if (!tavil)
@@ -11498,7 +11498,6 @@ static int tavil_probe(struct platform_device *pdev)
 			dev_dbg(tavil->dev, "%s micb load get failed\n",
 				__func__);
 	}
-
 	return ret;
 
 err_cdc_reg:

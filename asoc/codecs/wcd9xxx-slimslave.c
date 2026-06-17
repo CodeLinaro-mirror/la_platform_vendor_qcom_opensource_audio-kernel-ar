@@ -165,8 +165,8 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 				__func__, codec_port, ret);
 		}
 	}
-
 	wcd9xxx->sruntime_rx = slim_stream_allocate(wcd9xxx->slim, "WCD9xxx-SLIM-RX");
+
 	if (wcd9xxx->sruntime_rx == NULL) {
 		pr_err("%s: Failed to allocate slimbus stream\n",
 				__func__);
@@ -176,19 +176,18 @@ int wcd9xxx_cfg_slim_sch_rx(struct wcd9xxx *wcd9xxx,
 
 	/* slim_control_ch */
 	ret = slim_stream_prepare(wcd9xxx->sruntime_rx, &sconfig_rx);
+
 	if (ret < 0) {
 	    pr_err("%s: Failed to prepare slimbus stream, ret %d\n",
 			__func__, ret);
 		goto err_close_slim_sch;
 	}
-
 	ret = slim_stream_enable(wcd9xxx->sruntime_rx);
 	if (ret < 0) {
 		pr_err("%s: Failed to enable slimbus stream, ret %d\n",
 			__func__, ret);
 		goto err_close_slim_sch;
 	}
-
 	return 0;
 
 err_close_slim_sch:
@@ -307,7 +306,6 @@ int wcd9xxx_get_slave_port(unsigned int ch_num)
 	int ret = 0;
 
 	ret = (ch_num - BASE_CH_NUM);
-	pr_err("%s: ch_num[%d] slave port[%d]\n", __func__, ch_num, ret);
 	if (ret < 0) {
 		pr_err("%s: Error:- Invalid slave port found = %d\n",
 			__func__, ret);
@@ -320,23 +318,26 @@ EXPORT_SYMBOL(wcd9xxx_get_slave_port);
 int wcd9xxx_disconnect_port_tx(struct wcd9xxx *wcd9xxx)
 {
 	int ret = 0;
-
+	mutex_lock(&wcd9xxx->stream_lock);
 	if (wcd9xxx->sruntime_tx == NULL) {
 		pr_err("%s: sruntime_tx is NULL", __func__);
+		mutex_unlock(&wcd9xxx->stream_lock);
 		return -EINVAL;
 	}
 
 	/* free the ports allocated to the stream */
 	ret = slim_stream_disable(wcd9xxx->sruntime_tx);
-	if (ret != 0)
-		pr_err("%s: Failed to disable slimbus stream, ret %d\n", __func__, ret);
 
+	if (ret != 0) {
+		pr_err("%s: Failed to disable slimbus stream, ret %d\n", __func__, ret);
+	}
 	ret = slim_stream_unprepare_disconnect_port(wcd9xxx->sruntime_tx, true, true);
 	if (ret != 0)
 		pr_err("%s: Failed to disconnect slimbus stream, ret %d\n", __func__, ret);
 
 	slim_stream_free(wcd9xxx->sruntime_tx);
 	wcd9xxx->sruntime_tx = NULL;
+	mutex_unlock(&wcd9xxx->stream_lock);
 	return ret;
 }
 EXPORT_SYMBOL(wcd9xxx_disconnect_port_tx);
@@ -344,8 +345,10 @@ EXPORT_SYMBOL(wcd9xxx_disconnect_port_tx);
 int wcd9xxx_disconnect_port_rx(struct wcd9xxx *wcd9xxx)
 {
 	int ret = 0;
+	mutex_lock(&wcd9xxx->stream_lock);
 	if (wcd9xxx->sruntime_rx == NULL) {
 		pr_err("%s: sruntime_rx is NULL", __func__);
+		mutex_unlock(&wcd9xxx->stream_lock);
 		return -EINVAL;
 	}
 
@@ -360,7 +363,7 @@ int wcd9xxx_disconnect_port_rx(struct wcd9xxx *wcd9xxx)
 
 	slim_stream_free(wcd9xxx->sruntime_rx);
 	wcd9xxx->sruntime_rx = NULL;
-
+	mutex_unlock(&wcd9xxx->stream_lock);
 	return ret;
 }
 EXPORT_SYMBOL(wcd9xxx_disconnect_port_rx);
@@ -375,7 +378,7 @@ int wcd9xxx_rx_vport_validation(u32 port_id,
 	pr_debug("%s: port_id %u\n", __func__, port_id);
 	list_for_each_entry(ch,
 		codec_dai_list, list) {
-		pr_err("%s: ch->port %u\n", __func__, ch->port);
+		pr_debug("%s: ch->port %u\n", __func__, ch->port);
 		if (ch->port == port_id) {
 			ret = -EINVAL;
 			break;
@@ -430,15 +433,24 @@ EXPORT_SYMBOL(wcd9xxx_tx_vport_validation);
 int wcd9xxx_deinit_slimslave(struct wcd9xxx *wcd9xxx)
 {
 	int ret = 0;
-
+	mutex_lock(&wcd9xxx->stream_lock);
 	if (wcd9xxx->sruntime_tx) {
+		ret = slim_stream_disable(wcd9xxx->sruntime_tx);
+		if (ret)
+			pr_err("%s: Failed to disable TX stream, ret %d\n",__func__, ret);
+
 		ret = slim_stream_free(wcd9xxx->sruntime_tx);
 		wcd9xxx->sruntime_tx = NULL;
 	}
 
 	if (wcd9xxx->sruntime_rx) {
+		ret = slim_stream_disable(wcd9xxx->sruntime_rx);
+		if (ret)
+			pr_err("%s: Failed to disable RX stream, ret %d\n",__func__, ret);
+	
 		ret = slim_stream_free(wcd9xxx->sruntime_rx);
 		wcd9xxx->sruntime_rx = NULL;
 	}
+	mutex_unlock(&wcd9xxx->stream_lock);
 	return ret;
 }
