@@ -42,6 +42,10 @@
 #include "codecs/wsa883x/wsa883x.h"
 #include "codecs/wcd939x/wcd939x.h"
 #include "codecs/wcd9378/wcd9378.h"
+#if IS_ENABLED(CONFIG_SND_SOC_ROULEUR)
+#include "codecs/rouleur/rouleur.h"
+#include "codecs/rouleur/rouleur-mbhc.h"
+#endif
 #include "codecs/lpass-cdc/lpass-cdc.h"
 #include <bindings/audio-codec-port-types.h>
 #include "codecs/lpass-cdc/lpass-cdc-wsa-macro.h"
@@ -74,6 +78,7 @@ enum {
 	WCD938X_DEV_INDEX,
 	WCD939X_DEV_INDEX,
 	WCD9378_DEV_INDEX,
+	ROULEAR_DEV_INDEX
 };
 
 struct msm_asoc_mach_data {
@@ -1871,6 +1876,10 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 		strscpy(wcd_name, WCD9378_DRV_NAME, sizeof(WCD9378_DRV_NAME));
 	else if (pdata->wcd_used == WCD938X_DEV_INDEX)
 		strscpy(wcd_name, WCD938X_DRV_NAME, sizeof(WCD938X_DRV_NAME));
+#if IS_ENABLED(CONFIG_SND_SOC_ROULEUR)
+	else if (pdata->wcd_used == ROULEAR_DEV_INDEX)
+		strscpy(wcd_name, "rouleur_codec", sizeof("rouleur_codec"));
+#endif
 	else
 		strscpy(wcd_name, WCD939X_DRV_NAME, sizeof(WCD939X_DRV_NAME));
 	component = snd_soc_rtdcom_lookup(rtd, wcd_name);
@@ -1900,6 +1909,11 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	case WCD938X_DEV_INDEX:
 		ret = wcd938x_mbhc_hs_detect(component, &wcd_mbhc_cfg);
 		break;
+#if IS_ENABLED(CONFIG_SND_SOC_ROULEUR)
+	case ROULEAR_DEV_INDEX:
+		ret = rouleur_mbhc_hs_detect(component, &wcd_mbhc_cfg);
+		break;
+#endif
 	default:
 		return -EINVAL;
 	}
@@ -2583,10 +2597,15 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 				__func__, WCD9378_DRV_NAME);
 			component = snd_soc_rtdcom_lookup(rtd, WCD938X_DRV_NAME);
 			if (!component) {
-				pr_err("%s component is NULL\n", __func__);
-				return -EINVAL;
+				component = snd_soc_rtdcom_lookup(rtd, "rouleur_codec");
+				if (!component) {
+					pr_err("%s component is NULL\n", __func__);
+					return -EINVAL;
+				}
+				pdata->wcd_used = ROULEAR_DEV_INDEX;
+			} else {
+				pdata->wcd_used = WCD938X_DEV_INDEX;
 			}
-			pdata->wcd_used = WCD938X_DEV_INDEX;
 		} else {
 			pdata->wcd_used = WCD9378_DEV_INDEX;
 		}
@@ -2628,7 +2647,14 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 			ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, true);
 		else
 			ret = lpass_cdc_rx_set_fir_capability(lpass_cdc_component, false);
-	}  else {
+	}  else if (pdata->wcd_used == ROULEAR_DEV_INDEX) {
+#if IS_ENABLED(CONFIG_SND_SOC_ROULEUR)
+		rouleur_info_create_codec_entry(pdata->codec_root, component);
+		lpass_cdc_set_port_map(lpass_cdc_component,
+			ARRAY_SIZE(sm_port_map_rouleur),
+			sm_port_map_rouleur);
+#endif
+	} else {
 		wcd939x_info_create_codec_entry(pdata->codec_root, component);
 		codec_variant = wcd939x_get_codec_variant(component);
 		dev_dbg(component->dev, "%s: variant %d\n", __func__, codec_variant);
@@ -2967,9 +2993,8 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	if (pdata)
 		common_pdata = pdata->common_pdata;
 
-	msm_common_snd_deinit(common_pdata);
 	snd_event_master_deregister(&pdev->dev);
-	snd_soc_unregister_card(card);
+	msm_common_snd_deinit(common_pdata);
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return 0;
 #endif

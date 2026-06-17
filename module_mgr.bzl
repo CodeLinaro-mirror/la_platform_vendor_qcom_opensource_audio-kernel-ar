@@ -15,6 +15,19 @@ def _create_module_conditional_src_map(conditional_srcs):
 
     return processed_conditional_srcs
 
+def _create_module_conditional_dep_map(conditional_deps):
+    processed_conditional_deps = {}
+
+    for conditional_dep_name in conditional_deps:
+        conditional_dep = conditional_deps[conditional_dep_name]
+
+        if type(conditional_dep) == "list":
+            processed_conditional_deps[conditional_dep_name] = {True: conditional_dep}
+        else:
+            processed_conditional_deps[conditional_dep_name] = conditional_dep
+
+    return processed_conditional_deps
+
 def _get_enabled_module_objs(registry, modules):
     undefined_modules = []
     enabled_module_objs = []
@@ -41,6 +54,16 @@ def _get_module_srcs(module, options):
         srcs.extend(module.conditional_srcs[option].get(is_option_enabled, []))
 
     return ["{}{}".format(module_path, src) for src in srcs]
+
+def _get_module_deps(module, options, dep_formatter):
+    deps = [dep_formatter(dep) for dep in module.deps]
+
+    for option in module.conditional_deps:
+        is_option_enabled = option in options
+        for dep in module.conditional_deps[option].get(is_option_enabled, []):
+            deps.append(dep_formatter(dep))
+
+    return deps
 
 def _combine_target_module_options(enabled_modules, config_options):
     all_options = {option: True for option in config_options}
@@ -81,7 +104,7 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
     for module in enabled_modules:
         rule_name = "{}_{}".format(rule_prefix, module.name)
         srcs = _get_module_srcs(module, options)
-        deps = headers + [dep_formatter(dep) for dep in module.deps]
+        deps = headers + _get_module_deps(module, options, dep_formatter)
 
         if not srcs:
             continue
@@ -110,7 +133,7 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
     )
 
     pkg_install(
-        name = "{}_modules_dist".format(rule_prefix),
+        name = "{}_audio_modules_dist".format(rule_prefix),
         srcs = [":{}_dist_files".format(rule_prefix)],
         destdir = "out/target/product/{}/dlkm/lib/modules/".format(target),
     )
@@ -118,7 +141,7 @@ def _define_target_modules(target, variant, registry, modules, product = None, c
 def create_module_registry(hdrs = []):
     module_map = {}
 
-    def register(name, path = None, config_option = None, srcs = [], conditional_srcs = {}, deps = []):
+    def register(name, path = None, config_option = None, srcs = [], conditional_srcs = {}, deps = [], conditional_deps = {}):
         module_map[name] = struct(
             name = name,
             path = path,
@@ -126,6 +149,7 @@ def create_module_registry(hdrs = []):
             conditional_srcs = _create_module_conditional_src_map(conditional_srcs),
             config_option = config_option,
             deps = deps,
+            conditional_deps = _create_module_conditional_dep_map(conditional_deps),
         )
 
     return struct(
