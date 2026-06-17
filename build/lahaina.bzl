@@ -38,6 +38,7 @@ def define_lahaina():
             "wcd937x_slave_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
+            "acm8625s_dlkm",
         ],
         config_options = [
             "CONFIG_SND_SOC_LAHAINA",

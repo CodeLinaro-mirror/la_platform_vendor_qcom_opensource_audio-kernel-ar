@@ -670,3 +670,12 @@ audio_modules.register(
     ],
     deps = [":%b_swr_dlkm"],
 )
+# >>>> ACM8625S MODULES <<<<
+audio_modules.register(
+    name = "acm8625s_dlkm",
+    path = ASOC_CODECS_PATH + "/acm8625s",
+    config_option = "CONFIG_SND_SOC_ACM8625S",
+    srcs = [
+        "acm8625s.c",
+    ],
+)
