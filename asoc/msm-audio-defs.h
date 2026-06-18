@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2019-2022, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 #ifndef _MSM_AUDIO_DEFS_H
 #define _MSM_AUDIO_DEFS_H
@@ -126,5 +126,5 @@
 #define LPASS_BE_BTFM_PROXY_TX_0 "BTFM_PROXY-TX-0"
 #define LPASS_BE_BTFM_PROXY_RX_1 "BTFM_PROXY-RX-1"
 #define LPASS_BE_BTFM_PROXY_TX_1 "BTFM_PROXY-TX-1"
-
+#define LPASS_BE_BTFM_PROXY_TX_2 "BTFM_PROXY-TX-2"
 #endif /*_MSM_AUDIO_DEFS_H*/
