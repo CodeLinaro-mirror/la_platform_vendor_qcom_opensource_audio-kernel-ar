@@ -250,17 +250,27 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 
 	dma_mem_info = qaif_mem_alloc_attach(component,
 					qaif_platform_aif_hardware.buffer_bytes_max);
-	if (!dma_mem_info)
-		return -ENOMEM;
+	if (!dma_mem_info) {
+		ret = -ENOMEM;
+		goto err_free_data;
+	}
 
-	clk_prepare_enable(drvdata->aud_dma_clk);
-	clk_prepare_enable(drvdata->aud_dma_mem_clk);
+	ret = clk_prepare_enable(drvdata->aud_dma_clk);
+	if (ret) {
+		dev_err(soc_runtime->dev, "failed to enable aud_dma_clk: %d\n", ret);
+		goto err_mem_dealloc;
+	}
 
+	ret = clk_prepare_enable(drvdata->aud_dma_mem_clk);
+	if (ret) {
+		dev_err(soc_runtime->dev, "failed to enable aud_dma_mem_clk: %d\n", ret);
+		goto err_clk_dma;
+	}
 
 	ret = qaif_init(component);
 	if (ret) {
 		dev_err(soc_runtime->dev, "qaif_init failed: %d\n", ret);
-		return -EINVAL;
+		goto err_clk_dma_mem;
 	}
 	drvdata->qaif_init_ref_cnt++;
 
@@ -294,10 +304,9 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 	snd_pcm_set_runtime_buffer(substream, &substream->dma_buffer);
 	ret = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
 	if (ret < 0) {
-		kfree(data);
-		dev_err(soc_runtime->dev, "setting constraints failed: %d\n",
-			ret);
-		return -EINVAL;
+		dev_err(soc_runtime->dev, "setting constraints failed: %d\n", ret);
+		drvdata->qaif_init_ref_cnt--;
+		goto err_clk_dma_mem;
 	}
 	dev_dbg(soc_runtime->dev, "%s: runtime info - dma_area=%p, dma_addr=0x%llx, dma_bytes=%zu\n",
        __func__,
@@ -306,6 +315,16 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
        runtime->dma_bytes);
 
 	return 0;
+
+err_clk_dma_mem:
+	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
+err_clk_dma:
+	clk_disable_unprepare(drvdata->aud_dma_clk);
+err_mem_dealloc:
+	qaif_mem_dealloc_detach(dma_mem_info);
+err_free_data:
+	kfree(data);
+	return ret;
 }
 
 static int qaif_platform_pcmops_close(struct snd_soc_component *component,
@@ -955,8 +974,6 @@ static int qaif_platform_pcmops_suspend(struct snd_soc_component *component)
 
 	regcache_cache_only(map, true);
 	regcache_mark_dirty(map);
-	clk_disable(drvdata->aud_dma_clk);
-	clk_disable(drvdata->aud_dma_mem_clk);
 	return 0;
 }
 
@@ -964,8 +981,6 @@ static int qaif_platform_pcmops_resume(struct snd_soc_component *component)
 {
 	struct qaif_drv_data *drvdata = snd_soc_component_get_drvdata(component);
 	struct regmap *map;
-	clk_enable(drvdata->aud_dma_clk);
-	clk_enable(drvdata->aud_dma_mem_clk);
 	map = drvdata->audio_qaif_map;
 
 	regcache_cache_only(map, false);
