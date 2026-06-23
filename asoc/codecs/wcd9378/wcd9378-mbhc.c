@@ -1087,10 +1087,6 @@ int wcd9378_mbhc_post_ssr_init(struct wcd9378_mbhc *mbhc,
 	}
 
 	wcd_disable_irq(&wcd9378->irq_info,
-				WCD9378_IRQ_MBHC_ELECT_INS_REM_DET);
-	wcd_disable_irq(&wcd9378->irq_info,
-				WCD9378_IRQ_MBHC_ELECT_INS_REM_LEG_DET);
-	wcd_disable_irq(&wcd9378->irq_info,
 				WCD9378_IRQ_EAR_SCD_INT);
 	wcd_disable_irq(&wcd9378->irq_info,
 				WCD9378_IRQ_AUX_SCD_INT);
@@ -1162,10 +1158,6 @@ int wcd9378_mbhc_init(struct wcd9378_mbhc **mbhc,
 		goto err;
 	}
 
-	wcd_disable_irq(&wcd9378->irq_info,
-				WCD9378_IRQ_MBHC_ELECT_INS_REM_DET);
-	wcd_disable_irq(&wcd9378->irq_info,
-				WCD9378_IRQ_MBHC_ELECT_INS_REM_LEG_DET);
 	wcd_disable_irq(&wcd9378->irq_info,
 				WCD9378_IRQ_EAR_SCD_INT);
 	wcd_disable_irq(&wcd9378->irq_info,
