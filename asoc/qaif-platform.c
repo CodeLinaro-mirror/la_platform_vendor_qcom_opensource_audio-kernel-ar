@@ -454,9 +454,6 @@ static int qaif_platform_pcmops_prepare(struct snd_soc_component *component,
 	const struct qaif_variant *v = drvdata->variant;
 	struct qaif_dmactl *dmactl;
 	struct regmap *map;
-	int bitwidth = 32;//snd_pcm_format_width(runtime->format);
-	unsigned int channels = runtime->channels;
-	unsigned int rate = runtime->rate;
 	int ret, idx, dir = substream->stream;
 	unsigned int dai_id = cpu_dai->driver->id;
 
@@ -471,10 +468,10 @@ static int qaif_platform_pcmops_prepare(struct snd_soc_component *component,
 		return -EINVAL;
 	}
 
-	clk_set_rate(drvdata->aud_dma_clk, rate * bitwidth * channels * 100);
-	clk_set_rate(drvdata->aud_dma_mem_clk, rate * bitwidth * channels * 100);
+	clk_set_rate(drvdata->aud_dma_clk, QAIF_DMA_CLOCK_FREQ);
+	clk_set_rate(drvdata->aud_dma_mem_clk, QAIF_DMA_CLOCK_FREQ);
 	dev_dbg(soc_runtime->dev, "setting aud_dma_clk & aud_dma_mem_clk to %u\n",
-		rate * bitwidth * channels * 100);
+				QAIF_DMA_CLOCK_FREQ);
 
 	ret = regmap_write(map, QAIF_SID_MAP_REG(dir, dai_id),
 				drvdata->smmu_csid_bits);
