@@ -38,7 +38,7 @@ LOCAL_PATH := vendor/qcom/opensource/audio-kernel
 endif
 
 # Build/Package only in case of supported target
-ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4 gen4_gvm msmnile canoe), true)
+ifeq ($(call is-board-platform-in-list,taro kalama bengal pineapple sun holi blair gen4  auto_gen gen4_gvm msmnile canoe), true)
 
 # This makefile is only for DLKM
 ifneq ($(findstring vendor,$(LOCAL_PATH)),)
@@ -63,13 +63,13 @@ KBUILD_OPTIONS += MODNAME=audio_dlkm
 KBUILD_OPTIONS += BOARD_PLATFORM=$(TARGET_BOARD_PLATFORM)
 KBUILD_OPTIONS += $(AUDIO_SELECT)
 
-ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4),true)
+ifneq ($(call is-board-platform-in-list, bengal holi blair msmnile gen4 auto_gen),true)
 KBUILD_OPTIONS += KBUILD_EXTRA_SYMBOLS=$(PWD)/$(call intermediates-dir-for,DLKM,msm-ext-disp-module-symvers)/Module.symvers
 endif
 
-ifeq ($(call is-board-platform-in-list, gen4 msmnile),true)
+ifeq ($(call is-board-platform-in-list, gen4 auto_gen msmnile),true)
 KBUILD_OPTIONS += CONFIG_SND_SOC_AUTO=y
-ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq))
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq auto_gen_prime))
 KBUILD_OPTIONS +=CONFIG_SND_SOC_GVM=y
 endif
 endif
@@ -80,7 +80,7 @@ AUDIO_SRC_FILES := \
 	$(wildcard $(LOCAL_PATH)/*/*/*) \
 	$(wildcard $(LOCAL_PATH)/*/*/*/*)
 
-ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq))
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq auto_gen_prime))
 LOCAL_MODULE_DDK_BUILD := true
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)

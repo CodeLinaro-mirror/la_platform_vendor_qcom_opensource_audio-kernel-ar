@@ -71,9 +71,9 @@ AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 endif
 endif
 else
-SUPPORTED_PLATFORMS := gen4 msmnile
+SUPPORTED_PLATFORMS := gen4 auto_gen msmnile
 ifneq (,$(filter $(TARGET_BOARD_PLATFORM),$(SUPPORTED_PLATFORMS)))
-ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq))
+ifneq (,$(filter $(TARGET_BOARD_PLATFORM)$(TARGET_BOARD_SUFFIX), gen4_gvm gen4_gvm_sgt msmnile_gvmq auto_gen_prime))
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/machine_dlkm.ko\
 	$(KERNEL_MODULES_OUT)/stub_dlkm.ko
 endif   #msmnile
