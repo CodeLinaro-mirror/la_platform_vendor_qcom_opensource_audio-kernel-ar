@@ -74,7 +74,7 @@ ifeq ($(call is-board-platform-in-list, malabar), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wsa881x_analog_dlkm.ko
 endif
 
-ifeq ($(call is-board-platform-in-list, holi blair), true)
+ifeq ($(call is-board-platform-in-list, holi blair taro), true)
 AUDIO_KERNEL_MODULES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif

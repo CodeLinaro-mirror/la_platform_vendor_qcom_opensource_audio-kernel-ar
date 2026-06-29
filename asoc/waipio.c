@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2022 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -33,6 +33,7 @@
 #include "codecs/wcd938x/wcd938x-mbhc.h"
 #include "codecs/wsa883x/wsa883x.h"
 #include "codecs/wcd938x/wcd938x.h"
+#include "codecs/wcd937x/wcd937x.h"
 #include "codecs/lpass-cdc/lpass-cdc.h"
 #include <bindings/audio-codec-port-types.h>
 #include "codecs/lpass-cdc/lpass-cdc-wsa-macro.h"
@@ -381,7 +382,7 @@ static int msm_wcn_init(struct snd_soc_pcm_runtime *rtd)
 {
 	unsigned int rx_ch[WCN_CDC_SLIM_RX_CH_MAX] = {157, 158};
 	unsigned int tx_ch[WCN_CDC_SLIM_TX_CH_MAX]  = {159, 160};
-	struct snd_soc_dai *codec_dai = asoc_rtd_to_codec(rtd, 0);
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
     int ret = 0;
 
 	ret = snd_soc_dai_set_channel_map(codec_dai, ARRAY_SIZE(tx_ch),
@@ -526,8 +527,8 @@ static struct snd_soc_dai_link msm_wcn_be_dai_links[] = {
 static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	/* DISP PORT BACK END DAI Link */
 	{
-		.name = LPASS_BE_DISPLAY_PORT_RX,
-		.stream_name = LPASS_BE_DISPLAY_PORT_RX,
+		.name = LPASS_BE_DISPLAY_PORT_RX_0,
+		.stream_name = LPASS_BE_DISPLAY_PORT_RX_0,
 		.playback_only = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST},
@@ -1262,7 +1263,7 @@ static int msm_snd_card_late_probe(struct snd_soc_card *card)
 	if (!rtd) {
 		dev_err(card->dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[0]);
+			__func__, card->dai_link[0].name);
 		return -EINVAL;
 	}
 
@@ -1632,7 +1633,7 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 	if (!rtd_wcd) {
 		dev_dbg(dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[0]);
+			__func__, card->dai_link[0].name);
 	}
 
 	if (pdata->wsa_max_devs > 0) {
@@ -1641,7 +1642,7 @@ static int waipio_ssr_enable(struct device *dev, void *data)
 		if (!rtd_wsa) {
 			dev_dbg(dev,
 			"%s: snd_soc_get_pcm_runtime for %s failed!\n",
-			__func__, card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)]);
+			__func__, card->dai_link[ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links)].name);
 		}
 	}
 	/* set UPD configuration */
@@ -1883,7 +1884,7 @@ err:
 	return ret;
 }
 
-static int msm_asoc_machine_remove(struct platform_device *pdev)
+static void msm_asoc_machine_remove(struct platform_device *pdev)
 {
 	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct msm_asoc_mach_data *pdata = NULL;
@@ -1898,8 +1899,6 @@ static int msm_asoc_machine_remove(struct platform_device *pdev)
 	msm_common_snd_deinit(common_pdata);
 	snd_event_master_deregister(&pdev->dev);
 	snd_soc_unregister_card(card);
-
-	return 0;
 }
 
 static struct platform_driver waipio_asoc_machine_driver = {
