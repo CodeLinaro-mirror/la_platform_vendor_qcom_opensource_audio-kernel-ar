@@ -19,12 +19,15 @@
 #include <bindings/audio-codec-port-types.h>
 #include <linux/qti-regmap-debugfs.h>
 #include <linux/irqdesc.h>
+#include <linux/proc_fs.h>
+#include <linux/vmalloc.h>
 
 #include "wcd9378-reg-masks.h"
 #include "wcd9378.h"
 #include "internal.h"
 #include "asoc/bolero-slave-internal.h"
-
+#define REGDUMP_PRINT_LEN 8
+#define REGDUMP_BYTES_PER_LINE 20
 #define NUM_SWRS_DT_PARAMS 5
 
 #define WCD9378_MOBILE_MODE 0x01
@@ -4233,8 +4236,101 @@ static int wcd9378_wcd_mode_check(struct snd_soc_component *component)
 	return 0;
 }
 
+
+static int regdump_read(struct snd_soc_component *component,
+		const u32 *reg_array, int reg_num,
+		bool (*sdca_readable_register)(u32 reg),
+		char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int i = 0, start_idx = 0, ret = 0;
+	size_t pos = 0;
+	char *buf;
+	unsigned int reg_val = 0, reg_len = 0;
+	unsigned int reg_val_len = 0, regdump_wr_len = 0;
+
+	buf = vzalloc(count);
+	if (!buf)
+		return -ENOMEM;
+
+	/*
+	 * Use a fixed 8-char hex width for 32-bit SDCA register addresses.
+	 * reg_val_len is 2 bytes (one 8-bit value printed as 2 hex digits).
+	 * regdump_wr_len accounts for "XXXXXXXX: YY\n" = 8 + 2 + 2 + 1 = 13.
+	 */
+	reg_len = 8;
+	reg_val_len = 2 * DIV_ROUND_UP(REGDUMP_PRINT_LEN, 8);
+	regdump_wr_len = reg_len + reg_val_len + 3;
+
+	/*
+	 * Use the pre-built reg_array of known SDCA registers instead of
+	 * iterating the full 67M-entry address range (WCD9378_BASE to
+	 * WCD9378_MAX_REGISTER). Iterating that range issues a SoundWire
+	 * transaction for every address — including the ~67M non-existent
+	 * ones — causing extreme latency and returning stale zeros for
+	 * unimplemented addresses.
+	 *
+	 * snd_soc_component_read() serves non-volatile registers from the
+	 * regmap cache, avoiding unnecessary SoundWire bus traffic.
+	 *
+	 * Resume from where the previous read left off via ppos, using
+	 * BYTES_PER_LINE as the stride (matches sdca-registers-api.c).
+	 */
+	start_idx = (int)(*ppos / REGDUMP_BYTES_PER_LINE);
+	for (i = start_idx; i < reg_num; i++) {
+		if ((pos + regdump_wr_len) >= count)
+			break;
+
+		if (!sdca_readable_register(reg_array[i]))
+			continue;
+
+		scnprintf(buf + pos, count - pos, "%.*x: ", reg_len, reg_array[i]);
+		pos += reg_len + 2;
+
+		reg_val = snd_soc_component_read(component, reg_array[i]);
+		scnprintf(buf + pos, count - pos, "%.*x", reg_val_len, reg_val & 0xFF);
+		pos += reg_val_len;
+		buf[pos++] = '\n';
+		*ppos += REGDUMP_BYTES_PER_LINE;
+	}
+
+	ret = pos;
+	if (copy_to_user(user_buf, buf, pos))
+		ret = -EFAULT;
+
+	vfree(buf);
+	return ret;
+}
+
+static ssize_t wcd9378_proc_read(struct file *filep, char __user *buf, size_t size, loff_t *ppos)
+{
+	ssize_t ret = 0;
+	struct wcd9378_priv *wcd9378 = NULL;
+
+	if (!size || !filep || !ppos || !buf || *ppos < 0)
+		return -EINVAL;
+
+	wcd9378 = pde_data(file_inode(filep));
+	if (!wcd9378)
+		return -EINVAL;
+
+	if (!wcd9378->component || !wcd9378->regdump_info)
+		return -EINVAL;
+
+	ret = regdump_read(wcd9378->component,
+			wcd9378->regdump_info->reg_array,
+			wcd9378->regdump_info->reg_num,
+			wcd9378->regdump_info->sdca_readable_register,
+			buf, size, ppos);
+	return ret;
+}
+
+static const struct proc_ops wcd9378_proc_ops = {
+	.proc_read = wcd9378_proc_read,
+};
+
 static int wcd9378_soc_codec_probe(struct snd_soc_component *component)
 {
+	struct proc_dir_entry *wcd9378_proc_regdump_file = NULL;
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 	struct snd_soc_dapm_context *dapm =
 			snd_soc_component_get_dapm(component);
@@ -4249,7 +4345,20 @@ static int wcd9378_soc_codec_probe(struct snd_soc_component *component)
 	snd_soc_component_init_regmap(component, wcd9378->regmap);
 
 	devm_regmap_qti_debugfs_register(&wcd9378->tx_swr_dev->dev, wcd9378->regmap);
-
+	wcd9378->wcd9378_proc_entry = proc_mkdir("wcd9378_reginfo", NULL);
+	if (wcd9378->wcd9378_proc_entry) {
+		wcd9378_proc_regdump_file = proc_create_data("wcd9378_regdump", 0444,
+				wcd9378->wcd9378_proc_entry, &wcd9378_proc_ops, wcd9378);
+		if (!wcd9378_proc_regdump_file) {
+			dev_err(component->dev,
+					"%s: error creating proc reg read interface\n",
+					__func__);
+			proc_remove(wcd9378->wcd9378_proc_entry);
+			wcd9378->wcd9378_proc_entry = NULL;
+		}
+	} else {
+		dev_err(component->dev, "%s: error creating proc dir interface\n", __func__);
+	}
 	ret = wcd9378_wcd_mode_check(component);
 	if (!ret) {
 		dev_err(component->dev, "wcd mode check failed\n");
@@ -4345,6 +4454,9 @@ static void wcd9378_soc_codec_remove(struct snd_soc_component *component)
 			__func__);
 		return;
 	}
+	if (wcd9378->wcd9378_proc_entry)
+		proc_remove(wcd9378->wcd9378_proc_entry);
+
 	if (wcd9378->register_notifier)
 		wcd9378->register_notifier(wcd9378->handle,
 						&wcd9378->nblock,
