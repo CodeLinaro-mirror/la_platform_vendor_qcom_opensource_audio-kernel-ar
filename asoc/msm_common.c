@@ -971,7 +971,8 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 		break;
 	}
 	case CODEC_DMA: {
-		uint32_t cur_rx_ch = 0, cur_tx_ch = 0;
+		uint32_t cur_rx_ch[MAX_PORT] = {0};
+		uint32_t cur_tx_ch[MAX_PORT] = {0};
 		uint32_t cur_rx_ch_cnt = 0, cur_tx_ch_cnt = 0;
 
 		for (i = 0; i < kctl_pdata->num_codec_dai; ++i) {
@@ -981,11 +982,11 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 			}
 			cur_rx_ch_cnt = 0;
 			cur_tx_ch_cnt = 0;
-			cur_tx_ch = 0;
-			cur_rx_ch = 0;
+			memset(cur_rx_ch, 0, sizeof(cur_rx_ch));
+			memset(cur_tx_ch, 0, sizeof(cur_tx_ch));
 			ret = snd_soc_dai_get_channel_map(codec_dai,
-					&cur_tx_ch_cnt, &cur_tx_ch,
-					&cur_rx_ch_cnt, &cur_rx_ch);
+					&cur_tx_ch_cnt, cur_tx_ch,
+					&cur_rx_ch_cnt, cur_rx_ch);
 
 			/* DAIs that not supports get_channel_map should pass */
 			if (ret && (ret != -ENOTSUPP)) {
@@ -997,8 +998,8 @@ int msm_channel_map_get(struct snd_kcontrol *kcontrol,
 
 			rx_ch_cnt += cur_rx_ch_cnt;
 			tx_ch_cnt += cur_tx_ch_cnt;
-			rx_ch[0] |= cur_rx_ch;
-			tx_ch[0] |= cur_tx_ch;
+			rx_ch[0] |= cur_rx_ch[0];
+			tx_ch[0] |= cur_tx_ch[0];
 		}
 
 		/* reset return value from the loop above */
@@ -1224,7 +1225,7 @@ int msm_common_vote_against_sleep(bool enable)
 	mutex_unlock(&vote_against_sleep_lock);
 	return ret;
 }
-EXPORT_SYMBOL(msm_common_vote_against_sleep);
+EXPORT_SYMBOL_GPL(msm_common_vote_against_sleep);
 
 static int msm_vote_against_sleep_ctl_put(struct snd_kcontrol *kcontrol,
 		struct snd_ctl_elem_value *ucontrol)

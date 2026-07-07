@@ -939,7 +939,7 @@ static int codec_set_sysclk(struct snd_soc_dai *dai, int clk_id,
 	return 0;
 }
 
-int reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
+void reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
 {
 	int ret=0;
 	int ps=0;
@@ -968,7 +968,7 @@ int reinit_wsa885x_powerup(struct wsa885x_i2c_priv *wsa885x)
 		dev_dbg(wsa885x->component->dev,
 			"Successfully transitioned to power state %d\n", ps);
 	}
-	return 0;
+
 }
 
 /**
@@ -1067,7 +1067,6 @@ static int codec_mute_stream(struct snd_soc_dai *dai, int mute, int stream)
 		/* Commit all changes */
 		regmap_write(wsa885x->regmap, DIG_CTRL0_SDCA_COMMIT, 0x01);
 	}
-	
 	return ret;
 }
 

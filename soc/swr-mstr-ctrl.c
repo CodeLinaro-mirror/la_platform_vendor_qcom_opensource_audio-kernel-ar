@@ -2718,11 +2718,19 @@ handle_irq:
 			break;
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P6_2P0:
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P7:
-			value = swr_master_read(swrm, REGISTER_ADDRESS(swrm->version_index,
-					SWRM_CMD_FIFO_STATUS));
 			dev_err_ratelimited(swrm->dev,
-				"%s: SWR read FIFO overflow fifo status %x\n",
-				__func__, value);
+				"%s: interrupt status: 0x%x\n",
+				__func__, intr_sts_masked);
+			if (((swrm->version == SWRM_VERSION_1_7) &&
+				(value == SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P7)) ||
+				((swrm->version != SWRM_VERSION_1_7) &&
+				(value == SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P6_2P0))) {
+				value = swr_master_read(swrm, REGISTER_ADDRESS(swrm->version_index,
+							SWRM_CMD_FIFO_STATUS));
+				dev_err_ratelimited(swrm->dev,
+					"%s: SWR read FIFO overflow fifo status %x\n",
+					__func__, value);
+			}
 			break;
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_UNDERFLOW_VER_1P6_2P0:
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_UNDERFLOW_VER_1P7:
@@ -2781,9 +2789,18 @@ handle_irq:
 			break;
 		case SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P6_2P0:
 		case SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P7:
-			complete(&swrm->broadcast);
-			dev_dbg(swrm->dev, "%s: SWR cmd id finished\n",
-				__func__);
+			dev_err_ratelimited(swrm->dev,
+				"%s: interrupt status: 0x%x\n",
+				__func__, intr_sts_masked);
+			if (((swrm->version == SWRM_VERSION_1_7) &&
+				(value == SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P7)) ||
+				((swrm->version != SWRM_VERSION_1_7) &&
+				(value ==
+				SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P6_2P0))) {
+				complete(&swrm->broadcast);
+				dev_dbg(swrm->dev, "%s: SWR cmd id finished\n",
+					__func__);
+			}
 			break;
 		case SWRM_INTERRUPT_STATUS_AUTO_ENUM_FAILED:
 			swr_master_write(swrm, SWRM_ENUMERATOR_CFG, 0);
