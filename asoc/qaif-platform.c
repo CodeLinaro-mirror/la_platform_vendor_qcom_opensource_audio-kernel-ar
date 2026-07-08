@@ -308,7 +308,7 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 		drvdata->qaif_init_ref_cnt--;
 		goto err_clk_dma_mem;
 	}
-	dev_dbg(soc_runtime->dev, "%s: runtime info - dma_area=%p, dma_addr=0x%llx, dma_bytes=%zu\n",
+	dev_info(soc_runtime->dev, "%s: runtime info - dma_area=%p, dma_addr=0x%llx, dma_bytes=%zu\n",
        __func__,
        runtime->dma_area,
        (unsigned long long)runtime->dma_addr,
@@ -324,6 +324,7 @@ err_mem_dealloc:
 	qaif_mem_dealloc_detach(dma_mem_info);
 err_free_data:
 	kfree(data);
+	dev_err(soc_runtime->dev, "%s: failed\n", __func__);
 	return ret;
 }
 
@@ -368,6 +369,7 @@ static int qaif_platform_pcmops_close(struct snd_soc_component *component,
 	clk_disable_unprepare(drvdata->aud_dma_clk);
 	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
 	kfree(data);
+	dev_info(soc_runtime->dev, "%s: exit\n", __func__);
 	return 0;
 }
 
