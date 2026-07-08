@@ -492,12 +492,15 @@ static void qaif_aif_cpu_daiops_shutdown(struct snd_pcm_substream *substream,
 		return;
 	}
 
+		/* Clear only this direction's enable bit, preserve the other */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		regmap_write(drvdata->audio_qaif_map,
-			QAIF_AUD_INTF_CTL_REG(idx), 0);
+		regmap_update_bits(drvdata->audio_qaif_map,
+			QAIF_AUD_INTF_CTL_REG(idx),
+			QAIF_AUD_INTF_CTL_ENABLE_TX, 0);
 	else
-		regmap_write(drvdata->audio_qaif_map,
-			QAIF_AUD_INTF_CTL_REG(idx), 0);
+		regmap_update_bits(drvdata->audio_qaif_map,
+			QAIF_AUD_INTF_CTL_REG(idx),
+			QAIF_AUD_INTF_CTL_ENABLE_RX, 0);
 
 	if (drvdata->mi2s_was_prepared[idx]) {
 		drvdata->mi2s_was_prepared[idx] = false;
@@ -920,7 +923,8 @@ static int qaif_aif_cpu_daiops_trigger(struct snd_pcm_substream *substream,
 {
 	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
 	const struct qaif_variant *v = drvdata->variant;
-	int idx, ret = -EINVAL;
+	int idx, ret = 0;
+	unsigned int enable_bit;
 
 	idx = v->get_dma_idx(dai->driver->id);
 	if (idx < 0) {
@@ -928,19 +932,26 @@ static int qaif_aif_cpu_daiops_trigger(struct snd_pcm_substream *substream,
 		return -EINVAL;
 	}
 
+	/*
+	 * QAIF_AUD_INTF_CTL_REG shares TX and RX enable bits in one register:
+	 *   bit 4  (0x10) = ENABLE_TX  (playback)
+	 *   bit 8  (0x100) = ENABLE_RX (capture)
+	 * Use regmap_update_bits() to touch only the relevant bit so a
+	 * concurrent stream in the other direction is not disturbed.
+	 */
+	enable_bit = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) ?
+			QAIF_AUD_INTF_CTL_ENABLE_TX : QAIF_AUD_INTF_CTL_ENABLE_RX;
+
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			ret = regmap_write(drvdata->audio_qaif_map,
-				QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_TX);
-		} else {
-			ret = regmap_write(drvdata->audio_qaif_map,
-				QAIF_AUD_INTF_CTL_REG(idx), QAIF_AUD_INTF_CTL_ENABLE_RX);
-		}
+		/* Set only our direction's bit, leave the other untouched */
+		ret = regmap_update_bits(drvdata->audio_qaif_map,
+				QAIF_AUD_INTF_CTL_REG(idx), enable_bit, enable_bit);
 		if (ret)
-			dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
+			dev_err(dai->dev, "error setting AIF CTL bit 0x%x: %d\n",
+				enable_bit, ret);
 
 		ret = clk_enable(drvdata->mi2s_bit_clk[idx]);
 		if (ret) {
@@ -951,19 +962,18 @@ static int qaif_aif_cpu_daiops_trigger(struct snd_pcm_substream *substream,
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-
-		if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-			ret = regmap_write(drvdata->audio_qaif_map,
-				QAIF_AUD_INTF_CTL_REG(idx), 0);
-		} else {
-			ret = regmap_write(drvdata->audio_qaif_map,
-				QAIF_AUD_INTF_CTL_REG(idx), 0);
-		}
+		/* Clear only our direction's bit, leave the other untouched */
+		ret = regmap_update_bits(drvdata->audio_qaif_map,
+				QAIF_AUD_INTF_CTL_REG(idx), enable_bit, 0);
 		if (ret)
-			dev_err(dai->dev, "error writing to AIF CTL reg: %d\n", ret);
-
+			dev_err(dai->dev, "error clearing AIF CTL bit 0x%x: %d\n",
+				enable_bit, ret);
 		clk_disable(drvdata->mi2s_bit_clk[idx]);
+		break;
 
+	default:
+		ret = -EINVAL;
+		dev_err(dai->dev, "%s: invalid trigger cmd %d\n", __func__, cmd);
 		break;
 	}
 
