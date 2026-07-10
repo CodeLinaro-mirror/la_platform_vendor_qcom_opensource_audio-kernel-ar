@@ -76,4 +76,15 @@ static struct swr_mstr_port_map sm_port_map[] = {
 	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
 };
 
+/* Port configurations to support 4WSA HAC - same as 937x*/
+static struct swr_mstr_port_map sm_port_map_tx_plus_wsa[] = {
+	{RX_MACRO, SWR_UC0, rx_frame_params_default},
+	{RX_MACRO, SWR_UC1, rx_frame_params_dsd},
+	{RX_MACRO, SWR_UC2, rx_frame_params_44p1KHz},
+	{WSA_MACRO, SWR_UC0, wsa_frame_params_default},
+	{WSA_MACRO, SWR_UC1, wsa_frame_params_receiver},
+	{WSA2_MACRO, SWR_UC0, wsa_frame_params_default},
+	{WSA2_MACRO, SWR_UC1, wsa_frame_params_receiver},
+};
+
 #endif /* _WAIPIO_PORT_CONFIG */

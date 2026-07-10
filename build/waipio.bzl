@@ -34,6 +34,7 @@ def define_waipio():
             "lpass_cdc_rx_macro_dlkm",
             "lpass_cdc_tx_macro_dlkm",
             "wsa883x_dlkm",
+            "wsa881x_analog_dlkm",
             "wcd938x_dlkm",
             "wcd938x_slave_dlkm",
             "wcd937x_dlkm",
