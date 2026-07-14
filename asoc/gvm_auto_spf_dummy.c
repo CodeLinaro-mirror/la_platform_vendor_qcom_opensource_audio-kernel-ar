@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2014-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/clk.h>
@@ -14,6 +14,7 @@
 #include <linux/input.h>
 #include <linux/of_device.h>
 #include <linux/pm_qos.h>
+#include <linux/version.h>
 #include <sound/core.h>
 #include <sound/soc.h>
 #include <sound/soc-dapm.h>
@@ -22,7 +23,6 @@
 #include <sound/info.h>
 #include <dsp/audio_notifier.h>
 #include "msm_dailink.h"
-#include <soc/qcom/boot_stats.h>
 #include "msm_common.h"
 #include <linux/cdev.h>
 #include <linux/err.h>
@@ -542,6 +542,30 @@ static struct snd_soc_dai_link msm_gvm_auto_dai_links[] = {
 	.ignore_pmdown_time = 1,
 	SND_SOC_DAILINK_REG(pcm_dummy_tx0),
 	},
+	{
+	.name = "PCM_DUMMY-RX-0",
+	.stream_name = "PCM_DUMMY-RX-0",
+	.dpcm_playback = 1,
+	.trigger = {
+		SND_SOC_DPCM_TRIGGER_POST,
+		SND_SOC_DPCM_TRIGGER_POST
+		},
+	.ignore_pmdown_time = 1,
+	.ignore_suspend = 1,
+	SND_SOC_DAILINK_REG(pcm_dummy_rx0),
+	},
+	{
+	.name = "PCM_DUMMY-TX-1",
+	.stream_name = "PCM_DUMMY-TX-1",
+	.dpcm_capture = 1,
+	.trigger = {
+		SND_SOC_DPCM_TRIGGER_POST,
+		SND_SOC_DPCM_TRIGGER_POST
+		},
+	.ignore_suspend = 1,
+	.ignore_pmdown_time = 1,
+	SND_SOC_DAILINK_REG(pcm_dummy_tx1),
+	},
 };
 
 int snd_card_notify_user(snd_card_status_t card_status)
@@ -797,7 +821,11 @@ int msm_audio_ssr_register(struct cdev *virt_sndcard_ctl)
 		pr_err("%s: Cannot add the device to the system\n", __func__);
 		goto err;
 	}
+#if (KERNEL_VERSION(6, 12, 0) <= LINUX_VERSION_CODE)
+	dev_class = class_create("SSR");
+#else
 	dev_class = class_create(THIS_MODULE, "SSR");
+#endif
 	if (IS_ERR(dev_class)) {
 		pr_err("%s: Cannot create the struct class\n", __func__);
 		goto err;
@@ -968,14 +996,21 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 	return 0;
 }
 
+#if (KERNEL_VERSION(6, 12, 0) <= LINUX_VERSION_CODE)
+#define MSM_ASOC_MACHINE_REMOVE_RETURN_VAL
+static void msm_asoc_machine_remove(struct platform_device *pdev)
+#else
+#define MSM_ASOC_MACHINE_REMOVE_RETURN_VAL 0
 static int msm_asoc_machine_remove(struct platform_device *pdev)
+#endif
 {
-	/* kobject_put decrease the kref count, once the count reaches 0.
+	/*
+	 * kobject_put decrease the kref count, once the count reaches 0.
 	 * Kobject core will automatically clean up the memory allocated by kobject.
 	 * The snd_card_sysfs_release release will help clean up memory allocated by us
 	 */
 	kobject_put(&snd_card_pdata->snd_card_kobj);
-	return 0;
+	return MSM_ASOC_MACHINE_REMOVE_RETURN_VAL;
 }
 
 static struct platform_driver gvm_asoc_machine_driver = {

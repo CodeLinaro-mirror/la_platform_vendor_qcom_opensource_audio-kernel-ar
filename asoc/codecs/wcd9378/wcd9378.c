@@ -345,10 +345,6 @@ static int wcd9378_init_reg(struct snd_soc_component *component)
 	snd_soc_component_update_bits(component, WCD9378_HPH_DN_T0,
 			WCD9378_HPH_DN_T0_HPH_DN_T0_MASK, 0x06);
 
-	/*SHORT_PROT_EN ENABLE*/
-	snd_soc_component_update_bits(component, WCD9378_ANA_EAR,
-			WCD9378_ANA_EAR_SHORT_PROT_EN_MASK, 0x40);
-
 	/*SM0 MB SEL:MB1*/
 	snd_soc_component_update_bits(component, WCD9378_SM0_MB_SEL,
 			WCD9378_SM0_MB_SEL_SM0_MB_SEL_MASK, 0x01);

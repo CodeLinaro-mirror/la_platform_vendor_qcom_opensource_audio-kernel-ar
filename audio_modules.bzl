@@ -125,6 +125,11 @@ audio_modules.register(
 )
 # >>>> ASOC MODULES <<<<
 audio_modules.register(
+    name = "spf_machine_dlkm",
+    path = ASOC_PATH,
+    srcs = ["gvm_auto_spf_dummy.c"]
+)
+audio_modules.register(
     name = "machine_dlkm",
     path = ASOC_PATH,
     srcs = [
@@ -475,4 +480,14 @@ audio_modules.register(
     path = ASOC_CODECS_PATH + "/wcd9378",
     config_option = "CONFIG_SND_SOC_WCD9378_SLAVE",
     srcs = ["wcd9378-slave.c"]
+)
+
+# >>>> WSA885X I2C MODULES <<<<
+audio_modules.register(
+    name = "wsa885x_i2c_dlkm",
+    path = ASOC_CODECS_PATH,
+    config_option = "CONFIG_SND_SOC_WSA885X_I2C",
+    srcs = [
+        "wsa885x-i2c.c",
+    ]
 )
