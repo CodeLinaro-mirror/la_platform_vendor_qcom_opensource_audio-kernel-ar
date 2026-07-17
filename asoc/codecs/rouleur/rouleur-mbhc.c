@@ -32,7 +32,7 @@
 #define ROULEUR_ZDET_C1                 7500000
 #define ROULEUR_ZDET_C2                 187
 #define ROULEUR_ZDET_C3                 4500
-
+#define ROULEUR_MBHC_DEF_BUTTONS	5
 /* Cross connection thresholds in mV */
 #define ROULEUR_HPHL_CROSS_CONN_THRESHOLD 350
 #define ROULEUR_HPHR_CROSS_CONN_THRESHOLD 350
@@ -226,6 +226,10 @@ static void rouleur_mbhc_program_btn_thr(struct snd_soc_component *component,
 		dev_err(component->dev, "%s: invalid number of buttons: %d\n",
 			__func__, num_btn);
 		return;
+	}
+	/* Clamp to rouleur's actual number of button-threshold regs */
+	if (num_btn > ROULEUR_MBHC_DEF_BUTTONS) {
+		num_btn = ROULEUR_MBHC_DEF_BUTTONS;
 	}
 
 	for (i = 0; i < num_btn; i++) {
