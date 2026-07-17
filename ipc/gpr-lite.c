@@ -182,6 +182,7 @@ static void gpr_modem_down(unsigned long opcode)
 {
 	dev_info_ratelimited(gpr_priv->dev, "%s: Q6 is Down\n", __func__);
 	gpr_set_q6_state(GPR_SUBSYS_DOWN);
+	gpr_set_modem_state(GPR_SUBSYS_DOWN);
 	snd_event_notify(gpr_priv->dev, SND_EVENT_DOWN);
 }
 
@@ -189,6 +190,7 @@ static void gpr_modem_up(void)
 {
 	dev_info_ratelimited(gpr_priv->dev, "%s: Q6 is Up\n", __func__);
 	gpr_set_q6_state(GPR_SUBSYS_LOADED);
+	gpr_set_modem_state(GPR_SUBSYS_LOADED);
 	snd_event_notify(gpr_priv->dev, SND_EVENT_UP);
 }
 
@@ -559,8 +561,8 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 		__func__);
 
 #ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
-	gpr_set_q6_state(GPR_SUBSYS_LOADED);
-	gpr_set_modem_state(GPR_SUBSYS_LOADED);
+	gpr_priv->is_initial_boot = false;
+	gpr_modem_up();
 #endif
 
 	return 0;
