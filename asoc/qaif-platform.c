@@ -111,7 +111,7 @@ static struct qaif_dma_mem_info* qaif_mem_alloc_attach(struct snd_soc_component 
 		goto free_dmabuf;
 	}
 
-	dma_mem_info->table = dma_buf_map_attachment(dma_mem_info->buf_attach, DMA_BIDIRECTIONAL);
+	dma_mem_info->table = dma_buf_map_attachment_unlocked(dma_mem_info->buf_attach, DMA_BIDIRECTIONAL);
 	if (IS_ERR(dma_mem_info->table)) {
 		dev_err(component->dev, "error mapping attachment\n");
 		goto detach;
@@ -122,7 +122,7 @@ static struct qaif_dma_mem_info* qaif_mem_alloc_attach(struct snd_soc_component 
 		dev_err(component->dev, "error beginning cpu access: %d\n", ret);
 		goto unmap_attach;
 	}
-	ret = dma_buf_vmap(dma_mem_info->dmabuf, &dma_mem_info->iosys_vmap);
+	ret = dma_buf_vmap_unlocked(dma_mem_info->dmabuf, &dma_mem_info->iosys_vmap);
 	if (ret) {
 		dev_err(component->dev, "error mapping buffer: %d\n", ret);
 		goto end_cpu_access;
@@ -135,7 +135,8 @@ static struct qaif_dma_mem_info* qaif_mem_alloc_attach(struct snd_soc_component 
 end_cpu_access:
 	dma_buf_end_cpu_access(dma_mem_info->dmabuf, DMA_BIDIRECTIONAL);
 unmap_attach:
-	dma_buf_unmap_attachment(dma_mem_info->buf_attach, dma_mem_info->table, DMA_BIDIRECTIONAL);
+	dma_buf_unmap_attachment_unlocked(dma_mem_info->buf_attach, dma_mem_info->table, DMA_BIDIRECTIONAL);
+
 detach:
 	dma_buf_detach(dma_mem_info->dmabuf, dma_mem_info->buf_attach);
 free_dmabuf:
@@ -152,7 +153,7 @@ static void qaif_mem_dealloc_detach(struct qaif_dma_mem_info *dma_info)
 
 	// Unmap virtual mapping if it was mapped
 	if (!iosys_map_is_null(&dma_info->iosys_vmap))
-		dma_buf_vunmap(dma_info->dmabuf, &dma_info->iosys_vmap);
+		dma_buf_vunmap_unlocked(dma_info->dmabuf, &dma_info->iosys_vmap);
 
 	// End CPU access
 	if (dma_info->dmabuf)
@@ -160,7 +161,7 @@ static void qaif_mem_dealloc_detach(struct qaif_dma_mem_info *dma_info)
 
 	// Unmap attachment
 	if (dma_info->table && dma_info->buf_attach)
-		dma_buf_unmap_attachment(dma_info->buf_attach, dma_info->table, DMA_BIDIRECTIONAL);
+		dma_buf_unmap_attachment_unlocked(dma_info->buf_attach, dma_info->table, DMA_BIDIRECTIONAL);
 
 	// Detach buffer
 	if (dma_info->dmabuf && dma_info->buf_attach)
