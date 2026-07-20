@@ -494,6 +494,7 @@ static void gpr_notifier_register(struct work_struct *work)
 		gpr_subsys_notif_register("gpr_modem",
 				       AUDIO_NOTIFIER_MODEM_DOMAIN,
 				       &modem_service_nb);
+		gpr_modem_up();
 	}
 
 	dev_info_ratelimited(gpr_priv->dev,
@@ -559,11 +560,6 @@ static int gpr_probe(struct rpmsg_device *rpdev)
 	gpr_priv->wsource = wakeup_source_register(gpr_priv->dev, "audio-gpr");
 	dev_info(dev, "%s: gpr-lite probe success\n",
 		__func__);
-
-#ifdef CONFIG_AUDIO_GPR_DOMAIN_MODEM
-	gpr_priv->is_initial_boot = false;
-	gpr_modem_up();
-#endif
 
 	return 0;
 }
