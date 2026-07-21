@@ -20,12 +20,12 @@
 
 #define DRV_NAME "qaif-platform"
 
-/* period: 5ms @ 48kHz/S16/1ch min, 40ms @ 48kHz/S16/4ch max */
-#define QAIF_PLATFORM_PERIOD_BYTES_MIN		(48 * 5  * 1 * 2)	/* 480 B */
-#define QAIF_PLATFORM_PERIOD_BYTES_MAX		(48 * 40 * 4 * 2)	/* 15360 B */
+/* period: 5ms @ 48kHz/1ch/S16 min, 20ms @ 48kHz/8ch/S32 max */
+#define QAIF_PLATFORM_PERIOD_BYTES_MIN		(48 * 5 * 1 * 2)	/* 480 B */
+#define QAIF_PLATFORM_PERIOD_BYTES_MAX		(48 * 20 * 8 * 4)	/* 30720 B */
 #define QAIF_PLATFORM_PERIODS_MIN		2
 #define QAIF_PLATFORM_PERIODS_MAX		4
-#define QAIF_PLATFORM_BUFFER_BYTES_MAX		(QAIF_PLATFORM_PERIODS_MIN * QAIF_PLATFORM_PERIOD_BYTES_MAX)	/* 30720 B */
+#define QAIF_PLATFORM_BUFFER_BYTES_MAX		(QAIF_PLATFORM_PERIODS_MAX * QAIF_PLATFORM_PERIOD_BYTES_MAX)	/* 122880 B */
 
 #define QAIF_SMMU_SID_OFFSET				32
 
@@ -308,7 +308,7 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 		drvdata->qaif_init_ref_cnt--;
 		goto err_clk_dma_mem;
 	}
-	dev_dbg(soc_runtime->dev, "%s: runtime info - dma_area=%p, dma_addr=0x%llx, dma_bytes=%zu\n",
+	dev_info(soc_runtime->dev, "%s: runtime info - dma_area=%p, dma_addr=0x%llx, dma_bytes=%zu\n",
        __func__,
        runtime->dma_area,
        (unsigned long long)runtime->dma_addr,
@@ -324,6 +324,7 @@ err_mem_dealloc:
 	qaif_mem_dealloc_detach(dma_mem_info);
 err_free_data:
 	kfree(data);
+	dev_err(soc_runtime->dev, "%s: failed\n", __func__);
 	return ret;
 }
 
@@ -368,6 +369,7 @@ static int qaif_platform_pcmops_close(struct snd_soc_component *component,
 	clk_disable_unprepare(drvdata->aud_dma_clk);
 	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
 	kfree(data);
+	dev_info(soc_runtime->dev, "%s: exit\n", __func__);
 	return 0;
 }
 

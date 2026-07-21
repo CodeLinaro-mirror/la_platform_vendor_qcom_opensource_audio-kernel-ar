@@ -731,6 +731,16 @@ SND_SOC_DAILINK_DEFS(sen_qaif_mi2s_tx,
 	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-tx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("a000000.audio")));
 
+SND_SOC_DAILINK_DEFS(quin_tdm_qaif_rx_0,
+	DAILINK_COMP_ARRAY(COMP_CPU("Quinary MI2S")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-rx")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("a000000.audio")));
+
+SND_SOC_DAILINK_DEFS(quin_tdm_qaif_tx_0,
+	DAILINK_COMP_ARRAY(COMP_CPU("Quinary MI2S")),
+	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-tx")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("a000000.audio")));
+
 SND_SOC_DAILINK_DEFS(sen_tdm_qaif_rx_0,
 	DAILINK_COMP_ARRAY(COMP_CPU("Senary MI2S")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("msm-stub-codec.1", "msm-stub-rx")),

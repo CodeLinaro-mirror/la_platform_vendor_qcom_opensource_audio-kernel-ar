@@ -138,12 +138,13 @@ static struct snd_soc_dai_driver shikra_qaif_cpu_dai_driver[] = {
 		.name = "Quinary MI2S",
 		.playback = {
 			.stream_name = "Quinary MI2S Playback",
-			.formats	= SNDRV_PCM_FMTBIT_S16,
+			.formats	= SNDRV_PCM_FMTBIT_S16 |
+				SNDRV_PCM_FMTBIT_S32,
 			.rates = SNDRV_PCM_RATE_48000,
 			.rate_min	= 48000,
 			.rate_max	= 48000,
-			.channels_min	= 2,
-			.channels_max	= 2,
+			.channels_min	= 1,
+			.channels_max	= 8,
 		},
 		.capture = {
 			.stream_name = "Quinary MI2S Capture",
@@ -152,8 +153,8 @@ static struct snd_soc_dai_driver shikra_qaif_cpu_dai_driver[] = {
 			.rates = SNDRV_PCM_RATE_48000,
 			.rate_min	= 48000,
 			.rate_max	= 48000,
-			.channels_min	= 2,
-			.channels_max	= 2,
+			.channels_min	= 1,
+			.channels_max	= 8,
 		},
 		.ops = &asoc_qcom_qaif_aif_cpu_dai_ops,
 	}, {

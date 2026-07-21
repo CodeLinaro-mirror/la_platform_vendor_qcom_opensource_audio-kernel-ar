@@ -1483,6 +1483,27 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 		SND_SOC_DAILINK_REG(quat_tdm_tx_0),
 	},
 	{
+		.name = LPASS_BE_QUIN_TDM_RX_0,
+		.stream_name = LPASS_BE_QUIN_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(quin_tdm_rx_0),
+	},
+	{
+		.name = LPASS_BE_QUIN_TDM_TX_0,
+		.stream_name = LPASS_BE_QUIN_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(quin_tdm_tx_0),
+	},
+	{
 		.name = LPASS_BE_SEP_TDM_RX_0,
 		.stream_name = LPASS_BE_SEP_TDM_RX_0,
 		.playback_only = 1,
@@ -1502,6 +1523,30 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 		.ops = &msm_common_be_ops,
 		.ignore_suspend = 1,
 		SND_SOC_DAILINK_REG(sep_tdm_tx_0),
+	},
+};
+
+static struct snd_soc_dai_link msm_tdm_qaif_cpu_dai_links[] = {
+{
+		.name = LPASS_BE_QUIN_TDM_RX_0,
+		.stream_name = LPASS_BE_QUIN_TDM_RX_0,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(quin_tdm_qaif_rx_0),
+	},
+	{
+		.name = LPASS_BE_QUIN_TDM_TX_0,
+		.stream_name = LPASS_BE_QUIN_TDM_TX_0,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(quin_tdm_qaif_tx_0),
 	},
 };
 
@@ -1686,6 +1731,7 @@ static struct snd_soc_dai_link msm_canoe_dai_links[
 			ARRAY_SIZE(msm_mi2s_dai_links) +
 			ARRAY_SIZE(msm_mi2s_qaif_cpu_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links) +
+			ARRAY_SIZE(msm_tdm_qaif_cpu_dai_links) +
 			ARRAY_SIZE(msm_tdm_sen_dai_links) +
 			ARRAY_SIZE(msm_tdm_sen_qaif_cpu_dai_links) +
 			ARRAY_SIZE(wsa885x_tdm_dai_links) +
@@ -2037,10 +2083,18 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 		rc = of_property_read_u32(dev->of_node,
 				"qcom,tdm-audio-intf", &val);
 		if (!rc && val) {
-			memcpy(msm_canoe_dai_links + total_links,
-					msm_tdm_dai_links,
-					sizeof(msm_tdm_dai_links));
-			total_links += ARRAY_SIZE(msm_tdm_dai_links);
+			if (of_find_property(dev->of_node, "qaif-cpu-supported", NULL)) {
+				dev_dbg(dev, "%s(): qaif CPU driver supported\n", __func__);
+				memcpy(msm_canoe_dai_links + total_links,
+						msm_tdm_qaif_cpu_dai_links,
+						sizeof(msm_tdm_qaif_cpu_dai_links));
+				total_links += ARRAY_SIZE(msm_tdm_qaif_cpu_dai_links);
+			} else {
+				memcpy(msm_canoe_dai_links + total_links,
+						msm_tdm_dai_links,
+						sizeof(msm_tdm_dai_links));
+				total_links += ARRAY_SIZE(msm_tdm_dai_links);
+			}
 		}
 
 		rc = of_property_read_u32(dev->of_node,
