@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/module.h>
@@ -32,6 +32,7 @@
 #define WCD9370_VARIANT 0
 #define WCD9375_VARIANT 5
 #define WCD937X_VARIANT_ENTRY_SIZE 32
+#define WCD937X_ECID_ENTRY_SIZE 36
 
 #define NUM_SWRS_DT_PARAMS 5
 
@@ -2799,6 +2800,37 @@ static struct snd_info_entry_ops wcd937x_variant_ops = {
 	.read = wcd937x_variant_read,
 };
 
+static ssize_t wcd937x_ecid_read(struct snd_info_entry *entry,
+				    void *file_private_data,
+				    struct file *file,
+				    char __user *buf, size_t count,
+				    loff_t pos)
+{
+	struct wcd937x_priv *priv;
+	char buffer[WCD937X_ECID_ENTRY_SIZE];
+	int len = 0;
+	u8 *reg_value;
+
+	priv = (struct wcd937x_priv *) entry->private_data;
+	if (!priv) {
+		pr_err_ratelimited("%s: wcd937x priv is null\n", __func__);
+		return -EINVAL;
+	}
+
+	reg_value = &priv->ecid_val[0];
+	len = scnprintf(buffer, sizeof(buffer), "0x%016llx%016llx",
+			cpu_to_be64(*(u64 *)reg_value), cpu_to_be64(*(u64 *)(reg_value + 8)));
+
+	if (len <= 0)
+		return -EINVAL;
+	return simple_read_from_buffer(buf, count, &pos, buffer, len);
+}
+
+static struct snd_info_entry_ops wcd937x_ecid_ops = {
+	.read = wcd937x_ecid_read,
+};
+
+
 /*
  * wcd937x_info_create_codec_entry - creates wcd937x module
  * @codec_root: The parent directory
@@ -2814,6 +2846,7 @@ int wcd937x_info_create_codec_entry(struct snd_info_entry *codec_root,
 {
 	struct snd_info_entry *version_entry;
 	struct snd_info_entry *variant_entry;
+	struct snd_info_entry *ecid_entry;
 	struct wcd937x_priv *priv;
 	struct snd_soc_card *card;
 
@@ -2885,6 +2918,29 @@ int wcd937x_info_create_codec_entry(struct snd_info_entry *codec_root,
 		return -ENOMEM;
 	}
 	priv->variant_entry = variant_entry;
+
+	ecid_entry = snd_info_create_card_entry(card->snd_card, "ecid", priv->entry);
+	if (!ecid_entry) {
+		dev_dbg(component->dev, "%s: failed to create wcd937x ecid entry\n",
+			__func__);
+		snd_info_free_entry(variant_entry);
+		snd_info_free_entry(version_entry);
+		snd_info_free_entry(priv->entry);
+		return -ENOMEM;
+	}
+	ecid_entry->private_data = priv;
+	ecid_entry->size = WCD937X_ECID_ENTRY_SIZE;
+	ecid_entry->content = SNDRV_INFO_CONTENT_DATA;
+	ecid_entry->c.ops = &wcd937x_ecid_ops;
+
+	if (snd_info_register(ecid_entry) < 0) {
+		snd_info_free_entry(ecid_entry);
+		snd_info_free_entry(variant_entry);
+		snd_info_free_entry(version_entry);
+		snd_info_free_entry(priv->entry);
+		return -ENOMEM;
+	}
+	priv->ecid_entry = ecid_entry;
 	return 0;
 }
 EXPORT_SYMBOL(wcd937x_info_create_codec_entry);
@@ -2926,6 +2982,7 @@ static int wcd937x_soc_codec_probe(struct snd_soc_component *component)
 			snd_soc_component_get_dapm(component);
 	int variant;
 	int ret = -EINVAL;
+	u32 val;
 
 	dev_info(component->dev, "%s()\n", __func__);
 	wcd937x = snd_soc_component_get_drvdata(component);
@@ -2941,6 +2998,13 @@ static int wcd937x_soc_codec_probe(struct snd_soc_component *component)
 	variant = (snd_soc_component_read(
 			component, WCD937X_DIGITAL_EFUSE_REG_0) & 0x1E) >> 1;
 	wcd937x->variant = variant;
+
+	/* read ecid data */
+	for (int i = 0; i < WCD937X_ECID_REGS; ++i) {
+		ret = regmap_read(wcd937x->regmap, WCD937X_DIGITAL_EFUSE_REG_1 + i, &val);
+		if (ret == 0)
+			wcd937x->ecid_val[i] = val;
+	}
 
 	wcd937x->adc_count = 0;
 
