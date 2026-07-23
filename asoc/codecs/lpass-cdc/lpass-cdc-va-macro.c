@@ -186,6 +186,7 @@ struct lpass_cdc_va_macro_priv {
 	bool swr_dmic_enable;
 	bool use_lpi_mixer_control;
 	int wlock_holders;
+	struct device_node *dmic_eldo_en_gpio_p;
 };
 
 
@@ -1263,25 +1264,37 @@ static int lpass_cdc_va_macro_enable_micbias(struct snd_soc_dapm_widget *w,
 					 &va_priv, __func__))
 		return -EINVAL;
 
-	if (!va_priv->micb_supply) {
+	if (!va_priv->micb_supply && !va_priv->dmic_eldo_en_gpio_p) {
 		dev_err_ratelimited(va_dev,
-			"%s:regulator not provided in dtsi\n", __func__);
+			"%s:neither regulator nor GPIO provided in dtsi\n", __func__);
 		return -EINVAL;
 	}
+
 	switch (event) {
 	case SND_SOC_DAPM_PRE_PMU:
 		if (va_priv->micb_users++ > 0)
 			return 0;
+		if (va_priv->dmic_eldo_en_gpio_p) {
+			ret = msm_cdc_pinctrl_select_active_state(
+					va_priv->dmic_eldo_en_gpio_p);
+			if (ret) {
+				dev_err_ratelimited(va_dev,
+					"%s: failed to enable dmic_eldo_en gpio, ret=%d\n",
+					__func__, ret);
+				return ret;
+			}
+			break;
+		}
 		ret = regulator_set_voltage(va_priv->micb_supply,
-				      va_priv->micb_voltage,
-				      va_priv->micb_voltage);
+					va_priv->micb_voltage,
+					va_priv->micb_voltage);
 		if (ret) {
 			dev_err_ratelimited(va_dev, "%s: Setting voltage failed, err = %d\n",
 				__func__, ret);
 			return ret;
 		}
 		ret = regulator_set_load(va_priv->micb_supply,
-					 va_priv->micb_current);
+					va_priv->micb_current);
 		if (ret) {
 			dev_err_ratelimited(va_dev, "%s: Setting current failed, err = %d\n",
 				__func__, ret);
@@ -1299,9 +1312,20 @@ static int lpass_cdc_va_macro_enable_micbias(struct snd_soc_dapm_widget *w,
 			return 0;
 		if (va_priv->micb_users < 0) {
 			va_priv->micb_users = 0;
-			dev_dbg(va_dev, "%s: regulator already disabled\n",
+			dev_dbg(va_dev, "%s: already disabled\n",
 				__func__);
 			return 0;
+		}
+		if (va_priv->dmic_eldo_en_gpio_p) {
+			ret = msm_cdc_pinctrl_select_sleep_state(
+					va_priv->dmic_eldo_en_gpio_p);
+			if (ret) {
+				dev_err_ratelimited(va_dev,
+					"%s: failed to disable dmic_eldo_en gpio, ret=%d\n",
+					__func__, ret);
+				return ret;
+			}
+			break;
 		}
 		ret = regulator_disable(va_priv->micb_supply);
 		if (ret) {
@@ -2609,6 +2633,13 @@ static int lpass_cdc_va_macro_probe(struct platform_device *pdev)
 			return ret;
 		}
 	}
+
+	va_priv->dmic_eldo_en_gpio_p = of_parse_phandle(pdev->dev.of_node,
+					"qcom,dmic-eldo-en-gpios", 0);
+	if (!va_priv->dmic_eldo_en_gpio_p)
+		dev_dbg(&pdev->dev, "%s: dmic_eldo_en_gpio handle not provided\n",
+			__func__);
+
 	use_clk_id = VA_CORE_CLK; /* default to using VA CORE CLK */
 	if (of_find_property(pdev->dev.of_node, "qcom,use-clk-id", NULL)) {
 		ret = of_property_read_u32(pdev->dev.of_node, "qcom,use-clk-id",
