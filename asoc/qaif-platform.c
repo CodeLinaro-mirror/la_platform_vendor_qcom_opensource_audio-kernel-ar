@@ -33,7 +33,7 @@ static irqreturn_t qaif_aif_irq_handler(struct qaif_drv_data *drvdata, u32 summa
 static irqreturn_t qaif_cif_irq_handler(struct qaif_drv_data *drvdata, u32 summary_irq_status);
 //static irqreturn_t qaif_aud_inf_handler(struct qaif_drv_data *drvdata, u32 summary_irq_status);
 
-static int qaif_init(struct snd_soc_component *component);
+static int qaif_hw_init(struct snd_soc_component *component);
 
 static const struct snd_pcm_hardware qaif_platform_aif_hardware = {
 	.info			=	SNDRV_PCM_INFO_MMAP |
@@ -221,6 +221,8 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 
 	component->id = dai_id;
 
+	dev_info(soc_runtime->dev, "%s: entry dai_id=%u\n", __func__, dai_id);
+
 	if (v->alloc_stream_dma_idx)
 		stream_dma_idx = v->alloc_stream_dma_idx(drvdata, dir, dai_id);
 	else
@@ -256,25 +258,6 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 		goto err_free_data;
 	}
 
-	ret = clk_prepare_enable(drvdata->aud_dma_clk);
-	if (ret) {
-		dev_err(soc_runtime->dev, "failed to enable aud_dma_clk: %d\n", ret);
-		goto err_mem_dealloc;
-	}
-
-	ret = clk_prepare_enable(drvdata->aud_dma_mem_clk);
-	if (ret) {
-		dev_err(soc_runtime->dev, "failed to enable aud_dma_mem_clk: %d\n", ret);
-		goto err_clk_dma;
-	}
-
-	ret = qaif_init(component);
-	if (ret) {
-		dev_err(soc_runtime->dev, "qaif_init failed: %d\n", ret);
-		goto err_clk_dma_mem;
-	}
-	drvdata->qaif_init_ref_cnt++;
-
 	switch (dai_id) {
 	case MI2S_PRIMARY ... MI2S_SENARY:
 		drvdata->aif_substream[stream_dma_idx] = substream;
@@ -306,8 +289,7 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 	ret = snd_pcm_hw_constraint_integer(runtime, SNDRV_PCM_HW_PARAM_PERIODS);
 	if (ret < 0) {
 		dev_err(soc_runtime->dev, "setting constraints failed: %d\n", ret);
-		drvdata->qaif_init_ref_cnt--;
-		goto err_clk_dma_mem;
+		goto err_mem_dealloc;
 	}
 	dev_info(soc_runtime->dev, "%s: runtime info - dma_area=%p, dma_addr=0x%llx, dma_bytes=%zu\n",
        __func__,
@@ -317,10 +299,6 @@ static int qaif_platform_pcmops_open(struct snd_soc_component *component,
 
 	return 0;
 
-err_clk_dma_mem:
-	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
-err_clk_dma:
-	clk_disable_unprepare(drvdata->aud_dma_clk);
 err_mem_dealloc:
 	qaif_mem_dealloc_detach(dma_mem_info);
 err_free_data:
@@ -359,16 +337,8 @@ static int qaif_platform_pcmops_close(struct snd_soc_component *component,
 		break;
 	}
 
-	if (drvdata->qaif_init_ref_cnt > 0)
-		drvdata->qaif_init_ref_cnt--;
-	else
-		dev_dbg(component->dev, "%s: QAIF init ref cnt: %d, skipping decrement\n",
-					__func__, drvdata->qaif_init_ref_cnt);
-
 	if (v->free_stream_dma_idx)
 		v->free_stream_dma_idx(drvdata, data->stream_dma_idx, dai_id);
-	clk_disable_unprepare(drvdata->aud_dma_clk);
-	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
 	kfree(data);
 	dev_info(soc_runtime->dev, "%s: exit\n", __func__);
 	return 0;
@@ -409,7 +379,15 @@ static int qaif_platform_pcmops_hw_params(struct snd_soc_component *component,
 		return ret;
 	}
 
-	return 0;
+	mutex_lock(&drvdata->hw_init_lock);
+	ret = qaif_hw_init(component);
+	if (ret)
+		dev_err(soc_runtime->dev, "%s: qaif_hw_init failed: %d\n", __func__, ret);
+	else
+		drvdata->qaif_hw_configured++;
+	mutex_unlock(&drvdata->hw_init_lock);
+
+	return ret;
 }
 
 static int qaif_platform_pcmops_hw_free(struct snd_soc_component *component,
@@ -443,6 +421,14 @@ static int qaif_platform_pcmops_hw_free(struct snd_soc_component *component,
 	ret = regmap_write(map, reg, 0);
 	if (ret)
 		dev_err(soc_runtime->dev, "error writing to rdmactl reg: %d\n", ret);
+
+	mutex_lock(&drvdata->hw_init_lock);
+	if (drvdata->qaif_hw_configured > 0)
+		drvdata->qaif_hw_configured--;
+	else
+		dev_warn(component->dev, "%s: qaif_hw_configured already 0 (dai_id=%u)\n",
+				__func__, dai_id);
+	mutex_unlock(&drvdata->hw_init_lock);
 
 	return ret;
 }
@@ -670,6 +656,12 @@ static int qaif_platform_pcmops_trigger(struct snd_soc_component *component,
 					"error writing to enable irq reg: %d\n", ret);
 				return ret;
 			}
+			ret = qaif_platform_irq_clear(drvdata, substream->stream, QAIF_AIF_IRQ, idx);
+			if (ret) {
+				dev_err(soc_runtime->dev,
+					"error writing to clear irq reg: %d\n", ret);
+				return ret;
+			}
 			break;
 		case LPASS_CDC_DMA_RX0 ... LPASS_CDC_DMA_RX9:
 		case LPASS_CDC_DMA_TX0 ... LPASS_CDC_DMA_TX8:
@@ -678,6 +670,12 @@ static int qaif_platform_pcmops_trigger(struct snd_soc_component *component,
 			if (ret) {
 				dev_err(soc_runtime->dev,
 					"error writing to enable irq reg: %d\n", ret);
+				return ret;
+			}
+			ret = qaif_platform_irq_clear(drvdata, substream->stream, QAIF_CIF_IRQ, idx);
+			if (ret) {
+				dev_err(soc_runtime->dev,
+					"error writing to clear irq reg: %d\n", ret);
 				return ret;
 			}
 			break;
@@ -947,6 +945,11 @@ static irqreturn_t asoc_platform_qaif_irq(int irq, void *data)
 	int rv, client;
 	irqreturn_t ret = IRQ_NONE;
 
+	if (!atomic_read(&drvdata->aud_dma_clk_refcnt)) {
+		pr_err_ratelimited("%s: IRQ with aud_dma_clk gated, ignoring\n", __func__);
+		return IRQ_NONE;
+	}
+
 	rv = regmap_read(drvdata->audio_qaif_map,
 			QAIF_SUMMARY_IRQSTAT_REG(v), &summary_irq_status);
 	if (rv) {
@@ -1140,14 +1143,14 @@ static int qaif_config_shram(struct qaif_drv_data *drvdata)
 	return 0;
 }
 
-static int qaif_init(struct snd_soc_component *component)
+static int qaif_hw_init(struct snd_soc_component *component)
 {
 	struct qaif_drv_data *drvdata = snd_soc_component_get_drvdata(component);
 	int ret = 0;
 
-	if (drvdata->qaif_init_ref_cnt) {
-		dev_info(component->dev, "%s: QAIF init is done already: ref cnt: %d\n",
-				__func__, drvdata->qaif_init_ref_cnt);
+	if (drvdata->qaif_hw_configured) {
+		dev_info(component->dev, "%s: QAIF hw init already done: ref cnt: %u\n",
+				__func__, drvdata->qaif_hw_configured);
 		return 0;
 	}
 
@@ -1168,8 +1171,7 @@ static int qaif_init(struct snd_soc_component *component)
 		dev_err(component->dev, "QAIF: Failed to map EE resources: %d\n", ret);
 		return ret;
 	}
-	dev_dbg(component->dev, "%s: QAIF init is done ref cnt: %d\n",
-			__func__, drvdata->qaif_init_ref_cnt);
+	dev_dbg(component->dev, "%s: QAIF hw init done\n", __func__);
 	return 0;
 }
 
@@ -1250,7 +1252,9 @@ int asoc_qcom_qaif_platform_register(struct platform_device *pdev)
 		dev_err(&pdev->dev, "irq request failed: %d\n", ret);
 		return ret;
 	}
-	drvdata->qaif_init_ref_cnt = 0;
+	mutex_init(&drvdata->hw_init_lock);
+	drvdata->qaif_hw_configured = 0;
+	atomic_set(&drvdata->aud_dma_clk_refcnt, 0);
 	dev_info(&pdev->dev,"%s: Register QAIF Platform\n",__func__);
 	return devm_snd_soc_register_component(&pdev->dev,
 			&qaif_component_driver, NULL, 0);

@@ -290,7 +290,41 @@ static int qaif_cif_daiops_trigger(struct snd_pcm_substream *substream,
 	return ret;
 }
 
+static int qaif_cif_daiops_startup(struct snd_pcm_substream *substream,
+				    struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+	int ret;
+
+	ret = clk_prepare_enable(drvdata->aud_dma_clk);
+	if (ret) {
+		dev_err(dai->dev, "%s: failed to enable aud_dma_clk: %d\n", __func__, ret);
+		return ret;
+	}
+	ret = clk_prepare_enable(drvdata->aud_dma_mem_clk);
+	if (ret) {
+		dev_err(dai->dev, "%s: failed to enable aud_dma_mem_clk: %d\n", __func__, ret);
+		clk_disable_unprepare(drvdata->aud_dma_clk);
+		return ret;
+	}
+	atomic_inc(&drvdata->aud_dma_clk_refcnt);
+	dev_info(dai->dev, "%s: aud_dma_clk enabled\n", __func__);
+	return 0;
+}
+
+static void qaif_cif_daiops_shutdown(struct snd_pcm_substream *substream,
+				     struct snd_soc_dai *dai)
+{
+	struct qaif_drv_data *drvdata = snd_soc_dai_get_drvdata(dai);
+
+	atomic_dec(&drvdata->aud_dma_clk_refcnt);
+	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
+	clk_disable_unprepare(drvdata->aud_dma_clk);
+}
+
 const struct snd_soc_dai_ops asoc_qcom_qaif_cif_dai_ops = {
+	.startup	= qaif_cif_daiops_startup,
+	.shutdown	= qaif_cif_daiops_shutdown,
 	.hw_params	= qaif_cif_daiops_hw_params,
 	.trigger	= qaif_cif_daiops_trigger,
 };
@@ -478,6 +512,21 @@ static int qaif_aif_cpu_daiops_startup(struct snd_pcm_substream *substream,
 		dev_err(dai->dev, "error in enabling mi2s bit clk: %d\n", ret);
 		return ret;
 	}
+	ret = clk_prepare_enable(drvdata->aud_dma_clk);
+	if (ret) {
+		dev_err(dai->dev, "%s: failed to enable aud_dma_clk: %d\n", __func__, ret);
+		clk_unprepare(drvdata->mi2s_bit_clk[idx]);
+		return ret;
+	}
+	ret = clk_prepare_enable(drvdata->aud_dma_mem_clk);
+	if (ret) {
+		dev_err(dai->dev, "%s: failed to enable aud_dma_mem_clk: %d\n", __func__, ret);
+		clk_disable_unprepare(drvdata->aud_dma_clk);
+		clk_unprepare(drvdata->mi2s_bit_clk[idx]);
+		return ret;
+	}
+	atomic_inc(&drvdata->aud_dma_clk_refcnt);
+	dev_info(dai->dev, "%s: aud_dma_clk enabled\n", __func__);
 	return 0;
 }
 
@@ -508,6 +557,10 @@ static void qaif_aif_cpu_daiops_shutdown(struct snd_pcm_substream *substream,
 	}
 
 	clk_unprepare(drvdata->mi2s_bit_clk[idx]);
+
+	atomic_dec(&drvdata->aud_dma_clk_refcnt);
+	clk_disable_unprepare(drvdata->aud_dma_mem_clk);
+	clk_disable_unprepare(drvdata->aud_dma_clk);
 }
 
 #if 0
