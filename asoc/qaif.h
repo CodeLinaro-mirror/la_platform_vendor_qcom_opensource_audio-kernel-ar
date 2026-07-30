@@ -10,6 +10,7 @@
 
 //#include "qaif-reg.h"
 #include <linux/clk.h>
+#include <linux/atomic.h>
 #include <linux/dma-heap.h>
 #include <linux/dma-mapping.h>
 #include <linux/dma-buf.h>
@@ -330,8 +331,14 @@ struct qaif_drv_data {
 	/* interrupts from the Qualcomm audio interface (QAIF) */
 	int audio_qaif_irq;
 
-	/* QAIF init config refcount*/
-	unsigned int qaif_init_ref_cnt;
+	/* QAIF init config refcount; guarded by hw_init_lock */
+	unsigned int qaif_hw_configured;
+
+	/* serializes qaif_hw_init check-act and the refcount above */
+	struct mutex hw_init_lock;
+
+	/* aud_dma_clk enable refcount: > 0 <=> aud_dma_clk is prepared+enabled */
+	atomic_t aud_dma_clk_refcnt;
 
 	/* SOC specific variations in the QAIF IP integration */
 	struct qaif_variant *variant;
