@@ -1791,6 +1791,90 @@ static int wcd_mbhc_usbc_ana_event_handler(struct notifier_block *nb,
 }
 #endif
 
+#if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
+/*
+ * wcd_mbhc_usbss_reg_retry - delayed work to retry wcd_usbss notifier
+ * registration.
+ *
+ * wcd-usbss (WCD939X USB-SS switch IC) is an I2C device whose probe may
+ * complete after snd_soc_card late_probe runs on platforms using
+ * qcom,msm-mbhc-usbc-audio-supported.  When wcd_usbss_reg_notifier()
+ * is called while the I2C driver has not finished probing, it returns
+ * -EINVAL because i2c_get_clientdata() is still NULL.  Rather than let
+ * that error propagate and abort sound card registration, we schedule
+ * this work to keep retrying until the I2C driver is ready.
+ */
+static void wcd_mbhc_usbss_reg_retry(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct wcd_mbhc *mbhc =
+		container_of(dwork, struct wcd_mbhc, mbhc_usbss_reg_dwork);
+	int rc;
+
+	if (!mbhc->wcd_usbss_aatc_dev_np)
+		return;
+
+	rc = wcd_usbss_reg_notifier(&mbhc->aatc_dev_nb,
+				    mbhc->wcd_usbss_aatc_dev_np);
+	if (rc == -EINVAL) {
+		/* I2C driver still not ready; retry up to 100 times (~5s) */
+		if (++mbhc->usbss_reg_retry_cnt <= 100) {
+			schedule_delayed_work(&mbhc->mbhc_usbss_reg_dwork,
+					      msecs_to_jiffies(50));
+		} else {
+			dev_err(mbhc->component->dev,
+				"%s: wcd_usbss probe timeout after %u retries, USB-C headset disabled\n",
+				__func__, mbhc->usbss_reg_retry_cnt);
+		}
+	} else if (rc) {
+		dev_err(mbhc->component->dev,
+			"%s: wcd_usbss_reg_notifier failed, rc=%d\n",
+			__func__, rc);
+	}
+}
+#endif /* CONFIG_QCOM_WCD_USBSS_I2C */
+
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
+/*
+ * wcd_mbhc_fsa_reg_retry - delayed work to retry fsa4480 notifier
+ * registration.
+ *
+ * fsa4480 is an I2C device whose probe may complete after snd_soc_card
+ * late_probe runs.  When fsa4480_reg_notifier() is called while the I2C
+ * driver has not finished probing, it returns -EINVAL because
+ * of_find_i2c_device_by_node() or i2c_get_clientdata() is still NULL.
+ * Rather than let that error propagate and abort sound card registration,
+ * we schedule this work to keep retrying until the I2C driver is ready.
+ */
+static void wcd_mbhc_fsa_reg_retry(struct work_struct *work)
+{
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct wcd_mbhc *mbhc =
+		container_of(dwork, struct wcd_mbhc, mbhc_fsa_reg_dwork);
+	int rc;
+
+	if (!mbhc->fsa_aatc_dev_np)
+		return;
+
+	rc = fsa4480_reg_notifier(&mbhc->aatc_dev_nb, mbhc->fsa_aatc_dev_np);
+	if (rc == -EINVAL) {
+		/* I2C driver still not ready; retry up to 100 times (~5s) */
+		if (++mbhc->fsa_reg_retry_cnt <= 100) {
+			schedule_delayed_work(&mbhc->mbhc_fsa_reg_dwork,
+					      msecs_to_jiffies(50));
+		} else {
+			dev_err(mbhc->component->dev,
+				"%s: fsa4480 probe timeout after %u retries, USB-C headset disabled\n",
+				__func__, mbhc->fsa_reg_retry_cnt);
+		}
+	} else if (rc) {
+		dev_err(mbhc->component->dev,
+			"%s: fsa4480_reg_notifier failed, rc=%d\n",
+			__func__, rc);
+	}
+}
+#endif /* CONFIG_QCOM_FSA4480_I2C */
+
 int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 {
 	int rc = 0;
@@ -1870,19 +1954,57 @@ int wcd_mbhc_start(struct wcd_mbhc *mbhc, struct wcd_mbhc_config *mbhc_cfg)
 		mbhc->aatc_dev_nb.notifier_call = wcd_mbhc_usbc_ana_event_handler;
 		mbhc->aatc_dev_nb.priority = 0;
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
-		if (mbhc->wcd_usbss_aatc_dev_np)
+		if (mbhc->wcd_usbss_aatc_dev_np) {
 			rc = wcd_usbss_reg_notifier(&mbhc->aatc_dev_nb,
 					mbhc->wcd_usbss_aatc_dev_np);
+			if (rc == -EINVAL) {
+				/*
+				 * wcd-usbss I2C probe races with late_probe on
+				 * this platform.  Schedule a retry so that sound
+				 * card registration is not blocked.
+				 */
+				dev_warn(mbhc->component->dev,
+					"%s: wcd_usbss not ready, retry in 50ms\n",
+					__func__);
+				schedule_delayed_work(
+					&mbhc->mbhc_usbss_reg_dwork,
+					msecs_to_jiffies(50));
+				rc = 0;
+			} else if (rc) {
+				dev_err(mbhc->component->dev,
+					"%s: wcd_usbss_reg_notifier failed, rc=%d\n",
+					__func__, rc);
+			}
+		}
 #endif
 #if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
-		if (mbhc->fsa_aatc_dev_np)
+		if (mbhc->fsa_aatc_dev_np) {
 			rc = fsa4480_reg_notifier(&mbhc->aatc_dev_nb, mbhc->fsa_aatc_dev_np);
+			if (rc == -EINVAL) {
+				/*
+				 * fsa4480 I2C probe races with late_probe on
+				 * this platform.  Schedule a retry so that sound
+				 * card registration is not blocked.
+				 */
+				dev_warn(mbhc->component->dev,
+					"%s: fsa4480 not ready, retry in 50ms\n",
+					__func__);
+				schedule_delayed_work(
+					&mbhc->mbhc_fsa_reg_dwork,
+					msecs_to_jiffies(50));
+				rc = 0;
+			} else if (rc) {
+				dev_err(mbhc->component->dev,
+					"%s: fsa4480_reg_notifier failed, rc=%d\n",
+					__func__, rc);
+			}
+		}
 #endif
 	}
 
 	return rc;
 err:
-	dev_dbg(mbhc->component->dev, "%s: leave %d\n", __func__, rc);
+	dev_err(mbhc->component->dev, "%s: leave %d\n", __func__, rc);
 	return rc;
 }
 EXPORT_SYMBOL(wcd_mbhc_start);
@@ -1914,13 +2036,21 @@ void wcd_mbhc_stop(struct wcd_mbhc *mbhc)
 	}
 
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
-	if (mbhc->mbhc_cfg->enable_usbc_analog && mbhc->wcd_usbss_aatc_dev_np)
+	if (mbhc->mbhc_cfg && mbhc->mbhc_cfg->enable_usbc_analog &&
+			mbhc->wcd_usbss_aatc_dev_np) {
+		cancel_delayed_work_sync(&mbhc->mbhc_usbss_reg_dwork);
+		mbhc->usbss_reg_retry_cnt = 0;
 		wcd_usbss_unreg_notifier(&mbhc->aatc_dev_nb, mbhc->wcd_usbss_aatc_dev_np);
+	}
 #endif
 
 #if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
-	if (mbhc->mbhc_cfg->enable_usbc_analog && mbhc->fsa_aatc_dev_np)
+	if (mbhc->mbhc_cfg && mbhc->mbhc_cfg->enable_usbc_analog &&
+			mbhc->fsa_aatc_dev_np) {
+		cancel_delayed_work_sync(&mbhc->mbhc_fsa_reg_dwork);
+		mbhc->fsa_reg_retry_cnt = 0;
 		fsa4480_unreg_notifier(&mbhc->aatc_dev_nb, mbhc->fsa_aatc_dev_np);
+	}
 #endif
 
 	pr_debug("%s: leave\n", __func__);
@@ -2067,6 +2197,14 @@ int wcd_mbhc_init(struct wcd_mbhc *mbhc, struct snd_soc_component *component,
 		INIT_DELAYED_WORK(&mbhc->mbhc_firmware_dwork,
 				  wcd_mbhc_fw_read);
 		INIT_DELAYED_WORK(&mbhc->mbhc_btn_dwork, wcd_btn_lpress_fn);
+#if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
+		INIT_DELAYED_WORK(&mbhc->mbhc_usbss_reg_dwork,
+				  wcd_mbhc_usbss_reg_retry);
+#endif
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
+		INIT_DELAYED_WORK(&mbhc->mbhc_fsa_reg_dwork,
+				  wcd_mbhc_fsa_reg_retry);
+#endif
 	}
 	init_completion(&mbhc->btn_press_compl);
 
@@ -2231,6 +2369,21 @@ EXPORT_SYMBOL(wcd_mbhc_init);
 void wcd_mbhc_deinit(struct wcd_mbhc *mbhc)
 {
 	struct snd_soc_component *component = mbhc->component;
+
+#if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
+	/*
+	 * Ensure the retry work is stopped before freeing mbhc. wcd_mbhc_stop
+	 * normally does this, but callers that invoke wcd_mbhc_deinit directly
+	 * (e.g. wcd939x_mbhc_deinit) without a preceding wcd_mbhc_stop would
+	 * otherwise leave a pending work item referencing freed memory.
+	 */
+	cancel_delayed_work_sync(&mbhc->mbhc_usbss_reg_dwork);
+	mbhc->usbss_reg_retry_cnt = 0;
+#endif
+#if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
+	cancel_delayed_work_sync(&mbhc->mbhc_fsa_reg_dwork);
+	mbhc->fsa_reg_retry_cnt = 0;
+#endif
 
 	mbhc->mbhc_cb->free_irq(component, mbhc->intr_ids->mbhc_sw_intr, mbhc);
 	mbhc->mbhc_cb->free_irq(component, mbhc->intr_ids->mbhc_btn_press_intr,

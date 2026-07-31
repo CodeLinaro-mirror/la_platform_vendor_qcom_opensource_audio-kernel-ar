@@ -628,6 +628,12 @@ struct wcd_mbhc {
 	struct device_node *wcd_usbss_aatc_dev_np;
 	struct device_node *fsa_aatc_dev_np;
 	struct notifier_block aatc_dev_nb;
+	/* delayed retry for wcd_usbss notifier registration */
+	struct delayed_work mbhc_usbss_reg_dwork;
+	unsigned int usbss_reg_retry_cnt;
+	/* delayed retry for fsa4480 notifier registration */
+	struct delayed_work mbhc_fsa_reg_dwork;
+	unsigned int fsa_reg_retry_cnt;
 
 	struct extcon_dev *extdev;
 };
