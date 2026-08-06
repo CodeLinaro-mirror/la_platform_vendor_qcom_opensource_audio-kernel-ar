@@ -227,7 +227,6 @@ audio_modules.register(
             ":%b_snd_event_dlkm",
             ":%b_wcd9378_dlkm",
             ":%b_wcd937x_dlkm",
-            ":%b_wsa881x_dlkm",
 	],
 )
 # >>>> ASOC/CODEC MODULES <<<<
@@ -460,21 +459,6 @@ audio_modules.register(
         }
     },
     deps = [":%b_wcd_core_dlkm"]
-)
-# >>>> WSA881X-SOUNDWIRE MODULE <<<<
-audio_modules.register(
-    name = "wsa881x_dlkm",
-    path = ASOC_CODECS_PATH,
-    config_option = "CONFIG_SND_SOC_WSA881X",
-    srcs = [
-        "wsa881x.c",
-        "wsa881x-regmap.c",
-        "wsa881x-tables.c",
-        "wsa881x-temp-sensor.c",
-    ],
-    deps = [":%b_wcd_core_dlkm",
-            ":%b_swr_dlkm",
-	   ],
 )
 # >>>> WSA883X MODULE <<<<
 audio_modules.register(
