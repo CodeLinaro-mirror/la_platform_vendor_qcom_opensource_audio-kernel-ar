@@ -1098,7 +1098,7 @@ static int msm_int_wsa883x_init(struct snd_soc_pcm_runtime* rtd)
                 snd_soc_card_get_drvdata(rtd->card);
 
 	pr_err("%s Entered \n",__func__);
-        if (pdata->wsa_max_devs > 0) {
+        if (pdata->wsa_max_devs > 1) {
 		pr_err("%s wsa-codec.1 ",__func__);
                 component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
                 if (!component) {
@@ -1123,7 +1123,62 @@ static int msm_int_wsa883x_init(struct snd_soc_pcm_runtime* rtd)
                         wsa883x_codec_info_create_codec_entry(pdata->codec_root,
                                         component);
                 }
-        }
+	} else if (pdata->wsa_max_devs == 1) {
+                /*
+                 * A single WSA may be used as either the left or right
+                 * speaker. Find the available component first, then select
+                 * its channel map from the DT sound-name-prefix.
+                 */
+                component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.1");
+                if (!component) {
+                        pr_err("%s: wsa-codec.1 component is NULL, "
+                                "try wsa-codec.2\n", __func__);
+
+                        component = snd_soc_rtdcom_lookup(rtd, "wsa-codec.2");
+                        if (!component) {
+                                pr_err("%s: no WSA883x component found\n",
+                                        __func__);
+                                return -EINVAL;
+                        }
+                }
+
+                if (!component->name_prefix) {
+                        pr_err("%s: component %s has no sound-name-prefix\n",
+                                __func__, component->name);
+                        return -EINVAL;
+                }
+
+                if (!strcmp(component->name_prefix, "SpR")) {
+                        pr_info("%s: component %s prefix SpR, "
+                                "use right channel map\n",
+                                __func__, component->name);
+
+                        wsa883x_set_channel_map(component,
+                                        &spkright_ports[0],
+                                        WSA883X_MAX_SWR_PORTS,
+                                        &ch_mask[0], &ch_rate[0],
+                                        &spkright_port_types[0]);
+                } else if (!strcmp(component->name_prefix, "SpL")) {
+                        pr_info("%s: component %s prefix SpL, "
+                                "use left channel map\n",
+                                __func__, component->name);
+
+                        wsa883x_set_channel_map(component,
+                                        &spkleft_ports[0],
+                                        WSA883X_MAX_SWR_PORTS,
+                                        &ch_mask[0], &ch_rate[0],
+                                        &spkleft_port_types[0]);
+                } else {
+                        pr_err("%s: component %s has unsupported prefix %s\n",
+                                __func__, component->name,
+                                component->name_prefix);
+                        return -EINVAL;
+                }
+
+                wsa883x_codec_info_create_codec_entry(pdata->codec_root,
+                                component);
+         }
+
 
         /* If current platform has more than one WSA */
         if (pdata->wsa_max_devs > 1) {
