@@ -149,6 +149,7 @@ struct wcd9378_priv {
 	struct blocking_notifier_head notifier;
 	u8 ecid_val[WCD9378_ECID_REGS];
 	struct snd_info_entry *ecid_entry;
+	struct proc_dir_entry *wcd9378_proc_entry;
 };
 
 struct wcd9378_micbias_setting {

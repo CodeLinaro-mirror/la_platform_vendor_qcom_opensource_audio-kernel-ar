@@ -19,12 +19,15 @@
 #include <bindings/audio-codec-port-types.h>
 #include <linux/qti-regmap-debugfs.h>
 #include <linux/irqdesc.h>
+#include <linux/proc_fs.h>
+#include <linux/vmalloc.h>
 
 #include "wcd9378-reg-masks.h"
 #include "wcd9378.h"
 #include "internal.h"
 #include "asoc/bolero-slave-internal.h"
-
+#define REGDUMP_PRINT_LEN 8
+#define REGDUMP_BYTES_PER_LINE 20
 #define NUM_SWRS_DT_PARAMS 5
 
 #define WCD9378_MOBILE_MODE 0x01
@@ -1116,6 +1119,48 @@ static int wcd9378_sys_usage_bit_get(
 	return 0;
 }
 
+static bool wcd9378_is_adc_path_active(struct wcd9378_priv *wcd9378,
+					int adc_idx)
+{
+	switch (adc_idx) {
+	case 0:
+		return test_bit(TX0_AMIC1_EN, &wcd9378->sys_usage_status) ||
+		       test_bit(TX0_AMIC2_EN, &wcd9378->sys_usage_status);
+	case 1:
+		return test_bit(TX1_AMIC2_EN, &wcd9378->sys_usage_status) ||
+		       test_bit(TX1_AMIC3_EN, &wcd9378->sys_usage_status);
+	case 2:
+		return test_bit(TX2_AMIC1_EN, &wcd9378->sys_usage_status) ||
+		       test_bit(TX2_AMIC4_EN, &wcd9378->sys_usage_status);
+	default:
+		return false;
+	}
+}
+
+/*
+ * wcd9378_is_multi_mic_scenario - check if more than one TX ADC path is active
+ * @component: codec component handle
+ *
+ * Use sys_usage_status instead of MUX registers or status_mask. MUX settings
+ * can be stale after route changes, and status_mask bits are also used for
+ * transient sequencer state. sys_usage_status tracks the currently powered TX
+ * ADC paths and avoids false multi-mic detection for VA/headset single-mic
+ * cases.
+ */
+static bool wcd9378_is_multi_mic_scenario(struct snd_soc_component *component)
+{
+	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
+	int adc_count = 0;
+	int idx;
+
+	for (idx = 0; idx < 3; idx++) {
+		if (wcd9378_is_adc_path_active(wcd9378, idx))
+			adc_count++;
+	}
+
+	return adc_count > 1;
+}
+
 static int wcd9378_tx_sequencer_enable(struct snd_soc_dapm_widget *w,
 			       struct snd_kcontrol *kcontrol, int event)
 {
@@ -1146,6 +1191,76 @@ static int wcd9378_tx_sequencer_enable(struct snd_soc_dapm_widget *w,
 		}
 
 		rate = wcd9378_get_clk_rate(wcd9378->tx_mode[w->shift - ADC1]);
+		/*
+		 * In a multi-mic scenario, ensure the SWR bus clock is at least
+		 * 9.6MHz when the first ADC sequencer is enabled. This prevents
+		 * a mid-stream clock rate change (e.g. 4.8MHz -> 9.6MHz when the
+		 * second ADC starts in ADC_LP mode) that can intermittently mute
+		 * a channel. Single-mic ADC_LP recordings are unaffected and
+		 * continue to use 4.8MHz.
+		 */
+		if (rate < SWR_CLK_RATE_9P6MHZ &&
+				wcd9378_is_multi_mic_scenario(component)) {
+			int _idx;
+
+			dev_dbg(component->dev,
+				"%s: multi-mic scenario, upgrading SWR clk rate to 9.6MHz\n",
+				__func__);
+			rate = SWR_CLK_RATE_9P6MHZ;
+			/*
+			 * If another ADC path is already active at a lower
+			 * clock rate, reconnect it at 9.6MHz now. This
+			 * prevents a mid-stream bus clock change when the
+			 * current ADC connects at 9.6MHz.
+			 */
+			for (_idx = 0; _idx < 3; _idx++) {
+				int _adc_shift = ADC1 + _idx;
+
+				if (_adc_shift == w->shift)
+					continue;
+				if (!wcd9378_is_adc_path_active(wcd9378, _idx))
+					continue;
+				if (wcd9378_get_clk_rate(wcd9378->tx_mode[_idx]) >=
+						SWR_CLK_RATE_9P6MHZ)
+					continue;
+				dev_dbg(component->dev,
+					"%s: reconnecting active ADC at 9.6MHz to avoid bus clk change\n",
+					__func__);
+				wcd9378_tx_connect_port(component, _adc_shift,
+							0, false);
+				/*
+				 * If ADC2 had MBHC connected at 4.8MHz, also
+				 * disconnect it before the datapath disable so
+				 * all ports are consistent.
+				 */
+				if (_adc_shift == ADC2 &&
+				    test_bit(AMIC2_BCS_ENABLE,
+					     &wcd9378->status_mask))
+					wcd9378_tx_connect_port(component, MBHC,
+								0, false);
+				/*
+				 * Apply the disconnect now so the SWR bus clock
+				 * change (4.8MHz -> 9.6MHz, ssp_period 3->6)
+				 * happens here — while no active channel is
+				 * running — rather than later when ADC1 is being
+				 * initialized. This is the key step that prevents
+				 * the mid-stream clock change from muting ch2.
+				 */
+				swr_slvdev_datapath_control(
+						wcd9378->tx_swr_dev,
+						wcd9378->tx_swr_dev->dev_num,
+						false);
+				wcd9378_tx_connect_port(component, _adc_shift,
+							SWR_CLK_RATE_9P6MHZ,
+							true);
+				if (_adc_shift == ADC2 &&
+				    test_bit(AMIC2_BCS_ENABLE,
+					     &wcd9378->status_mask))
+					wcd9378_tx_connect_port(component, MBHC,
+								SWR_CLK_RATE_9P6MHZ,
+								true);
+			}
+		}
 		if (w->shift == ADC2 && ((snd_soc_component_read(component,
 				WCD9378_TX_NEW_TX_CH12_MUX) &
 				WCD9378_TX_NEW_TX_CH12_MUX_CH2_SEL_MASK) == 0x10)) {
@@ -4121,8 +4236,101 @@ static int wcd9378_wcd_mode_check(struct snd_soc_component *component)
 	return 0;
 }
 
+
+static int regdump_read(struct snd_soc_component *component,
+		const u32 *reg_array, int reg_num,
+		bool (*sdca_readable_register)(u32 reg),
+		char __user *user_buf, size_t count, loff_t *ppos)
+{
+	int i = 0, start_idx = 0, ret = 0;
+	size_t pos = 0;
+	char *buf;
+	unsigned int reg_val = 0, reg_len = 0;
+	unsigned int reg_val_len = 0, regdump_wr_len = 0;
+
+	buf = vzalloc(count);
+	if (!buf)
+		return -ENOMEM;
+
+	/*
+	 * Use a fixed 8-char hex width for 32-bit SDCA register addresses.
+	 * reg_val_len is 2 bytes (one 8-bit value printed as 2 hex digits).
+	 * regdump_wr_len accounts for "XXXXXXXX: YY\n" = 8 + 2 + 2 + 1 = 13.
+	 */
+	reg_len = 8;
+	reg_val_len = 2 * DIV_ROUND_UP(REGDUMP_PRINT_LEN, 8);
+	regdump_wr_len = reg_len + reg_val_len + 3;
+
+	/*
+	 * Use the pre-built reg_array of known SDCA registers instead of
+	 * iterating the full 67M-entry address range (WCD9378_BASE to
+	 * WCD9378_MAX_REGISTER). Iterating that range issues a SoundWire
+	 * transaction for every address — including the ~67M non-existent
+	 * ones — causing extreme latency and returning stale zeros for
+	 * unimplemented addresses.
+	 *
+	 * snd_soc_component_read() serves non-volatile registers from the
+	 * regmap cache, avoiding unnecessary SoundWire bus traffic.
+	 *
+	 * Resume from where the previous read left off via ppos, using
+	 * BYTES_PER_LINE as the stride (matches sdca-registers-api.c).
+	 */
+	start_idx = (int)(*ppos / REGDUMP_BYTES_PER_LINE);
+	for (i = start_idx; i < reg_num; i++) {
+		if ((pos + regdump_wr_len) >= count)
+			break;
+
+		if (!sdca_readable_register(reg_array[i]))
+			continue;
+
+		scnprintf(buf + pos, count - pos, "%.*x: ", reg_len, reg_array[i]);
+		pos += reg_len + 2;
+
+		reg_val = snd_soc_component_read(component, reg_array[i]);
+		scnprintf(buf + pos, count - pos, "%.*x", reg_val_len, reg_val & 0xFF);
+		pos += reg_val_len;
+		buf[pos++] = '\n';
+		*ppos += REGDUMP_BYTES_PER_LINE;
+	}
+
+	ret = pos;
+	if (copy_to_user(user_buf, buf, pos))
+		ret = -EFAULT;
+
+	vfree(buf);
+	return ret;
+}
+
+static ssize_t wcd9378_proc_read(struct file *filep, char __user *buf, size_t size, loff_t *ppos)
+{
+	ssize_t ret = 0;
+	struct wcd9378_priv *wcd9378 = NULL;
+
+	if (!size || !filep || !ppos || !buf || *ppos < 0)
+		return -EINVAL;
+
+	wcd9378 = pde_data(file_inode(filep));
+	if (!wcd9378)
+		return -EINVAL;
+
+	if (!wcd9378->component || !wcd9378->regdump_info)
+		return -EINVAL;
+
+	ret = regdump_read(wcd9378->component,
+			wcd9378->regdump_info->reg_array,
+			wcd9378->regdump_info->reg_num,
+			wcd9378->regdump_info->sdca_readable_register,
+			buf, size, ppos);
+	return ret;
+}
+
+static const struct proc_ops wcd9378_proc_ops = {
+	.proc_read = wcd9378_proc_read,
+};
+
 static int wcd9378_soc_codec_probe(struct snd_soc_component *component)
 {
+	struct proc_dir_entry *wcd9378_proc_regdump_file = NULL;
 	struct wcd9378_priv *wcd9378 = snd_soc_component_get_drvdata(component);
 	struct snd_soc_dapm_context *dapm =
 			snd_soc_component_get_dapm(component);
@@ -4137,7 +4345,20 @@ static int wcd9378_soc_codec_probe(struct snd_soc_component *component)
 	snd_soc_component_init_regmap(component, wcd9378->regmap);
 
 	devm_regmap_qti_debugfs_register(&wcd9378->tx_swr_dev->dev, wcd9378->regmap);
-
+	wcd9378->wcd9378_proc_entry = proc_mkdir("wcd9378_reginfo", NULL);
+	if (wcd9378->wcd9378_proc_entry) {
+		wcd9378_proc_regdump_file = proc_create_data("wcd9378_regdump", 0444,
+				wcd9378->wcd9378_proc_entry, &wcd9378_proc_ops, wcd9378);
+		if (!wcd9378_proc_regdump_file) {
+			dev_err(component->dev,
+					"%s: error creating proc reg read interface\n",
+					__func__);
+			proc_remove(wcd9378->wcd9378_proc_entry);
+			wcd9378->wcd9378_proc_entry = NULL;
+		}
+	} else {
+		dev_err(component->dev, "%s: error creating proc dir interface\n", __func__);
+	}
 	ret = wcd9378_wcd_mode_check(component);
 	if (!ret) {
 		dev_err(component->dev, "wcd mode check failed\n");
@@ -4233,6 +4454,9 @@ static void wcd9378_soc_codec_remove(struct snd_soc_component *component)
 			__func__);
 		return;
 	}
+	if (wcd9378->wcd9378_proc_entry)
+		proc_remove(wcd9378->wcd9378_proc_entry);
+
 	if (wcd9378->register_notifier)
 		wcd9378->register_notifier(wcd9378->handle,
 						&wcd9378->nblock,
