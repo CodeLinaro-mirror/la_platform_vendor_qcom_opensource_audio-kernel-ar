@@ -55,5 +55,7 @@ ddk_headers(
 )
 
 load(":build/bengal.bzl", "define_bengal")
+load(":build/bengal-le.bzl", "define_bengal_le")
 
 define_bengal()
+define_bengal_le()
