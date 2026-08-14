@@ -42,6 +42,7 @@
 #define  CF_MIN_3DB_150HZ		0x2
 
 #define LPASS_CDC_VA_MACRO_DMIC_SAMPLE_RATE_UNDEFINED 0
+#define MAX_TUNING_REG_VALUE_PAIRS 30
 #define LPASS_CDC_VA_MACRO_TX_PATH_OFFSET \
 	(LPASS_CDC_VA_TX1_TX_PATH_CTL - LPASS_CDC_VA_TX0_TX_PATH_CTL)
 #define LPASS_CDC_VA_MACRO_TX_DMIC_CLK_DIV_MASK 0x0E
@@ -187,6 +188,8 @@ struct lpass_cdc_va_macro_priv {
 	bool use_lpi_mixer_control;
 	int wlock_holders;
 	struct device_node *dmic_eldo_en_gpio_p;
+	int adapt_tuning_registers;
+	u32 tuning_reg_values[MAX_TUNING_REG_VALUE_PAIRS];
 };
 
 
@@ -1045,6 +1048,9 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 	u16 tx_fs_reg = 0;
 #ifdef CONFIG_BOLERO_VER_2P85
 	u16 adapt_ctrl = 0;
+	u16 adapt_pdm_ctl0 = 0;
+	u16 adapt_pdm_ctl1 = 0;
+	u8 i = 0;
 #endif
 	struct device *va_dev = NULL;
 	struct lpass_cdc_va_macro_priv *va_priv = NULL;
@@ -1077,6 +1083,10 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 #ifdef CONFIG_BOLERO_VER_2P85
 	adapt_ctrl = LPASS_VA_CDC_ADPT0_ADPT_CTRL +
 			LPASS_CDC_VA_MACRO_TX_PATH_OFFSET * decimator;
+	adapt_pdm_ctl0 = LPASS_VA_CDC_ADPT0_DBG_PDM_RATE_CTRL_0 +
+			LPASS_CDC_VA_MACRO_TX_PATH_OFFSET * decimator;
+	adapt_pdm_ctl1 = LPASS_VA_CDC_ADPT0_DBG_PDM_RATE_CTRL_1 +
+			LPASS_CDC_VA_MACRO_TX_PATH_OFFSET * decimator;
 #endif
 	va_priv->pcm_rate[decimator] = (snd_soc_component_read(component,
 				tx_fs_reg) & 0x0F);
@@ -1092,8 +1102,24 @@ static int lpass_cdc_va_macro_enable_dec(struct snd_soc_dapm_widget *w,
 		break;
 	case SND_SOC_DAPM_POST_PMU:
 #ifdef CONFIG_BOLERO_VER_2P85
-		//Disable adapt block
-		snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
+		if (va_priv->adapt_tuning_registers > 0) {
+			snd_soc_component_update_bits(component, adapt_pdm_ctl0, 0xFF, 0x59);
+			snd_soc_component_update_bits(component, adapt_pdm_ctl1, 0xFF, 0x06);
+			snd_soc_component_update_bits(component, dec_cfg_reg, 0xFF, 0x00);
+			/* Enable adapt block */
+			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x41);
+			if (va_priv->adapt_tuning_registers <= MAX_TUNING_REG_VALUE_PAIRS) {
+				for (i = 0; i < va_priv->adapt_tuning_registers; i += 3) {
+					snd_soc_component_update_bits(component,
+					(va_priv->tuning_reg_values[i] +
+					 LPASS_CDC_VA_MACRO_TX_PATH_OFFSET * decimator),
+					 0xFF, va_priv->tuning_reg_values[i + 1]);
+				}
+			}
+		} else {
+			//Disable adapt block
+			snd_soc_component_update_bits(component, adapt_ctrl, 0xFF, 0x00);
+		}
 #endif
 		/* Enable TX CLK */
 		snd_soc_component_update_bits(component,
@@ -2557,6 +2583,18 @@ static int lpass_cdc_va_macro_probe(struct platform_device *pdev)
 							temp[i], va_priv, i, true);
 	}
 
+#ifdef CONFIG_BOLERO_VER_2P85
+	va_priv->adapt_tuning_registers = of_property_read_variable_u32_array(
+				pdev->dev.of_node, "adapt-tuning-reg-values",
+				va_priv->tuning_reg_values, 0,
+				ARRAY_SIZE(va_priv->tuning_reg_values));
+
+	if (va_priv->adapt_tuning_registers == -EOVERFLOW ||
+		(va_priv->adapt_tuning_registers < 0)) {
+		dev_err(&pdev->dev, "failure in reading adapt tuning registers\n");
+		va_priv->adapt_tuning_registers = 0;
+	}
+#endif
 
 	if (of_find_property(pdev->dev.of_node, is_used_va_swr_gpio_dt,
 			     NULL)) {
