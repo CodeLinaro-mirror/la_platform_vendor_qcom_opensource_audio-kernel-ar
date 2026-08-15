@@ -1192,39 +1192,40 @@ static int wcd9378_tx_sequencer_enable(struct snd_soc_dapm_widget *w,
 
 		rate = wcd9378_get_clk_rate(wcd9378->tx_mode[w->shift - ADC1]);
 		/*
-		 * In a multi-mic scenario, ensure the SWR bus clock is at least
-		 * 9.6MHz when the first ADC sequencer is enabled. This prevents
-		 * a mid-stream clock rate change (e.g. 4.8MHz -> 9.6MHz when the
-		 * second ADC starts in ADC_LP mode) that can intermittently mute
-		 * a channel. Single-mic ADC_LP recordings are unaffected and
-		 * continue to use 4.8MHz.
+		 * swrm_update_bus_clk() aggregates every active port's own
+		 * ch_rate and picks the bus clock that covers the sum, so
+		 * the bus clock will rise to 9.6MHz on its own once a second
+		 * mic path joins (even two ADC_LP mics at 4.8MHz each sum to
+		 * 9.6MHz) — ports must keep reporting their own true rate,
+		 * not a forced 9.6MHz, or ports sharing a master port end up
+		 * with inconsistent sinterval values. What still needs help
+		 * is *when* that rise happens: if it happens while another
+		 * ADC path is already streaming, that path glitches. So when
+		 * a second mic path is about to join, cycle any other active
+		 * ADC path through disable/reconnect first, so the bus clock
+		 * change lands while no channel is actively running.
 		 */
 		if (rate < SWR_CLK_RATE_9P6MHZ &&
 				wcd9378_is_multi_mic_scenario(component)) {
 			int _idx;
 
 			dev_dbg(component->dev,
-				"%s: multi-mic scenario, upgrading SWR clk rate to 9.6MHz\n",
+				"%s: multi-mic scenario, cycling active ADC paths to apply bus clk change safely\n",
 				__func__);
-			rate = SWR_CLK_RATE_9P6MHZ;
-			/*
-			 * If another ADC path is already active at a lower
-			 * clock rate, reconnect it at 9.6MHz now. This
-			 * prevents a mid-stream bus clock change when the
-			 * current ADC connects at 9.6MHz.
-			 */
 			for (_idx = 0; _idx < 3; _idx++) {
 				int _adc_shift = ADC1 + _idx;
+				int _adc_rate;
 
 				if (_adc_shift == w->shift)
 					continue;
 				if (!wcd9378_is_adc_path_active(wcd9378, _idx))
 					continue;
-				if (wcd9378_get_clk_rate(wcd9378->tx_mode[_idx]) >=
-						SWR_CLK_RATE_9P6MHZ)
+				_adc_rate = wcd9378_get_clk_rate(
+						wcd9378->tx_mode[_idx]);
+				if (_adc_rate >= SWR_CLK_RATE_9P6MHZ)
 					continue;
 				dev_dbg(component->dev,
-					"%s: reconnecting active ADC at 9.6MHz to avoid bus clk change\n",
+					"%s: reconnecting active ADC to avoid mid-stream bus clk change\n",
 					__func__);
 				wcd9378_tx_connect_port(component, _adc_shift,
 							0, false);
@@ -1240,24 +1241,25 @@ static int wcd9378_tx_sequencer_enable(struct snd_soc_dapm_widget *w,
 								0, false);
 				/*
 				 * Apply the disconnect now so the SWR bus clock
-				 * change (4.8MHz -> 9.6MHz, ssp_period 3->6)
-				 * happens here — while no active channel is
-				 * running — rather than later when ADC1 is being
-				 * initialized. This is the key step that prevents
-				 * the mid-stream clock change from muting ch2.
+				 * change happens here — while no active channel
+				 * is running — rather than later when the new
+				 * ADC path connects and pushes the aggregate
+				 * clock up. This is the key step that prevents
+				 * the mid-stream clock change from muting this
+				 * channel.
 				 */
 				swr_slvdev_datapath_control(
 						wcd9378->tx_swr_dev,
 						wcd9378->tx_swr_dev->dev_num,
 						false);
 				wcd9378_tx_connect_port(component, _adc_shift,
-							SWR_CLK_RATE_9P6MHZ,
+							_adc_rate,
 							true);
 				if (_adc_shift == ADC2 &&
 				    test_bit(AMIC2_BCS_ENABLE,
 					     &wcd9378->status_mask))
 					wcd9378_tx_connect_port(component, MBHC,
-								SWR_CLK_RATE_9P6MHZ,
+								SWR_CLK_RATE_4P8MHZ,
 								true);
 			}
 		}
