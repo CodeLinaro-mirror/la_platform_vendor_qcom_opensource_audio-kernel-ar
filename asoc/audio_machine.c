@@ -434,6 +434,14 @@ static const struct snd_soc_dapm_widget msm_int_dapm_widgets[] = {
 	SND_SOC_DAPM_MIC("Digital Mic5", msm_dmic_event),
 	SND_SOC_DAPM_MIC("Digital Mic6", msm_dmic_event),
 	SND_SOC_DAPM_MIC("Digital Mic7", msm_dmic_event),
+	/*
+	 * Board-level endpoints for external I2S codecs (e.g. MAX98091 on the
+	 * Industrial variant). Unrouted on boards that don't reference them.
+	 */
+	SND_SOC_DAPM_HP("Headphone", NULL),
+	SND_SOC_DAPM_SPK("Speaker", NULL),
+	SND_SOC_DAPM_MIC("Headset Mic", NULL),
+	SND_SOC_DAPM_MIC("Int Mic", NULL),
 };
 
 #ifndef CONFIG_AUDIO_BTFM_PROXY
@@ -1352,6 +1360,79 @@ static struct snd_soc_dai_link msm_mi2s_dai_links[] = {
 	},
 };
 
+/*
+ * External MAX98091 codec on physical I2S0, which is the "Quaternary" MI2S slot
+ * in this driver's naming - LPASS_BE_QUAT_MI2S_RX resolves to
+ * "QAIF-QAIF_AUD-RX-0" -> QAIF_AUD_INTF0 -> CLOCK_ID_AUD_INTF0_IBIT,
+ * matching the bit clock the LE reference assigns to this same port. Replaces
+ * the generic stub-codec placeholders in msm_mi2s_dai_links[].
+ */
+#define MAX98091_MCLK_FREQ 12288000
+
+static int msm_max98091_dai_link_init(struct snd_soc_pcm_runtime *rtd)
+{
+	struct snd_soc_dai *codec_dai = snd_soc_rtd_to_codec(rtd, 0);
+	int ret;
+
+	/*
+	 * Codec runs as I2S bit-clock/frame-sync consumer (slave); the DSP/AGM
+	 * backend for this port provides BCLK/WS. set_fmt is still required -
+	 * max98090_dai_set_fmt()'s CBC_CFC branch actively programs the
+	 * consumer-mode PLL bypass (CLOCK_RATIO_NI_MSB/LSB, USE_M1_MASK), it
+	 * doesn't just leave POR defaults alone - so without this call the
+	 * codec's clock-divider setup is left in whatever partial/inconsistent
+	 * state POR happens to produce, not a clean, known consumer-mode
+	 * configuration.
+	 */
+	ret = snd_soc_dai_set_fmt(codec_dai, SND_SOC_DAIFMT_CBC_CFC |
+					SND_SOC_DAIFMT_NB_NF |
+					SND_SOC_DAIFMT_I2S);
+	if (ret < 0)
+		dev_err(rtd->dev, "%s: failed to set %s dai fmt, ret %d\n",
+			__func__, codec_dai->name, ret);
+
+	/*
+	 * msm_common_snd_hw_params() only pushes sysclk to wsa885x codecs, so
+	 * the MAX98091 would never learn its MCLK rate and would leave its
+	 * PSCLK/PLL unconfigured. MCLK is a fixed 12.288MHz fed from the DSP
+	 * (clock_audio_max98091_mclk in shikra-audio-iqs.dtsi), so set it once
+	 * here at link init.
+	 */
+	ret = snd_soc_dai_set_sysclk(codec_dai, 0, MAX98091_MCLK_FREQ,
+					SND_SOC_CLOCK_IN);
+	if (ret < 0)
+		dev_err(rtd->dev, "%s: failed to set %s sysclk, ret %d\n",
+			__func__, codec_dai->name, ret);
+
+	return msm_common_dai_link_init(rtd);
+}
+
+static struct snd_soc_dai_link msm_max98091_mi2s_dai_links[] = {
+	{
+		.name = LPASS_BE_QUAT_MI2S_RX,
+		.stream_name = LPASS_BE_QUAT_MI2S_RX,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.init = &msm_max98091_dai_link_init,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(quat_mi2s_max98091_rx),
+	},
+	{
+		.name = LPASS_BE_QUAT_MI2S_TX,
+		.stream_name = LPASS_BE_QUAT_MI2S_TX,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.init = &msm_max98091_dai_link_init,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(quat_mi2s_max98091_tx),
+	},
+};
+
 static struct snd_soc_dai_link msm_mi2s_qaif_cpu_dai_links[] = {
 	{
 		.name = LPASS_BE_QUIN_MI2S_RX,
@@ -2072,6 +2153,11 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 					msm_mi2s_qaif_cpu_dai_links,
 					sizeof(msm_mi2s_qaif_cpu_dai_links));
 				total_links += ARRAY_SIZE(msm_mi2s_qaif_cpu_dai_links);
+			} else if (of_find_property(dev->of_node, "qcom,max98091-supported", NULL)) {
+				memcpy(msm_canoe_dai_links + total_links,
+					msm_max98091_mi2s_dai_links,
+					sizeof(msm_max98091_mi2s_dai_links));
+				total_links += ARRAY_SIZE(msm_max98091_mi2s_dai_links);
 			} else {
 				memcpy(msm_canoe_dai_links + total_links,
 					msm_mi2s_dai_links,

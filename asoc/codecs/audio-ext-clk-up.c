@@ -257,10 +257,33 @@ static void lpass_hw_vote_unprepare(struct clk_hw *hw)
 	}
 }
 
+static unsigned long audio_ext_clk_recalc_rate(struct clk_hw *hw,
+					       unsigned long parent_rate)
+{
+	struct audio_ext_clk_priv *clk_priv = to_audio_clk(hw);
+
+	/*
+	 * LPASS/PRM-backed clocks are configured on the DSP at the rate given by
+	 * qcom,codec-lpass-ext-clk-freq. Report that rate instead of leaving it
+	 * at 0: consumers that query their input clock (e.g. an external I2S
+	 * codec calling clk_round_rate() on its MCLK) otherwise read back 0 and
+	 * misconfigure themselves. Non-LPASS sources keep the old behaviour.
+	 */
+	if ((clk_priv->clk_src >= AUDIO_EXT_CLK_LPASS) &&
+		(clk_priv->clk_src < AUDIO_EXT_CLK_LPASS_MAX)) {
+#ifdef CONFIG_AUDIO_PRM
+		return clk_priv->prm_clk_cfg.clk_freq_in_hz;
+#endif
+	}
+
+	return 0;
+}
+
 static const struct clk_ops audio_ext_clk_ops = {
 	.prepare = audio_ext_clk_prepare,
 	.unprepare = audio_ext_clk_unprepare,
 	.get_parent = audio_ext_clk_get_parent,
+	.recalc_rate = audio_ext_clk_recalc_rate,
 };
 
 static const struct clk_ops lpass_hw_vote_ops = {
