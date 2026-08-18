@@ -21,7 +21,7 @@
 
 #define TIMEOUT_MS 200
 #define MAX_RETRY_COUNT 3
-#define APM_READY_WAIT_DURATION 2
+#define APM_READY_WAIT_DURATION 50
 #define GPR_SEND_PKT_APM_TIMEOUT_MS 0
 
 #define DEBUG_TOKEN_MASK 0xFFFFF000
@@ -107,14 +107,19 @@ static int prm_gpr_send_pkt(struct gpr_pkt *pkt, wait_queue_head_t *wait)
 		mutex_unlock(&g_prm.lock);
 		return -ENODEV;
 	}
-	if (!is_apm_ready_check_done && g_prm.is_adsp_up &&
-			(gpr_get_q6_state() == GPR_SUBSYS_LOADED)) {
+	if (!is_apm_ready_check_done &&
+			pkt->hdr.opcode == PRM_CMD_REQUEST_HW_RSC) {
 		pr_info("%s: apm ready check not done\n", __func__);
 		retry = 0;
-		while (!spf_core_is_apm_ready(GPR_SEND_PKT_APM_TIMEOUT_MS) &&
+		while (!(ret = spf_core_is_apm_ready(GPR_SEND_PKT_APM_TIMEOUT_MS)) &&
 							retry < MAX_RETRY_COUNT) {
 			msleep(APM_READY_WAIT_DURATION);
 			++retry;
+		}
+		if (!ret) {
+			pr_err("%s: apm ready check failed\n", __func__);
+			mutex_unlock(&g_prm.lock);
+			return -ETIMEDOUT;
 		}
 		is_apm_ready_check_done = true;
 		pr_info("%s: apm ready check done\n", __func__);
