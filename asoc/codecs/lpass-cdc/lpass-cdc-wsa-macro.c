@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2018-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
-
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/io.h>
@@ -3984,6 +3984,7 @@ static int lpass_cdc_wsa_macro_probe(struct platform_device *pdev)
 	if (ret) {
 		dev_dbg(&pdev->dev, "%s: error finding %s entry in dt\n",
 			__func__, "wsa_data_fs_ctl_reg");
+		ret = 0;
 	}
 
 	if (!wsa_priv->wsa_fs_reg_base && wsa_priv->wsa_fs_ctl_reg)
@@ -4100,6 +4101,7 @@ static int lpass_cdc_wsa_macro_probe(struct platform_device *pdev)
 		dev_info(&pdev->dev, "%s: could not find %s entry in dt\n",
 			__func__, "qcom,noise-gate-mode");
 		wsa_priv->noise_gate_mode = IDLE_DETECT;
+		ret = 0;
 	} else {
 		if (noise_gate_mode >= IDLE_DETECT && noise_gate_mode <= NG3)
 			wsa_priv->noise_gate_mode = noise_gate_mode;

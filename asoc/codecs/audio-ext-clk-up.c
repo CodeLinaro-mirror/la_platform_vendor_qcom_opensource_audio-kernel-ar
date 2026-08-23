@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /* Copyright (c) 2015-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/kernel.h>
@@ -194,6 +194,15 @@ static int lpass_hw_vote_prepare(struct clk_hw *hw)
 			if (__ratelimit(&rtl))
 				pr_err("%s lpass core hw vote failed %d\n",
 					__func__, ret);
+			/*
+			 * On timeout (-ETIMEDOUT), the DSP may have already
+			 * processed the enable request. Send a disable request
+			 * to keep DSP state consistent with the kernel-side failure.
+			 */
+			if (ret == -ETIMEDOUT)
+				audio_prm_set_lpass_hw_core_req(
+					&clk_priv->prm_clk_cfg,
+					HW_CORE_ID_LPASS, 0);
 			return ret;
 		}
 	}
@@ -211,6 +220,17 @@ static int lpass_hw_vote_prepare(struct clk_hw *hw)
 			if (__ratelimit(&rtl))
 				pr_err("%s lpass audio hw vote failed %d\n",
 				__func__, ret);
+			/*
+			 * On timeout (-ETIMEDOUT), the DSP may have already
+			 * processed the enable request (as indicated by
+			 * hw_core_id_status=1 in hw_core_adspm_info dump).
+			 * Send a disable request to keep DSP state consistent
+			 * with the kernel-side failure.
+			 */
+			if (ret == -ETIMEDOUT)
+				audio_prm_set_lpass_hw_core_req(
+					&clk_priv->prm_clk_cfg,
+					HW_CORE_ID_DCODEC, 0);
 			return ret;
 		}
 	}

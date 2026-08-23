@@ -747,6 +747,42 @@ static struct snd_soc_dai_link msm_wcn_fm_be_dai_links_ext[] = {
 	},
 };
 
+static struct snd_soc_dai_link msm_wcn_btfm_slim_be_dai_links[] = {
+	{
+		.name = LPASS_BE_SLIMBUS_7_RX,
+		.stream_name = LPASS_BE_SLIMBUS_7_RX,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.init = &msm_wcn_init_btfm,
+		.ops = &msm_common_be_ops,
+		/* dai link has playback support */
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(slimbus_7_rx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_7_TX,
+		.stream_name = LPASS_BE_SLIMBUS_7_TX,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(slimbus_7_tx),
+	},
+	{
+		.name = LPASS_BE_SLIMBUS_8_TX,
+		.stream_name = LPASS_BE_SLIMBUS_8_TX,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(slimbus_8_tx),
+	},
+};
+
 static struct snd_soc_dai_link ext_disp_be_dai_link[] = {
 	/* DISP PORT BACK END DAI Link for DP0 */
 	{
@@ -1545,6 +1581,7 @@ static struct snd_soc_dai_link msm_canoe_dai_links[
 			ARRAY_SIZE(msm_wcn_be_dai_links) +
 			ARRAY_SIZE(msm_wcn_be_dai_links_ext) +
 			ARRAY_SIZE(msm_wcn_fm_be_dai_links_ext) +
+			ARRAY_SIZE(msm_wcn_btfm_slim_be_dai_links)+
 			ARRAY_SIZE(msm_swr_haptics_be_dai_links) +
 			ARRAY_SIZE(msm_mi2s_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links) +
@@ -1930,6 +1967,15 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 			       sizeof(msm_wcn_fm_be_dai_links_ext));
 			total_links += ARRAY_SIZE(msm_wcn_fm_be_dai_links_ext);
 		}
+		rc = of_property_read_u32(dev->of_node, "qcom,wcn-btfm-slim", &val);
+		if (!rc && val) {
+			dev_dbg(dev, "%s(): WCN BT FM Non-CP Slimbus support present\n",
+				__func__);
+			memcpy(msm_canoe_dai_links + total_links,
+				msm_wcn_btfm_slim_be_dai_links,
+				sizeof(msm_wcn_btfm_slim_be_dai_links));
+			total_links += ARRAY_SIZE(msm_wcn_btfm_slim_be_dai_links);
+		}
 		rc = of_property_read_u32(dev->of_node, "qcom,qmp-mic", &val);
 		if (!rc && val) {
 			dev_dbg(dev, "%s(): QMP MIC support present\n",
@@ -2213,9 +2259,16 @@ static int msm_int_wsa_init(struct snd_soc_pcm_runtime *rtd)
 		return ret;
 	}
 
-	if (strstr(rtd->card->name, "wsa883x")) {
-		lpass_cdc_set_port_map(lpass_cdc_component,
-			ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+	if (strnstr(rtd->card->name, "wsa883x", strlen(rtd->card->name))) {
+		if (strnstr(rtd->card->name, "ravelin", strlen(rtd->card->name)) ||
+			strnstr(rtd->card->name, "bourtzi", strlen(rtd->card->name))) {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+				ARRAY_SIZE(sm_wsa_port_map_legacy),
+				sm_wsa_port_map_legacy);
+		} else {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+				ARRAY_SIZE(sm_wsa_port_map), sm_wsa_port_map);
+		}
 		return msm_int_wsa883x_init(rtd);
 	} else if (strstr(rtd->card->name, "wsa884x")) {
 		lpass_cdc_set_port_map(lpass_cdc_component,
@@ -2397,9 +2450,17 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic4");
 	snd_soc_dapm_ignore_suspend(dapm, "Analog Mic5");
 
-	if (!pdata->wcd_disabled)
-		lpass_cdc_set_port_map(lpass_cdc_component,
-				ARRAY_SIZE(sm_rx_port_map), sm_rx_port_map);
+	if (!pdata->wcd_disabled) {
+		if (strnstr(rtd->card->name, "ravelin", strlen(rtd->card->name)) ||
+			strnstr(rtd->card->name, "bourtzi", strlen(rtd->card->name))) {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+					ARRAY_SIZE(sm_rx_port_map_legacy),
+					sm_rx_port_map_legacy);
+		} else {
+			lpass_cdc_set_port_map(lpass_cdc_component,
+					ARRAY_SIZE(sm_rx_port_map), sm_rx_port_map);
+		}
+	}
 
 	card = rtd->card->snd_card;
 	if (!pdata->codec_root) {
@@ -2647,15 +2708,23 @@ static int msm_asoc_parse_soundcard_name(struct platform_device *pdev,
 	int ret = 0;
 	u32 part_info = 0;
 
+	card->name = NULL;
 	ret = socinfo_get_subpart_info(PART_SLC, &part_info, 1);
 	if (ret < 0)
 		dev_dbg(&pdev->dev, "%s: socinfo_get_subpart_info failed, err:%d\n",
 			__func__, ret);
 
-	if (!part_info)
-		ret = snd_soc_of_parse_card_name(card, "qcom,model");
-	else
+	if (part_info) {
 		ret = snd_soc_of_parse_card_name(card, "qcom,slc-model");
+		if (ret || !card->name) {
+			dev_dbg(&pdev->dev,
+				"%s: parse slc card name failed, err:%d, falling back to qcom,model\n",
+				__func__, ret);
+			ret = snd_soc_of_parse_card_name(card, "qcom,model");
+		}
+	} else {
+		ret = snd_soc_of_parse_card_name(card, "qcom,model");
+	}
 
 	if (ret)
 		dev_err(&pdev->dev, "%s: parse card name failed, err:%d\n",

@@ -809,7 +809,7 @@ static void copy_port_tables(struct swr_mstr_ctrl *swrm,
 	u8 i;
 	struct port_params *config = params;
 
-	for (i = 0; i < SWR_MSTR_PORT_LEN; i++) {
+	for (i = 0; i < swrm->ports_cnt; i++) {
 		/* wsa uses single frame structure for all configurations */
 		if (!swrm->mport_cfg[i].port_en)
 			continue;
@@ -893,7 +893,7 @@ static int swrm_pcm_port_config(struct swr_mstr_ctrl *swrm, u8 port_num,
 	u32 flow_mode = (dir) ? SWRM_DP_PORT_CONTROL__FLOW_MODE_PULL :
 			SWRM_DP_PORT_CONTROL__FLOW_MODE_PUSH;
 
-	if (!port_num || port_num > SWR_MSTR_PORT_LEN) {
+	if (!port_num || (port_num > swrm->ports_cnt)) {
 		dev_err_ratelimited(swrm->dev, "%s: invalid port: %d\n",
 			__func__, port_num);
 		return -EINVAL;
@@ -1429,7 +1429,7 @@ static int swrm_update_bus_clk(struct swr_mstr_ctrl *swrm)
 	int agg_clk = 0;
 	int i;
 
-	for (i = 0; i < SWR_MSTR_PORT_LEN; i++)
+	for (i = 0; i < swrm->ports_cnt; i++)
 		agg_clk += swrm->mport_cfg[i].ch_rate;
 
 	if (agg_clk)
@@ -1462,7 +1462,7 @@ static void swrm_disable_ports(struct swr_master *master,
 		master->num_port);
 
 
-	for (i = 0; i < SWR_MSTR_PORT_LEN ; i++) {
+	for (i = 0; i < swrm->ports_cnt; i++) {
 
 		mport = &(swrm->mport_cfg[i]);
 		if (!mport->port_en)
@@ -1514,7 +1514,7 @@ static void swrm_cleanup_disabled_port_reqs(struct swr_master *master)
 	dev_dbg(swrm->dev, "%s: master num_port: %d\n", __func__,
 		master->num_port);
 
-	for (i = 0; i < SWR_MSTR_PORT_LEN; i++) {
+	for (i = 0; i < swrm->ports_cnt; i++) {
 		mport = &(swrm->mport_cfg[i]);
 		list_for_each_entry_safe(port_req, next,
 			&mport->port_req_list, list) {
@@ -1705,7 +1705,7 @@ static void swrm_copy_data_port_config(struct swr_master *master, u8 bank)
 	memset(agg_slv_port_ch_mask, 0, sizeof(agg_slv_port_ch_mask));
 	memset(agg_slv_port_offset1, 0, sizeof(agg_slv_port_offset1));
 
-	for (i = 0; i < SWR_MSTR_PORT_LEN; i++) {
+	for (i = 0; i < swrm->ports_cnt; i++) {
 		mport = &(swrm->mport_cfg[i]);
 		if (!mport->port_en)
 			continue;
@@ -2718,11 +2718,19 @@ handle_irq:
 			break;
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P6_2P0:
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P7:
-			value = swr_master_read(swrm, REGISTER_ADDRESS(swrm->version_index,
-					SWRM_CMD_FIFO_STATUS));
 			dev_err_ratelimited(swrm->dev,
-				"%s: SWR read FIFO overflow fifo status %x\n",
-				__func__, value);
+				"%s: interrupt status: 0x%x\n",
+				__func__, intr_sts_masked);
+			if (((swrm->version == SWRM_VERSION_1_7) &&
+				(value == SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P7)) ||
+				((swrm->version != SWRM_VERSION_1_7) &&
+				(value == SWRM_INTERRUPT_STATUS_RD_FIFO_OVERFLOW_VER_1P6_2P0))) {
+				value = swr_master_read(swrm, REGISTER_ADDRESS(swrm->version_index,
+							SWRM_CMD_FIFO_STATUS));
+				dev_err_ratelimited(swrm->dev,
+					"%s: SWR read FIFO overflow fifo status %x\n",
+					__func__, value);
+			}
 			break;
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_UNDERFLOW_VER_1P6_2P0:
 		case SWRM_INTERRUPT_STATUS_RD_FIFO_UNDERFLOW_VER_1P7:
@@ -2781,9 +2789,18 @@ handle_irq:
 			break;
 		case SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P6_2P0:
 		case SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P7:
-			complete(&swrm->broadcast);
-			dev_dbg(swrm->dev, "%s: SWR cmd id finished\n",
-				__func__);
+			dev_err_ratelimited(swrm->dev,
+				"%s: interrupt status: 0x%x\n",
+				__func__, intr_sts_masked);
+			if (((swrm->version == SWRM_VERSION_1_7) &&
+				(value == SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P7)) ||
+				((swrm->version != SWRM_VERSION_1_7) &&
+				(value ==
+				SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED_VER_1P6_2P0))) {
+				complete(&swrm->broadcast);
+				dev_dbg(swrm->dev, "%s: SWR cmd id finished\n",
+					__func__);
+			}
 			break;
 		case SWRM_INTERRUPT_STATUS_AUTO_ENUM_FAILED:
 			swr_master_write(swrm, SWRM_ENUMERATOR_CFG, 0);
@@ -3111,7 +3128,7 @@ static void swrm_update_wordlength(struct swr_mstr_ctrl *swrm)
 {
 	u8 i = 0;
 
-	for (i = 0; i < SWR_MSTR_PORT_LEN; i++) {
+	for (i = 0; i < swrm->ports_cnt; i++) {
 		if (swrm->port_wordlength[i] != 0xff)
 			swr_master_write(swrm, SWRM_DP_BLOCK_CTRL_1((i + 1)),
 				swrm->port_wordlength[i]);
@@ -3478,6 +3495,19 @@ static int swrm_probe(struct platform_device *pdev)
 		swrm->version = 0;
 	}
 
+	ret = of_property_read_u32(pdev->dev.of_node,
+				"qcom,swr-legacy-ports-en",
+				&swrm->legacy_ports_en);
+	if (ret) {
+		dev_info(&pdev->dev, "%s: swr legacy port cnt selection not defined, use default as 0\n",
+			 __func__);
+		swrm->legacy_ports_en = 0;
+	}
+
+	if (swrm->legacy_ports_en)
+		swrm->ports_cnt = SWR_MSTR_PORT_LEN_LEGACY;
+	else
+		swrm->ports_cnt = SWR_MSTR_PORT_LEN;
 	swrm->version_index = get_version_index(swrm->version);
 	dev_dbg(&pdev->dev, "%s: swr version: 0x%x, version index: %d\n",
 				__func__, swrm->version, swrm->version_index);
@@ -3571,7 +3601,7 @@ static int swrm_probe(struct platform_device *pdev)
 	}
 	swrm->pcm_enable_count = 0;
 	map_length = map_size / (3 * sizeof(u32));
-	if (num_ports > SWR_MSTR_PORT_LEN) {
+	if (num_ports > swrm->ports_cnt) {
 		dev_err(&pdev->dev, "%s:invalid number of swr ports\n",
 			__func__);
 		ret = -EINVAL;
@@ -3598,7 +3628,7 @@ static int swrm_probe(struct platform_device *pdev)
 
 		if (port_num != old_port_num)
 			ch_iter = 0;
-		if (port_num > SWR_MSTR_PORT_LEN ||
+		if (port_num > swrm->ports_cnt ||
 			ch_iter >= SWR_MAX_CH_PER_PORT) {
 			dev_err(&pdev->dev,
 				"%s:invalid port_num %d or ch_iter %d\n",
@@ -3620,7 +3650,7 @@ static int swrm_probe(struct platform_device *pdev)
 	devm_kfree(&pdev->dev, temp);
 
 	/* This array is required only for enabling a software workaround. */
-	for (i = 0; i <= SWR_MSTR_PORT_LEN; i++)
+	for (i = 0; i <= swrm->ports_cnt; i++)
 		swrm->port_wordlength[i] = 0xff;
 
 	/* Parse wordlength information if available. */
@@ -3709,7 +3739,7 @@ static int swrm_probe(struct platform_device *pdev)
 	cpu_latency_qos_add_request(&swrm->pm_qos_req,
 			   PM_QOS_DEFAULT_VALUE);
 
-	for (i = 0 ; i < SWR_MSTR_PORT_LEN; i++) {
+	for (i = 0 ; i < swrm->ports_cnt; i++) {
 		INIT_LIST_HEAD(&swrm->mport_cfg[i].port_req_list);
 
 		if (swrm->master_id == MASTER_ID_TX || swrm->master_id == MASTER_ID_BT) {

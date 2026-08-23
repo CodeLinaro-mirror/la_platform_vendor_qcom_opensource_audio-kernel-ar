@@ -33,6 +33,7 @@
 #include "wcd939x-reg-shifts.h"
 #include <linux/proc_fs.h>
 #include <linux/version.h>
+#include <linux/vmalloc.h>
 
 #if IS_ENABLED(CONFIG_QCOM_WCD_USBSS_I2C)
 #include <linux/soc/qcom/wcd939x-i2c.h>
@@ -4642,7 +4643,7 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 
 	i  = ((int) *ppos + baseReg);
 
-	buf = kzalloc(count, GFP_KERNEL);
+	buf = vzalloc(count);
 	if (!buf)
 		return -ENOMEM;
 
@@ -4682,7 +4683,7 @@ static int regdump_read(struct regmap *map, int baseReg, int endReg,
 	if (copy_to_user(user_buf, buf, pos))
 		ret = -EFAULT;
 
-	kfree(buf);
+	vfree(buf);
 	return ret;
 }
 
