@@ -853,7 +853,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 				unsigned long __user ioctl_param)
 {
 	void *mem_handle;
-	dma_addr_t paddr;
+	dma_addr_t paddr = 0;
 	size_t pa_len = 0;
 	struct dma_buf_map *dma_vmap = NULL;
 	int ret = 0;
