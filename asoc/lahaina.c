@@ -705,8 +705,8 @@ static struct snd_soc_dai_link msm_mi2s_dai_links[] = {
 		SND_SOC_DAILINK_REG(tert_mi2s_rx),
 	},
 	{
-		.name = LPASS_BE_TERT_MI2S_TX,
-		.stream_name = LPASS_BE_TERT_MI2S_TX,
+		.name = LPASS_BE_TERT_DP_MI2S_TX,
+		.stream_name = LPASS_BE_TERT_DP_MI2S_TX,
 		.capture_only = 1,
 		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
 			SND_SOC_DPCM_TRIGGER_POST},
