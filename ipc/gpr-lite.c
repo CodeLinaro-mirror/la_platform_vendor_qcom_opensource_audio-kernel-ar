@@ -101,7 +101,7 @@ int gpr_send_pkt(struct gpr_device *adev, struct gpr_pkt *pkt)
 	int ret;
 
 	if (gpr_get_q6_state() == GPR_SUBSYS_DOWN) {
-		pr_err_ratelimited("%s: q6 state is down\n", __func__, adev);
+		pr_err_ratelimited("%s: q6 state is down\n", __func__);
 		return -EINVAL;
 	}
 

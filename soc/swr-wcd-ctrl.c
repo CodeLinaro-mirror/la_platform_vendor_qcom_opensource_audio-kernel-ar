@@ -1324,7 +1324,7 @@ static int swrm_get_logical_dev_num(struct swr_master *mstr, u64 dev_id,
 						*dev_num = i;
 						ret = 0;
 					}
-					dev_dbg(swrm->dev, "%s: devnum %d is assigned for dev addr %lx\n",
+					dev_dbg(swrm->dev, "%s: devnum %d is assigned for dev addr %llx\n",
 						__func__, i, swr_dev->addr);
 				}
 			}
@@ -1579,6 +1579,8 @@ static int swrm_probe(struct platform_device *pdev)
 	pm_runtime_enable(&pdev->dev);
 	pm_runtime_mark_last_busy(&pdev->dev);
 
+	dev_info(&pdev->dev, "%s :setting work to notify soundwire event\n",
+			__func__);
 	INIT_WORK(&swrm->dc_presence_work, swrm_notify_work_fn);
 	swrm->event_notifier.notifier_call  = swrm_event_notify;
 	msm_aud_evt_register_client(&swrm->event_notifier);

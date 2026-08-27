@@ -555,7 +555,7 @@ static int regmap_bus_read(void *context, const void *reg, size_t reg_size,
 		goto err;
 	}
 	ret = wcd9xxx_page_write(wcd9xxx, &c_reg);
-	if (ret)
+	if (ret < 0)
 		goto err;
 	ret = wcd9xxx->read_dev(wcd9xxx, c_reg, val_size, val, false);
 	if (ret < 0)
@@ -603,7 +603,7 @@ static int regmap_bus_gather_write(void *context,
 		goto err;
 	}
 	ret = wcd9xxx_page_write(wcd9xxx, &c_reg);
-	if (ret)
+	if (ret < 0)
 		goto err;
 
 	for (i = 0; i < val_size; i++)

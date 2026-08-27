@@ -467,7 +467,7 @@ int audpkt_chk_and_update_satellite_physical_addr(struct audio_satellite_gpr_pkt
 					__func__, ret);
 			return ret;
 		}
-		AUDIO_PKT_INFO("%s physical address %pK pa_len %d", __func__,
+		AUDIO_PKT_INFO("%s physical address %pK pa_len %ld", __func__,
 				(void *) paddr, pa_len);
 		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_lsw = (uint32_t) paddr;
 		gpr_pkt->audpkt_mem_map.mmap_payload.shm_addr_msw = (uint64_t) paddr >> 32;

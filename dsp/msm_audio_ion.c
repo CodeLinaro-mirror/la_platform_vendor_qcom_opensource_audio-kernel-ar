@@ -853,7 +853,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 				unsigned long __user ioctl_param)
 {
 	void *mem_handle;
-	dma_addr_t paddr;
+	dma_addr_t paddr = 0;
 	size_t pa_len = 0;
 	struct dma_buf_map *dma_vmap = NULL;
 	int ret = 0;
@@ -871,7 +871,7 @@ static long msm_audio_ion_ioctl(struct file *file, unsigned int ioctl_num,
 	struct msm_audio_ion_private *ion_data =
 			container_of(file->f_inode->i_cdev, struct msm_audio_ion_private, cdev);
 
-	pr_debug("%s ioctl num %u ioctl_param %d\n", __func__, ioctl_num, ioctl_param);
+	pr_debug("%s ioctl num %u ioctl_param %lu\n", __func__, ioctl_num, ioctl_param);
 	switch (ioctl_num) {
 	case IOCTL_MAP_PHYS_ADDR:
 	case COMPAT_IOCTL_MAP_PHYS_ADDR:
@@ -1003,8 +1003,8 @@ static int __audio_mem_hyp_assign(struct device *dev, int *source_vms,
 		return -EINVAL;
 	}
 
-	pr_debug("%s: hyp_assign_phys addr = 0x%pK size = %pa\n", __func__,
-		 rmem->base, rmem->size);
+	pr_debug("%s: hyp_assign_phys addr = %pK size = %llu\n", __func__,
+		 (void *)rmem->base, rmem->size);
 	return hyp_assign_phys(rmem->base, rmem->size, source_vms,
 			       source_nelems, dest_vms, dest_perms,
 			       dest_nelems);
