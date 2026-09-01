@@ -1478,6 +1478,39 @@ static struct snd_soc_dai_link msm_mi2s_qaif_cpu_dai_links[] = {
 	},
 };
 
+/*
+ * Dedicated Quaternary MI2S backend (audio-over-HDMI: Quaternary MI2S/I2S0
+ * physically wired to the lt9611uxd HDMI bridge's audio input)
+ */
+static struct snd_soc_dai_link msm_quat_mi2s_qaif_cpu_dai_links[] = {
+	{
+		.name = LPASS_BE_QUAT_MI2S_RX,
+		.stream_name = LPASS_BE_QUAT_MI2S_RX,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		.ignore_pmdown_time = 1,
+		SND_SOC_DAILINK_REG(quat_qaif_mi2s_rx_hdmi),
+	},
+};
+
+/* HDMI BACK END DAI Link */
+static struct snd_soc_dai_link msm_quat_mi2s_dai_link[] = {
+	{
+		.name = LPASS_BE_QUAT_MI2S_RX,
+		.stream_name = LPASS_BE_QUAT_MI2S_RX,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(quat_mi2s_rx_hdmi),
+	},
+};
+
 static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 	{
 		.name = LPASS_BE_PRI_TDM_RX_0,
@@ -1805,12 +1838,14 @@ static struct snd_soc_dai_link msm_canoe_dai_links[
 			ARRAY_SIZE(msm_cdc_tx_va_dma_be_dai_links) +
 			ARRAY_SIZE(msm_cdc_qmp_dma_be_dai_links) +
 			ARRAY_SIZE(ext_disp_be_dai_link) +
+			ARRAY_SIZE(msm_quat_mi2s_dai_link) +
 			ARRAY_SIZE(msm_common_be_dai_links) +
 			ARRAY_SIZE(msm_wcn_be_dai_links) +
 			ARRAY_SIZE(msm_wcn_be_dai_links_ext) +
 			ARRAY_SIZE(msm_swr_haptics_be_dai_links) +
 			ARRAY_SIZE(msm_mi2s_dai_links) +
 			ARRAY_SIZE(msm_mi2s_qaif_cpu_dai_links) +
+			ARRAY_SIZE(msm_quat_mi2s_qaif_cpu_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links) +
 			ARRAY_SIZE(msm_tdm_qaif_cpu_dai_links) +
 			ARRAY_SIZE(msm_tdm_sen_dai_links) +
@@ -2225,6 +2260,24 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 					ext_disp_be_dai_link,
 						sizeof(ext_disp_be_dai_link));
 				total_links += ARRAY_SIZE(ext_disp_be_dai_link);
+			}
+		}
+
+		if (of_find_property(dev->of_node, "qcom,ext-disp-audio-hdmi", NULL)) {
+			if (of_find_property(dev->of_node, "qaif-cpu-supported", NULL)) {
+				dev_dbg(dev, "%s(): quat mi2s audio (HDMI) present\n",
+					__func__);
+				memcpy(msm_canoe_dai_links + total_links,
+					msm_quat_mi2s_qaif_cpu_dai_links,
+					sizeof(msm_quat_mi2s_qaif_cpu_dai_links));
+				total_links += ARRAY_SIZE(msm_quat_mi2s_qaif_cpu_dai_links);
+			} else {
+				dev_dbg(dev, "%s(): ext disp HDMI audio support present\n",
+					__func__);
+				memcpy(msm_canoe_dai_links + total_links,
+					msm_quat_mi2s_dai_link,
+					sizeof(msm_quat_mi2s_dai_link));
+				total_links += ARRAY_SIZE(msm_quat_mi2s_dai_link);
 			}
 		}
 
