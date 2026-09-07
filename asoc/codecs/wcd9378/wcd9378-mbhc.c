@@ -364,6 +364,11 @@ static int wcd9378_mbhc_micb_ctrl_threshold_mic(
 
 	if (micb_num != MIC_BIAS_2)
 		return -EINVAL;
+
+	if (!pdata) {
+		dev_err(component->dev, "%s: pdata is NULL\n", __func__);
+		return -EINVAL;
+	}
 	/*
 	 * If device tree micbias level is already above the minimum
 	 * voltage needed to detect threshold microphone, then do
@@ -1042,10 +1047,6 @@ void wcd9378_mbhc_ssr_down(struct wcd9378_mbhc *mbhc,
 		return;
 
 	wcd_mbhc = &mbhc->wcd_mbhc;
-	if (!wcd_mbhc) {
-		dev_err(component->dev, "%s: wcd_mbhc is NULL\n", __func__);
-		return;
-	}
 
 	wcd9378_mbhc_hs_detect_exit(component);
 	wcd_mbhc_deinit(wcd_mbhc);
@@ -1071,10 +1072,6 @@ int wcd9378_mbhc_post_ssr_init(struct wcd9378_mbhc *mbhc,
 		return -EINVAL;
 
 	wcd_mbhc = &mbhc->wcd_mbhc;
-	if (wcd_mbhc == NULL) {
-		pr_err("%s: wcd_mbhc is NULL\n", __func__);
-		return -EINVAL;
-	}
 
 	wcd9378 = dev_get_drvdata(component->dev);
 	if (wcd9378 == NULL) {
@@ -1142,11 +1139,6 @@ int wcd9378_mbhc_init(struct wcd9378_mbhc **mbhc,
 
 	BLOCKING_INIT_NOTIFIER_HEAD(&wcd9378_mbhc->notifier);
 	wcd_mbhc = &wcd9378_mbhc->wcd_mbhc;
-	if (wcd_mbhc == NULL) {
-		pr_err("%s: wcd_mbhc is NULL\n", __func__);
-		ret = -EINVAL;
-		goto err;
-	}
 
 	/* Setting default mbhc detection logic to ADC */
 	wcd_mbhc->mbhc_detection_logic = WCD_DETECTION_ADC;

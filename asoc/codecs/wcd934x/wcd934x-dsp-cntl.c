@@ -999,7 +999,7 @@ static void wcd_cntl_debugfs_init(char *dir, struct wcd_dsp_cntl *cntl)
 	struct snd_soc_component *component = cntl->component;
 
 	cntl->entry = debugfs_create_dir(dir, NULL);
-	if (IS_ERR_OR_NULL(dir)) {
+	if (IS_ERR_OR_NULL(cntl->entry)) {
 		dev_err(component->dev, "%s debugfs_create_dir failed for %s\n",
 			__func__, dir);
 		goto done;

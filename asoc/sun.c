@@ -1408,6 +1408,7 @@ static struct snd_soc_dai_link msm_sun_dai_links[
 			ARRAY_SIZE(ext_hdmi_be_dai_link) +
 			ARRAY_SIZE(msm_common_be_dai_links) +
 			ARRAY_SIZE(msm_wcn_be_dai_links) +
+			ARRAY_SIZE(msm_wcn_btfm_proxy_be_dai_links) +
 			ARRAY_SIZE(msm_swr_haptics_be_dai_links) +
 			ARRAY_SIZE(msm_mi2s_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links)];

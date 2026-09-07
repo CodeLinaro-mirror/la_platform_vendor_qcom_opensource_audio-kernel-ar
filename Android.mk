@@ -629,6 +629,17 @@ include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 ########################### WSA883x CODEC  ###########################
 
+########################### ACM8625S CODEC  ###########################
+include $(CLEAR_VARS)
+LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
+LOCAL_MODULE              := acm8625s_dlkm.ko
+LOCAL_MODULE_KBUILD_NAME  := asoc/codecs/acm8625s/acm8625s_dlkm.ko
+LOCAL_MODULE_TAGS         := optional
+LOCAL_MODULE_DEBUG_ENABLE := true
+LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
+include $(DLKM_DIR)/Build_external_kernelmodule.mk
+########################### ACM8625S CODEC  ###########################
+
 endif # DLKM check
 endif # supported target check
 endif
