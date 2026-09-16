@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /* Copyright (c) 2018-2020, The Linux Foundation. All rights reserved.
- * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #ifndef _WCD937X_INTERNAL_H
@@ -24,6 +24,7 @@
 
 #define WCD937X_MAX_SLAVE_PORT_TYPES 10
 extern struct regmap_config wcd937x_regmap_config;
+#define WCD937X_ECID_REGS 16
 
 struct codec_port_info {
 	u32 slave_port_type;
@@ -100,6 +101,8 @@ struct wcd937x_priv {
 	u8 tx_master_ch_map[WCD937X_MAX_SLAVE_CH_TYPES];
 	bool usbc_hs_status;
 	u32 tx_ch_pwr[MAX_TX_PWR_CH];
+	u8 ecid_val[WCD937X_ECID_REGS];
+	struct snd_info_entry *ecid_entry;
 };
 
 struct wcd937x_micbias_setting {
