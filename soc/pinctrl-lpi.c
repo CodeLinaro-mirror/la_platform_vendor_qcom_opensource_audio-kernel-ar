@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2016-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2024, Qualcomm Innovation Center, Inc. All rights reserved.
  * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
@@ -133,6 +132,7 @@ struct lpi_gpio_state {
 	struct clk          *lpass_audio_hw_vote;
 	struct mutex         slew_access_lock;
 	bool core_hw_vote_status;
+	bool sleep_vote_disable;
 	struct mutex        core_hw_vote_lock;
 };
 
@@ -799,6 +799,8 @@ static int lpi_pinctrl_probe(struct platform_device *pdev)
 			ret);
 	}
 
+	state->sleep_vote_disable = of_property_read_bool(dev->of_node, "qcom,sleep_vote_disable");
+
 	pindesc = devm_kcalloc(dev, npins, sizeof(*pindesc), GFP_KERNEL);
 	if (!pindesc)
 		return -ENOMEM;
@@ -992,8 +994,10 @@ int lpi_pinctrl_runtime_resume(struct device *dev)
 		state->core_hw_vote_status = true;
 	}
 	dev_err(dev, "%s():: state->core_hw_vote_status: %d\n",__func__,state->core_hw_vote_status);
-	if (state->core_hw_vote_status)
-		msm_common_vote_against_sleep(true);
+	if (state->core_hw_vote_status) {
+		if (!state->sleep_vote_disable)
+			msm_common_vote_against_sleep(true);
+	}
 	pm_runtime_set_autosuspend_delay(dev, LPI_AUTO_SUSPEND_DELAY);
 
 exit:
@@ -1018,7 +1022,8 @@ int lpi_pinctrl_runtime_suspend(struct device *dev)
 	dev_err(dev, "%s():: state->core_hw_vote_status: %d\n",__func__,state->core_hw_vote_status);
 	mutex_lock(&state->core_hw_vote_lock);
 	if (state->core_hw_vote_status) {
-		msm_common_vote_against_sleep(false);
+		if (!state->sleep_vote_disable)
+			msm_common_vote_against_sleep(false);
 		digital_cdc_rsc_mgr_hw_vote_disable(hw_vote, dev);
 		state->core_hw_vote_status = false;
 	}
