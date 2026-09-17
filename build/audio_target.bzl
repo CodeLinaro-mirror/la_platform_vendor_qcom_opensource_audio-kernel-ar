@@ -266,7 +266,8 @@ def define_pitti(t, v, lt=None):
             "lpass_cdc_wsa2_macro_dlkm",
             "wsa881x_analog_dlkm",
             "wcd9378_dlkm",
-            "wcd9378_slave_dlkm"
+            "wcd9378_slave_dlkm",
+            "wsa885x_i2c_dlkm"
         ],
         config_options = [
             "CONFIG_SND_SOC_PITTI",
@@ -282,6 +283,7 @@ def define_pitti(t, v, lt=None):
             "CONFIG_SND_SOC_WCD9XXX_V2",
             "CONFIG_SND_SOC_WCD_MBHC_ADC",
             "CONFIG_MSM_EXT_DISPLAY",
+            "CONFIG_SND_SOC_WSA885X_I2C",
         ],
         lunch_target = lt,
     )

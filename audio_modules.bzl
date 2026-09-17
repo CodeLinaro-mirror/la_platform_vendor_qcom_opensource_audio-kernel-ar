@@ -481,3 +481,13 @@ audio_modules.register(
     config_option = "CONFIG_SND_SOC_WCD9378_SLAVE",
     srcs = ["wcd9378-slave.c"]
 )
+
+# >>>> WSA885X I2C MODULES <<<<
+audio_modules.register(
+    name = "wsa885x_i2c_dlkm",
+    path = ASOC_CODECS_PATH,
+    config_option = "CONFIG_SND_SOC_WSA885X_I2C",
+    srcs = [
+        "wsa885x-i2c.c",
+    ]
+)

@@ -76,6 +76,7 @@ LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_va_macro_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_tx_macro_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/lpass-cdc/lpass_cdc_rx_macro_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa881x_analog_dlkm.ko
+LOCAL_MODULE_KO_DIRS += asoc/codecs/wsa885x_i2c_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/wcd9378/wcd9378_slave_dlkm.ko
 LOCAL_MODULE_KO_DIRS += asoc/codecs/hdmi_dlkm.ko
