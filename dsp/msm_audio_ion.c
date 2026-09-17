@@ -901,6 +901,7 @@ static const struct file_operations msm_audio_ion_fops = {
 	.open = msm_audio_ion_open,
 	.release = msm_audio_ion_release,
 	.unlocked_ioctl = msm_audio_ion_ioctl,
+	.compat_ioctl = msm_audio_ion_ioctl,
 };
 
 static int msm_audio_ion_reg_chrdev(struct msm_audio_ion_private *ion_data)
