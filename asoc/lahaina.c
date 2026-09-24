@@ -130,10 +130,10 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	if (!pdata->fsa_handle)
 		return false;
 
-	return false;
 #if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
 #endif
+	return false;
 }
 
 static bool msm_swap_gnd_mic(struct snd_soc_component *component, bool active)
