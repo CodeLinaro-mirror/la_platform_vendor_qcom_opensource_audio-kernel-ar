@@ -156,6 +156,8 @@ int lpass_cdc_set_port_map(struct snd_soc_component *component,
 	struct lpass_cdc_priv *priv = NULL;
 	struct swr_mstr_port_map *map = NULL;
 	u16 idx;
+	u32 port_len;
+	struct snd_soc_card *card;
 
 	if (!component || (size == 0) || !data)
 		return -EINVAL;
@@ -169,12 +171,27 @@ int lpass_cdc_set_port_map(struct snd_soc_component *component,
 		return -EINVAL;
 	}
 	map = (struct swr_mstr_port_map *)data;
+	card = component->card;
+
+	if (!card || !card->name) {
+		dev_err(priv->dev,
+			"%s: sound card or card name is NULL\n",
+			__func__);
+		return -EINVAL;
+	}
+
+	if (strnstr(card->name, "ravelin", strlen(card->name)) ||
+		strnstr(card->name, "bourtzi", strlen(card->name))) {
+		port_len = SWR_MSTR_PORT_LEN_LEGACY;
+	} else {
+		port_len = SWR_MSTR_PORT_LEN;
+	}
 
 	for (idx = 0; idx < size; idx++) {
 		if (priv->macro_params[map->id].set_port_map)
 			priv->macro_params[map->id].set_port_map(component,
 						map->uc,
-						SWR_MSTR_PORT_LEN,
+						port_len,
 						map->swr_port_params);
 		map += 1;
 	}
