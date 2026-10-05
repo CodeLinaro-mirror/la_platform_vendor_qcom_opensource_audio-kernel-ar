@@ -499,6 +499,28 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 						__func__, ret);
 					goto done;
 				}
+			} else if ((strnstr(stream_name, "AUXPCM", strlen(stream_name)))) {
+
+				ret = get_mi2s_clk_id(index);
+				if (ret < 0)
+					goto done;
+
+				intf_clk_cfg.clk_id = ret;
+				rate = params_rate(params);
+				sample_width = 16;
+				intf_clk_cfg.clk_freq_in_hz = rate *
+					MI2S_NUM_CHANNELS * sample_width;
+				intf_clk_cfg.clk_attri = pdata->mi2s_clk_attribute[index];
+				intf_clk_cfg.clk_root = CLOCK_ROOT_DEFAULT;
+
+				pr_err("%s: auxpcm clk_id :%d clk freq %d\n", __func__,
+					intf_clk_cfg.clk_id, intf_clk_cfg.clk_freq_in_hz);
+				ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 1);
+				if (ret < 0) {
+					pr_err("%s: prm lpass auxpcm clk cfg set failed ret %d\n",
+						__func__, ret);
+					goto done;
+				}
 			} else {
 				pr_err("%s: unsupported stream name: %s\n",
 					__func__, stream_name);
@@ -594,6 +616,15 @@ void msm_common_snd_shutdown(struct snd_pcm_substream *substream)
 					ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 0);
 					if (ret < 0)
 						pr_err("%s: prm mi2s clk cfg disable failed ret %d\n",
+							__func__, ret);
+				}
+			} else if ((strnstr(stream_name, "AUXPCM", strlen(stream_name)))) {
+				ret = get_mi2s_clk_id(index);
+				if (ret > 0) {
+					intf_clk_cfg.clk_id = ret;
+					ret = audio_prm_set_lpass_clk_cfg(&intf_clk_cfg, 0);
+					if (ret < 0)
+						pr_err("%s: prm auxpcm clk cfg disable failed ret %d\n",
 							__func__, ret);
 				}
 			} else {
