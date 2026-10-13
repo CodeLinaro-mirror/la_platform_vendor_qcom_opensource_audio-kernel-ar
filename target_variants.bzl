@@ -9,6 +9,7 @@ targets = [
     "vienna",
     "volcano",
     "x1p42100",
+    "pitti",
 ]
 
 la_variants = [

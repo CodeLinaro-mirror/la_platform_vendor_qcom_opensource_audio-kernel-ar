@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * Copyright (c) 2020-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) 2021-2024 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  */
 
 #include <linux/gpio.h>
@@ -403,6 +403,7 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 	struct msm_common_pdata *pdata = msm_common_get_pdata(card);
 	int index = get_mi2s_tdm_auxpcm_intf_index(stream_name);
 	struct clk_cfg intf_clk_cfg;
+	struct snd_soc_dai *codec_dai = (rtd)->dais[(rtd)->dai_link->num_cpus];
 
 	dev_dbg(rtd->card->dev,
 		"%s: substream = %s  stream = %d\n",
@@ -423,6 +424,9 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 				ret = get_tdm_clk_id(index);
 				if ( ret < 0)
 					goto done;
+
+				if (index == TER_MI2S_TDM_AUXPCM)
+					slots = 0x04;
 
 				intf_clk_cfg.clk_id = ret;
 				intf_clk_cfg.clk_freq_in_hz = rate * slot_width * slots;
@@ -500,6 +504,10 @@ int msm_common_snd_hw_params(struct snd_pcm_substream *substream,
 		atomic_inc(&pdata->lpass_intf_clk_ref_cnt[index]);
 done:
 		mutex_unlock(&pdata->lock[index]);
+		if (strnstr(codec_dai->name, "wsa885x", strlen(codec_dai->name))) {
+			snd_soc_dai_set_tdm_slot(codec_dai, 0x0f, 0b11, 0x04, slot_width);
+			snd_soc_dai_set_sysclk(codec_dai, 0, rate * 0X04 * slot_width, 0);
+		}
 	}
 	return ret;
 }
