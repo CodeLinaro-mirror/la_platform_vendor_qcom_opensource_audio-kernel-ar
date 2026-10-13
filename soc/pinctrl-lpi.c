@@ -368,6 +368,14 @@ static int lpi_config_set(struct pinctrl_dev *pctldev, unsigned int pin,
 	volatile unsigned long val;
 	struct lpi_gpio_state *state = dev_get_drvdata(pctldev->dev);
 
+	/*
+	 * Acquire a single runtime PM reference for the entire pin
+	 * configuration sequence to prevent the device from auto-suspending
+	 * between individual lpi_gpio_read/write calls, which would cause
+	 * repeated clk_prepare_enable RPM round-trips and add latency.
+	 */
+	pm_runtime_get_sync(lpi_dev);
+
 	pad = pctldev->desc->pins[pin].drv_data;
 
 	for (i = 0; i < nconfs; i++) {
@@ -473,6 +481,8 @@ set_gpio:
 	lpi_gpio_write(pad, LPI_GPIO_REG_DIR_CTL,
 		       pad->output_enabled << LPI_GPIO_REG_DIR_SHIFT);
 done:
+	pm_runtime_mark_last_busy(lpi_dev);
+	pm_runtime_put_autosuspend(lpi_dev);
 	return ret;
 }
 
