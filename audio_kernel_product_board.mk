@@ -46,6 +46,9 @@ PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd938x_dlkm.ko
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/wcd938x_slave_dlkm.ko
 endif
+ifeq ($(call is-board-platform-in-list,taro),true)
+PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/hdmi_dlkm.ko
+endif
 ifeq ($(call is-board-platform-in-list,bengal holi blair), true)
 PRODUCT_PACKAGES += $(KERNEL_MODULES_OUT)/bolero_cdc_dlkm.ko \
 	$(KERNEL_MODULES_OUT)/va_macro_dlkm.ko \

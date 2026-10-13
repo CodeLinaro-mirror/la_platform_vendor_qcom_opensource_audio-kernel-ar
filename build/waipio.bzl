@@ -45,6 +45,7 @@ def define_waipio():
             "wcd9378_dlkm",
             "wcd9378_slave_dlkm",
             "sdca_registers_dlkm",
+            "hdmi_dlkm",
         ],
         config_options = [
             "CONFIG_SND_SOC_WAIPIO",

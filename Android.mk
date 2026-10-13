@@ -467,7 +467,7 @@ LOCAL_MODULE_PATH         := $(KERNEL_MODULES_OUT)
 include $(DLKM_DIR)/Build_external_kernelmodule.mk
 endif
 ###########################################################
-ifeq ($(call is-board-platform-in-list, sun canoe alor whale chora),true)
+ifeq ($(call is-board-platform-in-list, sun canoe alor whale chora taro),true)
 include $(CLEAR_VARS)
 LOCAL_SRC_FILES           := $(AUDIO_SRC_FILES)
 LOCAL_MODULE              := hdmi_dlkm.ko
