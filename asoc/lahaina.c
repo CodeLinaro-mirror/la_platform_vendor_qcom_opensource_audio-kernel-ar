@@ -130,10 +130,10 @@ static bool msm_usbc_swap_gnd_mic(struct snd_soc_component *component, bool acti
 	if (!pdata->fsa_handle)
 		return false;
 
-	return false;
 #if IS_ENABLED(CONFIG_QCOM_FSA4480_I2C)
 	return fsa4480_switch_event(pdata->fsa_handle, FSA_MIC_GND_SWAP);
 #endif
+	return false;
 }
 
 static bool msm_swap_gnd_mic(struct snd_soc_component *component, bool active)
@@ -782,14 +782,36 @@ static struct snd_soc_dai_link msm_tdm_dai_links[] = {
 	},
 };
 
+static struct snd_soc_dai_link msm_auxpcm_be_dai_links[] = {
+	/* Primary AUX PCM Backend DAI Links */
+	{
+		.name = LPASS_BE_PRI_AUXPCM_RX,
+		.stream_name = LPASS_BE_PRI_AUXPCM_RX,
+		.playback_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_pmdown_time = 1,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(auxpcm_rx),
+	},
+	{
+		.name = LPASS_BE_PRI_AUXPCM_TX,
+		.stream_name = LPASS_BE_PRI_AUXPCM_TX,
+		.capture_only = 1,
+		.trigger = {SND_SOC_DPCM_TRIGGER_POST,
+			SND_SOC_DPCM_TRIGGER_POST},
+		.ops = &msm_common_be_ops,
+		.ignore_suspend = 1,
+		SND_SOC_DAILINK_REG(auxpcm_tx),
+	},
+};
 
 static struct snd_soc_dai_link msm_lahaina_dai_links[
 			ARRAY_SIZE(msm_common_be_dai_links) +
 			ARRAY_SIZE(msm_tdm_dai_links) +
 			ARRAY_SIZE(msm_mi2s_dai_links) +
-#if 0
 			ARRAY_SIZE(msm_auxpcm_be_dai_links) +
-#endif
 			ARRAY_SIZE(msm_wsa_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_rx_tx_cdc_dma_be_dai_links) +
 			ARRAY_SIZE(msm_va_cdc_dma_be_dai_links) +
@@ -961,6 +983,7 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 	u32 val = 0;
 	u32 rxtx_bolero_codec = 0;
         u32 va_bolero_codec = 0;
+	u32 auxpcm_audio_intf = 0;
 	const struct of_device_id *match;
 
 	match = of_match_node(lahaina_asoc_machine_of_match, dev->of_node);
@@ -1027,6 +1050,26 @@ static struct snd_soc_card *populate_snd_card_dailinks(struct device *dev, int w
 					msm_mi2s_dai_links,
 					sizeof(msm_mi2s_dai_links));
 			total_links += ARRAY_SIZE(msm_mi2s_dai_links);
+		}
+
+		// AUX PCM BE DAI Links
+		rc = of_property_read_u32(dev->of_node,
+				"qcom,auxpcm-audio-intf", &auxpcm_audio_intf);
+		if (rc) {
+			pr_err("%s: No DT match for auxpcm-audio-intf\n",
+				__func__);
+		} else {
+			if (auxpcm_audio_intf) {
+				pr_err("%s: AUXPCM audio intf enabled, populating DAI links\n",
+					__func__);
+				memcpy(msm_lahaina_dai_links + total_links,
+						msm_auxpcm_be_dai_links,
+						sizeof(msm_auxpcm_be_dai_links));
+				total_links += ARRAY_SIZE(msm_auxpcm_be_dai_links);
+			} else {
+				pr_err("%s: AUXPCM audio intf disabled in DT\n",
+					__func__);
+			}
 		}
 
 		// TDM BE DAI Links
