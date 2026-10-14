@@ -48,12 +48,12 @@ module_param_named(debug_mask, audio_pkt_debug_mask, int, 0664);
 #define AUDIO_PKT_BUF_SIZE SZ_4K
 #define AUDIO_PKT_BACKUP_BUFFERS_NUM 10
 
-#if IS_ENABLED(IPC_LOGGING_ENABLED)
-static void *audio_pkt_ilctxt;
-
 enum {
 	AUDIO_PKT_INFO = 1U << 0,
 };
+
+#if IS_ENABLED(IPC_LOGGING_ENABLED)
+static void *audio_pkt_ilctxt;
 
 #define AUDIO_PKT_INFO(x, ...)						\
 
@@ -74,7 +74,9 @@ do {									      \
 
 #define AUDIO_PKT_INFO(x, ...) \
 do { \
-	pr_info("[%s]: "x, __func__, ##__VA_ARGS__); \
+	if (audio_pkt_debug_mask & AUDIO_PKT_INFO) { \
+		pr_info("[%s]: "x, __func__, ##__VA_ARGS__); \
+	} \
 } while(0)
 
 #define AUDIO_PKT_ERR(x, ...)						      \
