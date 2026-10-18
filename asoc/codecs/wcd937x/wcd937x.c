@@ -41,7 +41,7 @@
 #define WCD937X_VERSION_ENTRY_SIZE 32
 #define EAR_RX_PATH_AUX 1
 
-#define NUM_ATTEMPTS 5
+#define NUM_ATTEMPTS 20
 
 #define WCD937X_RATES (SNDRV_PCM_RATE_8000 | SNDRV_PCM_RATE_16000 |\
 			SNDRV_PCM_RATE_32000 | SNDRV_PCM_RATE_48000 |\
@@ -1760,7 +1760,7 @@ static int wcd937x_get_logical_addr(struct swr_device *swr_dev)
 				"%s get devnum %d for dev addr %llx failed\n",
 				__func__, devnum, swr_dev->addr);
 			/* retry after 1ms */
-			usleep_range(1000, 1010);
+			usleep_range(4000, 4010);
 		}
 	} while (ret && --num_retry);
 	swr_dev->dev_num = devnum;
