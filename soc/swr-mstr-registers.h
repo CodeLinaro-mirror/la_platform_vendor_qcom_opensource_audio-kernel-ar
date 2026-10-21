@@ -69,7 +69,7 @@
 #define SWRM_INTERRUPT_STATUS_SPECIAL_CMD_ID_FINISHED           0x100000
 #define SWRM_INTERRUPT_MAX                                      0x20
 #else
-#define SWRM_INTERRUPT_EN(n)                      SWRM_CPU1_INTERRUPT_EN(n)
+#define SWRM_INTERRUPT_EN(n)                      (SWRM_BASE+0x0204*n)
 #define SWRM_INTERRUPT_EN_1(n)                    (SWRM_BASE+0x0224*n)
 #define SWRM_CMD_FIFO_WR_CMD(n)                   (SWRM_BASE+0x0300*n)
 #define SWRM_CMD_FIFO_RD_CMD(n)                   (SWRM_BASE+0x0304*n)

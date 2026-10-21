@@ -4119,10 +4119,6 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
         }
         wcd937x_info_create_codec_entry(pdata->codec_root, component);
 
-        codec_reg_done = true;
-	msm_common_dai_link_init(rtd);
-
-
 	 mbhc_calibration = def_wcd_mbhc_cal();
         if (!mbhc_calibration)
                 return -ENOMEM;
@@ -4136,6 +4132,8 @@ static int msm_rx_tx_codec_init(struct snd_soc_pcm_runtime *rtd)
         }
 
 done:
+        codec_reg_done = true;
+	msm_common_dai_link_init(rtd);
         return 0;
 
 err:
@@ -5183,6 +5181,11 @@ static int msm_asoc_machine_probe(struct platform_device *pdev)
 			sizeof(struct msm_asoc_mach_data), GFP_KERNEL);
 	if (!pdata)
 		return -ENOMEM;
+
+	of_property_read_u32(pdev->dev.of_node,
+				"qcom,wcd-disabled",
+				&pdata->wcd_disabled);
+
 	card = populate_snd_card_dailinks(&pdev->dev);
 	if (!card) {
 		dev_err(&pdev->dev, "%s: Card uninitialized\n", __func__);

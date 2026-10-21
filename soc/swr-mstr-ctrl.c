@@ -1049,8 +1049,10 @@ static int swrm_cmd_fifo_wr_cmd(struct swr_mstr_ctrl *swrm, u8 cmd_data,
 	 * Check for outstanding cmd wrt. write fifo depth to avoid
 	 * overflow.
 	 */
-	usleep_range(500, 550);
-	swrm_wait_for_fifo_avail(swrm, SWRM_WR_CHECK_AVAIL);
+	if (!swrm->write) {
+		usleep_range(500, 550);
+		swrm_wait_for_fifo_avail(swrm, SWRM_WR_CHECK_AVAIL);
+	}
 	swr_master_write(swrm, SWRM_CMD_FIFO_WR_CMD(swrm->ee_val), val);
 	/*
 	 * wait for FIFO WR command to complete to avoid overflow
