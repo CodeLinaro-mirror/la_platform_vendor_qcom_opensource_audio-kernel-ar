@@ -6,6 +6,12 @@
 
 #include <sound/soc.h>
 
+#if IS_ENABLED(CONFIG_SND_SOC_WAIPIO)
+#define MSM_BTFMSLIM_CODEC_NAME "btfmslim_slave"
+#else
+#define MSM_BTFMSLIM_CODEC_NAME "btfmslim"
+#endif
+
 SND_SOC_DAILINK_DEFS(usb_audio_rx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
 	DAILINK_COMP_ARRAY(COMP_DUMMY()),
@@ -23,13 +29,13 @@ SND_SOC_DAILINK_DEFS(pcm_dummy_tx0,
 
 SND_SOC_DAILINK_DEFS(slimbus_7_rx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim",
+	DAILINK_COMP_ARRAY(COMP_CODEC(MSM_BTFMSLIM_CODEC_NAME,
 			"btfm_bt_sco_a2dp_slim_rx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
 SND_SOC_DAILINK_DEFS(slimbus_7_tx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim",
+	DAILINK_COMP_ARRAY(COMP_CODEC(MSM_BTFMSLIM_CODEC_NAME,
 			"btfm_bt_sco_slim_tx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
@@ -41,7 +47,7 @@ SND_SOC_DAILINK_DEFS(slimbus_8_fmtx,
 
 SND_SOC_DAILINK_DEFS(slimbus_8_tx,
 	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
-	DAILINK_COMP_ARRAY(COMP_CODEC("btfmslim",
+	DAILINK_COMP_ARRAY(COMP_CODEC(MSM_BTFMSLIM_CODEC_NAME,
 			"btfm_fm_slim_tx")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
