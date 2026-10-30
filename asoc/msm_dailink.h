@@ -703,6 +703,13 @@ SND_SOC_DAILINK_DEFS(sen_tdm_wsa885x_i2c_rx_virt_c2,
 	DAILINK_COMP_ARRAY(COMP_CODEC("wsa885x_i2c", "wsa885x_dai_drv_virt_c2")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
 
+SND_SOC_DAILINK_DEFS(quat_mi2s_rx_hdmi,
+	DAILINK_COMP_ARRAY(COMP_CPU("snd-soc-dummy-dai")),
+	DAILINK_COMP_ARRAY(COMP_CODEC(
+			"soc:qcom,msm-ext-disp:qcom,msm-ext-disp-audio-codec-rx",
+			"msm_hdmi_audio_codec_rx_dai")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("snd-soc-dummy")));
+
 // QAIF CPU DAILINK DEFINITION
 SND_SOC_DAILINK_DEFS(rx_qaif_dma_rx0,
 	DAILINK_COMP_ARRAY(COMP_CPU("CDC DMA RX0")),
@@ -719,6 +726,13 @@ SND_SOC_DAILINK_DEFS(va_qaif_dma_tx0,
 	DAILINK_COMP_ARRAY(COMP_CPU("CDC DMA VA0")),
 	DAILINK_COMP_ARRAY(COMP_CODEC("lpass-cdc", "va_macro_tx1"),
 						COMP_CODEC("rouleur-codec", "rouleur_cdc")),
+	DAILINK_COMP_ARRAY(COMP_PLATFORM("a000000.audio")));
+
+SND_SOC_DAILINK_DEFS(quat_qaif_mi2s_rx_hdmi,
+	DAILINK_COMP_ARRAY(COMP_CPU("Quaternary MI2S")),
+	DAILINK_COMP_ARRAY(COMP_CODEC(
+			"soc:qcom,msm-ext-disp:qcom,msm-ext-disp-audio-codec-rx",
+			"msm_hdmi_audio_codec_rx_dai")),
 	DAILINK_COMP_ARRAY(COMP_PLATFORM("a000000.audio")));
 
 SND_SOC_DAILINK_DEFS(quin_qaif_mi2s_rx,
